@@ -34,7 +34,7 @@ Now supports
 * Microsoft Windows 10 (1903/1909/2004/20H2)
 * Microsoft Edge (Chromium)
 * Microsoft OneDrive
-* Microsoct Office
+* Microsoft Office
 * FSLogix
 
 # Notes
