@@ -36,6 +36,7 @@ Now supports
 * Microsoft OneDrive
 * Microsoft Office
 * FSLogix
+* Google Chrome
 
 # Notes
 

@@ -37,17 +37,17 @@ param(
 )
 
 #region init
-$admxversions = @()
+$admxversions = $null
 if (-not $WorkingDirectory) { $WorkingDirectory = $PSScriptRoot }
-if (Test-Path -Path "$($WorkingDirectory)\admxversions.json") { $admxversions = Get-Content -Path "$($WorkingDirectory)\admxversions.json" | ConvertFrom-Json }
+if (Test-Path -Path "$($WorkingDirectory)\admxversions.xml") { $admxversions = Import-Clixml -Path "$($WorkingDirectory)\admxversions.xml" }
 if (-not (Test-Path -Path "$($WorkingDirectory)\admx\en-US")) { $null = mkdir -Path "$($WorkingDirectory)\admx\en-US" -Force }
 if (-not (Test-Path -Path "$($WorkingDirectory)\downloads")) { $null = mkdir -Path "$($WorkingDirectory)\downloads" -Force }
 if ($PolicyStore -and -not $PolicyStore.EndsWith("\")) { $policypath += "\" }
 
 Write-Verbose "WorkingDirectory:`t$($WorkingDirectory)"
-Write-Verbose "Admx path:`t`t`t$($WorkingDirectory)\admx"
-Write-Verbose "Download path:`t`t$($WorkingDirectory)\downloads"
-Write-Verbose "PolicyStore:`t`t$($PolicyStore)"
+Write-Verbose "Admx path:`t$($WorkingDirectory)\admx"
+Write-Verbose "Download path:`t$($WorkingDirectory)\downloads"
+Write-Verbose "PolicyStore:`t$($PolicyStore)"
 #endregion
 
 #region functions
@@ -215,6 +215,31 @@ function Get-MicrosoftEdgePolicyOnline {
         Throw $_
     }
 
+}
+
+function Get-GoogleChromeAdmxOnline {
+<#
+    .SYNOPSIS
+    Returns latest Version and Uri for the Google Chrome Admx files
+#>
+
+    try {
+        $ProgressPreference = 'SilentlyContinue'
+        $URI = "https://dl.google.com/dl/edgedl/chrome/policy/policy_templates.zip"
+        # download the file
+        Invoke-WebRequest -Uri $URI -OutFile "$($env:TEMP)\policy_templates.zip"
+        # extract the file
+        Expand-Archive -Path "$($env:TEMP)\policy_templates.zip" -DestinationPath "$($env:TEMP)\chromeadmx" -Force
+        # open the version file
+        $versionfile = (Get-Content -Path "$($env:TEMP)\chromeadmx\VERSION").Split('=')
+        $Version = "$($versionfile[1]).$($versionfile[3]).$($versionfile[5]).$($versionfile[7])"
+
+        # return evergreen object
+        return @{ Version = $Version; URI = $URI }
+    }
+    catch {
+        Throw $_
+    }
 }
 
 function Get-FSLogixAdmx {
@@ -527,27 +552,108 @@ function Get-MicrosoftEdgeAdmx {
         return $null
     }
 }
+
+function Get-GoogleChromeAdmx {
+<#
+    .SYNOPSIS
+    Process Google Chrome Admx files
+
+    .PARAMETER Version
+    Current Version present
+
+    .PARAMETER PolicyStore
+    Destination for the Admx files
+#>
+
+    param(
+        [string]$Version,
+        [string]$PolicyStore = $null
+    )
+
+    $evergreen = Get-GoogleChromeAdmxOnline
+
+    # see if this is a newer version
+    if (-not $Version -or [version]$evergreen.Version -gt [version]$Version) {
+        # download and process
+        $outfile = "$($WorkingDirectory)\downloads\googlechromeadmx.zip"
+        try {
+            # download
+            $ProgressPreference = 'SilentlyContinue'
+            Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
+            Invoke-WebRequest -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
+
+            # extract
+            Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\chromeadmx'"
+            Expand-Archive -Path $outfile -DestinationPath "$($env:TEMP)\chromeadmx" -Force
+
+            # copy
+            Write-Verbose "Copying Admx files from '$($env:TEMP)\chromeadmx\windows\admx\' to '$($WorkingDirectory)\admx'"
+            Copy-Item -Path "$($env:TEMP)\chromeadmx\windows\admx\*.admx" -Destination "$($WorkingDirectory)\admx" -Force
+            Copy-Item -Path "$($env:TEMP)\chromeadmx\windows\admx\en-us\*.adml" -Destination "$($WorkingDirectory)\admx\en-US" -Force
+            if ($PolicyStore) {
+                Write-Verbose "Copying Admx files from '$($env:TEMP)\chromeadmx\windows\admx\' to '$($PolicyStore)'"
+                Copy-Item -Path "$($env:TEMP)\chromeadmx\windows\admx\*.admx" -Destination "$($PolicyStore)" -Force
+                Copy-Item -Path "$($env:TEMP)\chromeadmx\windows\admx\en-us\*.adml" -Destination "$($PolicyStore)\en-US" -Force
+            }
+
+            # chrome update admx is a seperate download
+            $url = "https://dl.google.com/dl/update2/enterprise/googleupdateadmx.zip"
+
+            # download
+            $outfile = "$($WorkingDirectory)\downloads\googlechromeupdateadmx.zip"
+            Write-Verbose "Downloading '$($url)' to '$($outfile)'"
+            Invoke-WebRequest -Uri $url -UseBasicParsing -OutFile $outfile
+
+            # extract
+            Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\chromeupdateadmx'"
+            Expand-Archive -Path $outfile -DestinationPath "$($env:TEMP)\chromeupdateadmx" -Force
+
+            # copy
+            Write-Verbose "Copying Admx files from '$($env:TEMP)\chromeupdateadmx\GoogleUpdateAdmx\' to '$($WorkingDirectory)\admx'"
+            Copy-Item -Path "$($env:TEMP)\chromeupdateadmx\GoogleUpdateAdmx\*.admx" -Destination "$($WorkingDirectory)\admx" -Force
+            Copy-Item -Path "$($env:TEMP)\chromeupdateadmx\GoogleUpdateAdmx\en-us\*.adml" -Destination "$($WorkingDirectory)\admx\en-US" -Force
+            if ($PolicyStore) {
+                Write-Verbose "Copying Admx files from '$($env:TEMP)\chromeupdateadmx\GoogleUpdateAdmx\' to '$($PolicyStore)'"
+                Copy-Item -Path "$($env:TEMP)\chromeupdateadmx\GoogleUpdateAdmx\*.admx" -Destination "$($PolicyStore)" -Force
+                Copy-Item -Path "$($env:TEMP)\chromeupdateadmx\GoogleUpdateAdmx\en-us\*.adml" -Destination "$($PolicyStore)\en-US" -Force
+            }
+
+            return $evergreen
+        }
+        catch {
+            Throw $_
+        }
+    } else {
+        # version already processed
+        return $null
+    }
+}
+
 #endregion
 
 Write-Verbose "Processing Admx files for Windows 10 $($WindowsVersion)"
-$admx = Get-Windows10Admx -Version $admxversions.Windows.Version -PolicyStore $policystore -WindowsVersion $WindowsVersion
-if ($admx) { if ($admxversions.Windows) { $admxversions.Windows = $admx } else { $admxversions += @{ Windows = $admx } } }
+$admx = Get-Windows10Admx -Version $admxversions.Windows.Version -PolicyStore $PolicyStore -WindowsVersion $WindowsVersion
+if ($admx) { if ($admxversions.Windows) { $admxversions.Windows = $admx } else { $admxversions += @{ Windows = @{ Version = $admx.Version; URI = $admx.URI } } } }
 
 Write-Verbose "Processing Admx files for Microsoft Edge (Chromium)"
-$admx = Get-MicrosoftEdgeAdmx -Version $admxversions.Edge.Version -PolicyStore $policystore
-if ($admx) { if ($admxversions.Edge) { $admxversions.Edge = $admx } else { $admxversions += @{ Edge = $admx } } }
+$admx = Get-MicrosoftEdgeAdmx -Version $admxversions.Edge.Version -PolicyStore $PolicyStore
+if ($admx) { if ($admxversions.Edge) { $admxversions.Edge = $admx } else { $admxversions += @{ Edge = @{ Version = $admx.Version; URI = $admx.URI } } } }
 
 Write-Verbose "Processing Admx files for Microsoft OneDrive"
-$admx = Get-OneDriveAdmx -Version $admxversions.OneDrive.Version -PolicyStore $policystore
-if ($admx) { if ($admxversions.OneDrive) { $admxversions.OneDrive = $admx } else { $admxversions += @{ OneDrive = $admx } } }
+$admx = Get-OneDriveAdmx -Version $admxversions.OneDrive.Version -PolicyStore $PolicyStore
+if ($admx) { if ($admxversions.OneDrive) { $admxversions.OneDrive = $admx } else { $admxversions += @{ OneDrive = @{ Version = $admx.Version; URI = $admx.URI } } } }
 
 Write-Verbose "Processing Admx files for Microsoft Office"
-$admx = Get-MicrosoftOfficeAdmx -Version $admxversions.Office.Version -PolicyStore $policystore -Architecture "x64"
-if ($admx) { if ($admxversions.Office) { $admxversions.Office = $admx } else { $admxversions += @{ Office = $admx } } }
+$admx = Get-MicrosoftOfficeAdmx -Version $admxversions.Office.Version -PolicyStore $PolicyStore -Architecture "x64"
+if ($admx) { if ($admxversions.Office) { $admxversions.Office = $admx } else { $admxversions += @{ Office = @{ Version = $admx.Version; URI = $admx.URI } } } }
 
 Write-Verbose "Processing Admx files for FSLogix"
-$admx = Get-FSLogixAdmx -Version $admxversions.FSLogix.Version -PolicyStore $policystore
-if ($admx) { if ($admxversions.FSLogix) { $admxversions.FSLogix = $admx } else { $admxversions += @{ FSLogix = $admx } } }
+$admx = Get-FSLogixAdmx -Version $admxversions.FSLogix.Version -PolicyStore $PolicyStore
+if ($admx) { if ($admxversions.FSLogix) { $admxversions.FSLogix = $admx } else { $admxversions += @{ FSLogix = @{ Version = $admx.Version; URI = $admx.URI } } } }
 
-Write-Verbose "Saving Admx versions to '$($WorkingDirectory)\admxversions.json'"
-$admxversions | ConvertTo-Json | Out-File -FilePath "$($WorkingDirectory)\admxversions.json" -Force
+Write-Verbose "Processing Admx files for Google Chrome"
+$admx = Get-GoogleChromeAdmx -Version $admxversions.GoogleChrome.Version -PolicyStore $PolicyStore
+if ($admx) { if ($admxversions.GoogleChrome) { $admxversions.GoogleChrome = $admx } else { $admxversions += @{ GoogleChrome = @{ Version = $admx.Version; URI = $admx.URI } } } }
+
+Write-Verbose "Saving Admx versions to '$($WorkingDirectory)\admxversions.xml'"
+$admxversions | Export-Clixml -Path "$($WorkingDirectory)\admxversions.xml" -Force

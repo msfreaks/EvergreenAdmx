@@ -1,5 +1,10 @@
 # Change Log
 
+## 2012.3
+
+* Added Admx for Google Chrome
+* Fixed bug where hash for json output would throw an error. Switched to Xml output.
+
 ## 2012.2
 
 * Added .xml file for Scheduled Task creation
