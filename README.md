@@ -1,6 +1,7 @@
 # About
 
 [![License][license-badge]][license]
+
 After deploying several Windows Virtual Desktop environments I decided I no longer wanted to manually download the Admx files I needed, and I wanted a way to keep them up-to-date.
 
 This script solves both problems.
