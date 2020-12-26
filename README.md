@@ -10,6 +10,18 @@ This script solves both problems.
 
 The name I chose for this script is an ode to the Evergreen module (https://github.com/aaronparker/Evergreen) by Aaron Parker (@stealthpuppy).
 
+# How to use
+
+Quick start:
+* Download the script to a location of your chosing (for example: C:\Scripts\EvergreenAdmx)
+* Run or schedule the script
+
+I have scheduled the script to run daily using the following command:
+
+`
+EvergreenAdmx.ps1 -WindowsVersion "20H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions"
+`
+
 [github-release-badge]: https://img.shields.io/github/release/msfreaks/EvergreenAdmx.svg?style=flat-square
 [github-release]: https://github.com/msfreaks/EvergreenAdmx/releases/latest
 [license-badge]: https://img.shields.io/github/license/msfreaks/EvergreenAdmx.svg?style=flat-square
