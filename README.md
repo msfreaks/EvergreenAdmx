@@ -1,6 +1,7 @@
 # About
 
 [![License][license-badge]][license]
+[![Release][github-release-badge]][github-release]
 
 After deploying several Windows Virtual Desktop environments I decided I no longer wanted to manually download the Admx files I needed, and I wanted a way to keep them up-to-date.
 
@@ -23,9 +24,18 @@ EvergreenAdmx.ps1 -WindowsVersion "20H2" -PolicyStore "C:\Windows\SYSVOL\domain\
 `
 The above execution will keep the central Policy Store up-to-date on a daily basis.
 
+A sample .xml file that you can import in Task Scheduler is provided with this script.
+
 # Admx files
 
 See [Change Log](https://github.com/msfreaks/EvergreenAdmx/blob/main/CHANGELOG.md) for a list of supported products.
+
+Now supports
+* Microsoft Windows 10 (1903/1909/2004/20H2)
+* Microsoft Edge (Chromium)
+* Microsoft OneDrive
+* Microsoct Office
+* FSLogix
 
 # Notes
 
