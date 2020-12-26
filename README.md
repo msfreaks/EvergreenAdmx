@@ -16,11 +16,23 @@ Quick start:
 * Download the script to a location of your chosing (for example: C:\Scripts\EvergreenAdmx)
 * Run or schedule the script
 
-I have scheduled the script to run daily using the following command:
+I have scheduled the script to run daily:
 
 `
 EvergreenAdmx.ps1 -WindowsVersion "20H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions"
 `
+The above execution will keep the central Policy Store up-to-date on a daily basis.
+
+# Admx files
+
+See [Change Log](https://github.com/msfreaks/EvergreenAdmx/blob/main/CHANGELOG.md) for a list of supported products.
+
+# Notes
+
+I have not tested this script on Windows Core.
+Some of the Admx files can only be obtained by installing the package that was downloaded. For instance, the Windows 10 Admx files are in an msi file, the OneDrive Admx files are in the installation folder after installing OneDrive.
+So this is what the script does for these packages: installing the package, copying the Admx files, uninstalling the package.
+
 
 [github-release-badge]: https://img.shields.io/github/release/msfreaks/EvergreenAdmx.svg?style=flat-square
 [github-release]: https://github.com/msfreaks/EvergreenAdmx/releases/latest
