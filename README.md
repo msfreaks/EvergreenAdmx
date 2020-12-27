@@ -35,9 +35,11 @@ Also see [Change Log](https://github.com/msfreaks/EvergreenAdmx/blob/main/CHANGE
 
 Now supports
 *  Adobe Acrobat Reader DC
+*  Base Image Script Framework (BIS-F)
 *  Citrix Workspace App
 *  FSLogix
 *  Google Chrome
+*  Microsoft Desktop Optimization Pack
 *  Microsoft Edge (Chromium)
 *  Microsoft Office
 *  Microsoft OneDrive

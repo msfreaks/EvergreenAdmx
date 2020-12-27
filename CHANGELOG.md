@@ -5,6 +5,13 @@
 *  Create module structure and publish to PowerShell Gallery
 *  Add logging options
 *  Add notification options
+*  Provide easier way for users to define which products to process
+
+## 2012.5
+
+*  Added Admx for Base Image Script Framework (BIS-F)
+*  Added Admx for Microsoft Desktop Optimization Pack (disabled by default)
+*  Updated cleanup logic
 
 ## 2012.4
 

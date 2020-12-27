@@ -107,7 +107,7 @@ function Get-MicrosoftOfficeAdmxOnline {
         $ProgressPreference = 'SilentlyContinue'
         # load page for version scrape
         $web = Invoke-WebRequest -UseBasicParsing -Uri $urlversion -ErrorAction SilentlyContinue
-        $str = ($web.ToString() -split "[`r`n]" | select-string "Version:").ToString()
+        $str = ($web.ToString() -split "[`r`n]" | Select-String "Version:").ToString()
         # grab version
         $Version = ($str | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
         # load page for uri scrape
@@ -151,7 +151,7 @@ function Get-Windows10AdmxOnline {
         $ProgressPreference = 'SilentlyContinue'
         # load page for version scrape
         $web = Invoke-WebRequest -UseBasicParsing -Uri $urlversion -ErrorAction SilentlyContinue
-        $str = ($web.ToString() -split "[`r`n]" | select-string "Version:").ToString()
+        $str = ($web.ToString() -split "[`r`n]" | Select-String "Version:").ToString()
         # grab version
         $Version = "$($DownloadId).$(($str | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString())"
         # load page for uri scrape
@@ -312,7 +312,7 @@ function Get-CitrixWorkspaceAppAdmxOnline {
 function Get-MozillaFirefoxAdmxOnline {
 <#
     .SYNOPSIS
-    Returns latest Version and Uri for Citrix Workspace App ADMX files
+    Returns latest Version and Uri for Mozilla Firefox ADMX files
 #>
 
     try {
@@ -357,7 +357,61 @@ function Get-ZoomDesktopClientAdmxOnline {
     catch {
         Throw $_
     }
+}
 
+function Get-BIS-FAdmxOnline {
+<#
+    .SYNOPSIS
+    Returns latest Version and Uri for BIS-F ADMX files
+#>
+
+    try {
+        $ProgressPreference = 'SilentlyContinue'
+        # define github repo
+        $repo = "EUCweb/BIS-F"
+        # grab latest release properties
+        $latest = (Invoke-WebRequest -Uri "https://api.github.com/repos/$($repo)/releases" -UseBasicParsing | ConvertFrom-Json)[0]
+
+        # grab version
+        $Version = ($latest.tag_name | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
+        # grab uri
+        $URI = $latest.zipball_url
+
+        # return evergreen object
+        return @{ Version = $Version; URI = $URI }
+    }
+    catch {
+        Throw $_
+    }
+}
+
+function Get-MDOPAdmxOnline {
+<#
+    .SYNOPSIS
+    Returns latest Version and Uri for the Desktop Optimization Pack Admx files (both x64 and x86)
+#>
+
+    $id = "55531"
+    $urlversion = "https://www.microsoft.com/en-us/download/details.aspx?id=$($id)"
+    $urldownload = "https://www.microsoft.com/en-us/download/confirmation.aspx?id=$($id)"
+    try {
+        $ProgressPreference = 'SilentlyContinue'
+        # load page for version scrape
+        $web = Invoke-WebRequest -UseBasicParsing -Uri $urlversion -ErrorAction SilentlyContinue
+        $str = ($web.ToString() -split "[`r`n]" | Select-String "Version:").ToString()
+        # grab version
+        $Version = ($str | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
+        # load page for uri scrape
+        $web = Invoke-WebRequest -UseBasicParsing -Uri $urldownload -ErrorAction SilentlyContinue -MaximumRedirection 0
+        # grab download url
+        $href = $web.Links | Where-Object { $_.outerHTML -like "*click here to download manually*" }
+
+        # return evergreen object
+        return @{ Version = $Version; URI = $href.href }
+    }
+    catch {
+        Throw $_
+    }
 }
 
 function Get-FSLogixAdmx {
@@ -402,6 +456,9 @@ function Get-FSLogixAdmx {
                 Copy-Item -Path "$($env:TEMP)\fslogix\*.admx" -Destination "$($PolicyStore)" -Force
                 Copy-Item -Path "$($env:TEMP)\fslogix\*.adml" -Destination "$($PolicyStore)\en-US" -Force
             }
+
+            # cleanup
+            Remove-Item -Path "$($env:TEMP)\fslogix" -Recurse -Force
 
             return $evergreen
         }
@@ -460,6 +517,9 @@ function Get-MicrosoftOfficeAdmx {
                 Copy-Item -Path "$($env:TEMP)\office\admx\*.admx" -Destination "$($PolicyStore)" -Force
                 Copy-Item -Path "$($env:TEMP)\office\admx\en-us\*.adml" -Destination "$($PolicyStore)\en-US" -Force
             }
+
+            # cleanup
+            Remove-Item -Path "$($env:TEMP)\office" -Recurse -Force
 
             return $evergreen
         }
@@ -660,6 +720,9 @@ function Get-MicrosoftEdgeAdmx {
                 Copy-Item -Path "$($env:TEMP)\microsoftedgepolicy\windows\admx\en-us\*.adml" -Destination "$($PolicyStore)\en-US" -Force
             }
 
+            # cleanup
+            Remove-Item -Path "$($env:TEMP)\microsoftedgepolicy" -Recurse -Force
+
             return $evergreen
         }
         catch {
@@ -714,6 +777,9 @@ function Get-GoogleChromeAdmx {
                 Copy-Item -Path "$($env:TEMP)\chromeadmx\windows\admx\en-us\*.adml" -Destination "$($PolicyStore)\en-US" -Force
             }
 
+            # cleanup
+            Remove-Item -Path "$($env:TEMP)\chromeadmx" -Recurse -Force
+
             # chrome update admx is a seperate download
             $url = "https://dl.google.com/dl/update2/enterprise/googleupdateadmx.zip"
 
@@ -735,6 +801,9 @@ function Get-GoogleChromeAdmx {
                 Copy-Item -Path "$($env:TEMP)\chromeupdateadmx\GoogleUpdateAdmx\*.admx" -Destination "$($PolicyStore)" -Force
                 Copy-Item -Path "$($env:TEMP)\chromeupdateadmx\GoogleUpdateAdmx\en-us\*.adml" -Destination "$($PolicyStore)\en-US" -Force
             }
+
+            # cleanup
+            Remove-Item -Path "$($env:TEMP)\chromeupdateadmx" -Recurse -Force
 
             return $evergreen
         }
@@ -790,6 +859,9 @@ function Get-AdobeAcrobatReaderDCAdmx {
                 Copy-Item -Path "$($env:TEMP)\acrobatreaderdc\*.adml" -Destination "$($PolicyStore)\en-US" -Force
             }
 
+            # cleanup
+            Remove-Item -Path "$($env:TEMP)\acrobatreaderdc" -Recurse -Force
+
             return $evergreen
         }
         catch {
@@ -843,6 +915,9 @@ function Get-CitrixWorkspaceAppAdmx {
                 Copy-Item -Path "$($env:TEMP)\citrixworkspaceapp\$([io.path]::GetFileNameWithoutExtension($evergreen.URI.Split("/")[-1].Split("?")[0]))\Configuration\*.admx" -Destination "$($PolicyStore)" -Force
                 Copy-Item -Path "$($env:TEMP)\citrixworkspaceapp\$([io.path]::GetFileNameWithoutExtension($evergreen.URI.Split("/")[-1].Split("?")[0]))\Configuration\en-us\*.adml" -Destination "$($PolicyStore)\en-US" -Force
             }
+
+            # cleanup
+            Remove-Item -Path "$($env:TEMP)\citrixworkspaceapp" -Recurse -Force
 
             return $evergreen
         }
@@ -898,6 +973,9 @@ function Get-MozillaFirefoxAdmx {
                 Copy-Item -Path "$($env:TEMP)\firefoxadmx\windows\en-us\*.adml" -Destination "$($PolicyStore)\en-US" -Force
             }
 
+            # cleanup
+            Remove-Item -Path "$($env:TEMP)\firefoxadmx" -Recurse -Force
+
             return $evergreen
         }
         catch {
@@ -952,6 +1030,149 @@ function Get-ZoomDesktopClientAdmx {
                 Copy-Item -Path "$($env:TEMP)\zoomclientadmx\$([io.path]::GetFileNameWithoutExtension($evergreen.URI.Split("/")[-1]))\en-us\*.adml" -Destination "$($PolicyStore)\en-US" -Force
             }
 
+            # cleanup
+            Remove-Item -Path "$($env:TEMP)\zoomclientadmx" -Recurse -Force
+
+            return $evergreen
+        }
+        catch {
+            Throw $_
+        }
+    } else {
+        # version already processed
+        return $null
+    }
+}
+
+function Get-BIS-FAdmx {
+<#
+    .SYNOPSIS
+    Process BIS-F Admx files
+
+    .PARAMETER Version
+    Current Version present
+
+    .PARAMETER PolicyStore
+    Destination for the Admx files
+#>
+
+    param(
+        [string]$Version,
+        [string]$PolicyStore = $null
+    )
+
+    $evergreen = Get-BIS-FAdmxOnline
+
+    # see if this is a newer version
+    if (-not $Version -or [version]$evergreen.Version -gt [version]$Version) {
+        # download and process
+        $outfile = "$($WorkingDirectory)\downloads\bis-f.$($evergreen.Version).zip"
+        try {
+            # download
+            $ProgressPreference = 'SilentlyContinue'
+            Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
+            Invoke-WebRequest -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
+
+            # extract
+            Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\bisfadmx'"
+            Expand-Archive -Path $outfile -DestinationPath "$($env:TEMP)\bisfadmx" -Force
+
+            # find extraction folder
+            Write-Verbose "Finding extraction folder"
+            $folder = (Get-ChildItem -Path "$($env:TEMP)\bisfadmx" | Sort-Object LastWriteTime -Descending)[0].Name
+
+            # copy
+            Write-Verbose "Copying Admx files from '$($env:TEMP)\bisfadmx\$($folder)\admx\' to '$($WorkingDirectory)\admx'"
+            Copy-Item -Path "$($env:TEMP)\bisfadmx\$($folder)\admx\*.admx" -Destination "$($WorkingDirectory)\admx" -Force
+            Copy-Item -Path "$($env:TEMP)\bisfadmx\$($folder)\admx\en-us\*.adml" -Destination "$($WorkingDirectory)\admx\en-US" -Force
+            if ($PolicyStore) {
+                Write-Verbose "Copying Admx files from '$($env:TEMP)\bisfadmx\$($folder)\admx\' to '$($PolicyStore)'"
+                Copy-Item -Path "$($env:TEMP)\bisfadmx\$($folder)\admx\*.admx" -Destination "$($PolicyStore)" -Force
+                Copy-Item -Path "$($env:TEMP)\bisfadmx\$($folder)\admx\en-us\*.adml" -Destination "$($PolicyStore)\en-US" -Force
+            }
+
+            # cleanup
+            Remove-Item -Path "$($env:TEMP)\bisfadmx" -Recurse -Force
+
+            return $evergreen
+        }
+        catch {
+            Throw $_
+        }
+    } else {
+        # version already processed
+        return $null
+    }
+}
+
+function Get-MDOPAdmx {
+<#
+    .SYNOPSIS
+    Process MDOP Admx files
+
+    .PARAMETER Version
+    Current Version present
+
+    .PARAMETER PolicyStore
+    Destination for the Admx files
+#>
+
+    param(
+        [string]$Version,
+        [string]$PolicyStore = $null
+    )
+
+    $evergreen = Get-MDOPAdmxOnline
+
+    # see if this is a newer version
+    if (-not $Version -or [version]$evergreen.Version -gt [version]$Version) {
+        # download and process
+        $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1])"
+        try {
+            # download
+            $ProgressPreference = 'SilentlyContinue'
+            Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
+            Invoke-WebRequest -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
+
+            # extract
+            Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\mdopadmx'"
+            $null = (expand "$($outfile)" -F:* "$($env:TEMP)\mdopadmx")
+
+            # find app-v folder
+            Write-Verbose "Finding App-V folder"
+            $appvfolder = (Get-ChildItem -Path "$($env:TEMP)\mdopadmx" -Filter "App-V*" | Sort-Object Name -Descending)[0].Name
+
+            Write-Verbose "Finding MBAM folder"
+            $mbamfolder = (Get-ChildItem -Path "$($env:TEMP)\mdopadmx" -Filter "MBAM*" | Sort-Object Name -Descending)[0].Name
+
+            Write-Verbose "Finding UE-V folder"
+            $uevfolder = (Get-ChildItem -Path "$($env:TEMP)\mdopadmx" -Filter "UE-V*" | Sort-Object Name -Descending)[0].Name
+
+            # copy
+            Write-Verbose "Copying Admx files from '$($env:TEMP)\mdopadmx\$($appvfolder)\' to '$($WorkingDirectory)\admx'"
+            Copy-Item -Path "$($env:TEMP)\mdopadmx\$($appvfolder)\*.admx" -Destination "$($WorkingDirectory)\admx" -Force
+            Copy-Item -Path "$($env:TEMP)\mdopadmx\$($appvfolder)\en-us\*.adml" -Destination "$($WorkingDirectory)\admx\en-US" -Force
+            Write-Verbose "Copying Admx files from '$($env:TEMP)\mdopadmx\$($mbamfolder)\' to '$($WorkingDirectory)\admx'"
+            Copy-Item -Path "$($env:TEMP)\mdopadmx\$($mbamfolder)\*.admx" -Destination "$($WorkingDirectory)\admx" -Force
+            Copy-Item -Path "$($env:TEMP)\mdopadmx\$($mbamfolder)\en-us\*.adml" -Destination "$($WorkingDirectory)\admx\en-US" -Force
+            Write-Verbose "Copying Admx files from '$($env:TEMP)\mdopadmx\$($uevfolder)\' to '$($WorkingDirectory)\admx'"
+            Copy-Item -Path "$($env:TEMP)\mdopadmx\$($uevfolder)\*.admx" -Destination "$($WorkingDirectory)\admx" -Force
+            Copy-Item -Path "$($env:TEMP)\mdopadmx\$($uevfolder)\en-us\*.adml" -Destination "$($WorkingDirectory)\admx\en-US" -Force
+            if ($PolicyStore) {
+                Write-Verbose "Copying Admx files from '$($env:TEMP)\mdopadmx\$($appvfolder)\' to '$($PolicyStore)'"
+                Copy-Item -Path "$($env:TEMP)\mdopadmx\$($appvfolder)\*.admx" -Destination "$($PolicyStore)" -Force
+                Copy-Item -Path "$($env:TEMP)\mdopadmx\$($appvfolder)\en-us\*.adml" -Destination "$($PolicyStore)\en-US" -Force
+                Write-Verbose "Copying Admx files from '$($env:TEMP)\mdopadmx\$($mbamfolder)\' to '$($PolicyStore)'"
+                Copy-Item -Path "$($env:TEMP)\mdopadmx\$($mbamfolder)\*.admx" -Destination "$($PolicyStore)" -Force
+                Copy-Item -Path "$($env:TEMP)\mdopadmx\$($mbamfolder)\en-us\*.adml" -Destination "$($PolicyStore)\en-US" -Force
+                Write-Verbose "Copying Admx files from '$($env:TEMP)\mdopadmx\$($uevfolder)\' to '$($PolicyStore)'"
+                Copy-Item -Path "$($env:TEMP)\mdopadmx\$($uevfolder)\*.admx" -Destination "$($PolicyStore)" -Force
+                Copy-Item -Path "$($env:TEMP)\mdopadmx\$($uevfolder)\en-us\*.adml" -Destination "$($PolicyStore)\en-US" -Force
+            }
+
+            # cleanup
+            Remove-Item -Path "$($env:TEMP)\mdopadmx" -Recurse -Force
+
             return $evergreen
         }
         catch {
@@ -984,17 +1205,25 @@ Write-Verbose "Processing Admx files for FSLogix"
 $admx = Get-FSLogixAdmx -Version $admxversions.FSLogix.Version -PolicyStore $PolicyStore
 if ($admx) { if ($admxversions.FSLogix) { $admxversions.FSLogix = $admx } else { $admxversions += @{ FSLogix = @{ Version = $admx.Version; URI = $admx.URI } } } }
 
-Write-Verbose "Processing Admx files for Google Chrome"
-$admx = Get-GoogleChromeAdmx -Version $admxversions.GoogleChrome.Version -PolicyStore $PolicyStore
-if ($admx) { if ($admxversions.GoogleChrome) { $admxversions.GoogleChrome = $admx } else { $admxversions += @{ GoogleChrome = @{ Version = $admx.Version; URI = $admx.URI } } } }
-
 Write-Verbose "Processing Admx files for Adobe AcrobatReader DC"
 $admx = Get-AdobeAcrobatReaderDCAdmx -Version $admxversions.AdobeAcrobatReaderDC.Version -PolicyStore $PolicyStore
 if ($admx) { if ($admxversions.AdobeAcrobatReaderDC) { $admxversions.AdobeAcrobatReaderDC = $admx } else { $admxversions += @{ AdobeAcrobatReaderDC = @{ Version = $admx.Version; URI = $admx.URI } } } }
 
+Write-Verbose "Processing Admx files for BIS-F"
+$admx = Get-BIS-FAdmx -Version $admxversions.BISF.Version -PolicyStore $PolicyStore
+if ($admx) { if ($admxversions.BISF) { $admxversions.BISF = $admx } else { $admxversions += @{ BISF = @{ Version = $admx.Version; URI = $admx.URI } } } }
+
 Write-Verbose "Processing Admx files for Citrix Workspace App"
 $admx = Get-CitrixWorkspaceAppAdmx -Version $admxversions.CitrixWorkspaceApp.Version -PolicyStore $PolicyStore
 if ($admx) { if ($admxversions.CitrixWorkspaceApp) { $admxversions.CitrixWorkspaceApp = $admx } else { $admxversions += @{ CitrixWorkspaceApp = @{ Version = $admx.Version; URI = $admx.URI } } } }
+
+Write-Verbose "Processing Admx files for Google Chrome"
+$admx = Get-GoogleChromeAdmx -Version $admxversions.GoogleChrome.Version -PolicyStore $PolicyStore
+if ($admx) { if ($admxversions.GoogleChrome) { $admxversions.GoogleChrome = $admx } else { $admxversions += @{ GoogleChrome = @{ Version = $admx.Version; URI = $admx.URI } } } }
+
+#Write-Verbose "Processing Admx files for Microsoft Desktop Optimization Pack"
+#$admx = Get-MDOPAdmx -Version $admxversions.MDOP.Version -PolicyStore $PolicyStore
+#if ($admx) { if ($admxversions.MDOP) { $admxversions.MDOP = $admx } else { $admxversions += @{ MDOP = @{ Version = $admx.Version; URI = $admx.URI } } } }
 
 Write-Verbose "Processing Admx files for Mozilla Firefox"
 $admx = Get-MozillaFirefoxAdmx -Version $admxversions.MozillaFirefox.Version -PolicyStore $PolicyStore
