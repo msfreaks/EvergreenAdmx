@@ -2,6 +2,7 @@
 
 [![License][license-badge]][license]
 [![Release][github-release-badge]][github-release]
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/c0efab02b66442399bb16b0493cdfbef)](https://www.codacy.com/gh/msfreaks/EvergreenAdmx/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=msfreaks/EvergreenAdmx&amp;utm_campaign=Badge_Grade)
 
 After deploying several Windows Virtual Desktop environments I decided I no longer wanted to manually download the Admx files I needed, and I wanted a way to keep them up-to-date.
 
