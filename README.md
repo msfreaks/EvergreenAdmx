@@ -28,21 +28,27 @@ A sample .xml file that you can import in Task Scheduler is provided with this s
 
 # Admx files
 
-See [Change Log](https://github.com/msfreaks/EvergreenAdmx/blob/main/CHANGELOG.md) for a list of supported products.
+Also see [Change Log](https://github.com/msfreaks/EvergreenAdmx/blob/main/CHANGELOG.md) for a list of supported products.
 
 Now supports
-* Microsoft Windows 10 (1903/1909/2004/20H2)
-* Microsoft Edge (Chromium)
-* Microsoft OneDrive
-* Microsoft Office
+* Adobe Acrobat Reader DC
+* Citrix Workspace App
 * FSLogix
 * Google Chrome
+* Microsoft Edge (Chromium)
+* Microsoft Office
+* Microsoft OneDrive
+* Microsoft Windows 10 (1903/1909/2004/20H2)
+* Mozilla Firefox
+* Zoom Desktop Client
 
 # Notes
 
 I have not tested this script on Windows Core.
 Some of the Admx files can only be obtained by installing the package that was downloaded. For instance, the Windows 10 Admx files are in an msi file, the OneDrive Admx files are in the installation folder after installing OneDrive.
 So this is what the script does for these packages: installing the package, copying the Admx files, uninstalling the package.
+
+This script processes all the products by default. Simply comment out any products you don't need and the script will skip those.
 
 
 [github-release-badge]: https://img.shields.io/github/release/msfreaks/EvergreenAdmx.svg?style=flat-square

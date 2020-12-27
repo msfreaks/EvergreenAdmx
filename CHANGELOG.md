@@ -1,5 +1,18 @@
 # Change Log
 
+## To do
+
+* Create module structure and publish to PowerShell Gallery
+* Add logging options
+* Add notification options
+
+## 2012.4
+
+* Added Admx for Adobe AcrobatReader DC
+* Added Admx for Citrix Workspace App
+* Added Admx for Mozilla Firefox
+* Added Admx for Zoom Desktop Client
+
 ## 2012.3
 
 * Added Admx for Google Chrome
