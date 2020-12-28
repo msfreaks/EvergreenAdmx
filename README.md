@@ -32,7 +32,7 @@ This script processes all the products by default. Simply comment out any produc
 
 ## Admx files
 
-Also see [![Change Log][change-log]] for a list of supported products.
+Also see [Change Log][change-log] for a list of supported products.
 
 Now supports
 *  Adobe Acrobat Reader DC
@@ -62,4 +62,4 @@ So this is what the script does for these packages: installing the package, copy
 [license]: https://github.com/msfreaks/EvergreenAdmx/blob/master/LICENSE
 [twitter-follow-badge]: https://img.shields.io/twitter/follow/menschab?style=flat-square
 [twitter-follow]: https://twitter.com/menschab?ref_src=twsrc%5Etfw
-[change-log]: https://github.com/msfreaks/EvergreenAdmx/blob/main/CHANGELOG.md)(https://github.com/msfreaks/EvergreenAdmx/blob/main/CHANGELOG.md
+[change-log]: https://github.com/msfreaks/EvergreenAdmx/blob/main/CHANGELOG.md
