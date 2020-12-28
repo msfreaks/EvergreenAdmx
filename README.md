@@ -1,8 +1,10 @@
 # EvergreenAdmx
 
 [![Release][github-release-badge]][github-release]
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/c0efab02b66442399bb16b0493cdfbef)](https://www.codacy.com/gh/msfreaks/EvergreenAdmx/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=msfreaks/EvergreenAdmx&amp;utm_campaign=Badge_Grade)
+[![Codacy][code-quality-badge]][code-quality]
 [![License][license-badge]][license]
+[![Twitter][twitter-follow-badge]][twitter-follow]
+
 
 After deploying several Windows Virtual Desktop environments I decided I no longer wanted to manually download the Admx files I needed, and I wanted a way to keep them up-to-date.
 
@@ -55,5 +57,9 @@ So this is what the script does for these packages: installing the package, copy
 
 [github-release-badge]: https://img.shields.io/github/release/msfreaks/EvergreenAdmx.svg?style=flat-square
 [github-release]: https://github.com/msfreaks/EvergreenAdmx/releases/latest
+[code-quality-badge]: https://app.codacy.com/project/badge/Grade/c0efab02b66442399bb16b0493cdfbef
+[code-quality]: https://www.codacy.com/gh/msfreaks/EvergreenAdmx/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=msfreaks/EvergreenAdmx&amp;utm_campaign=Badge_Grade
 [license-badge]: https://img.shields.io/github/license/msfreaks/EvergreenAdmx.svg?style=flat-square
 [license]: https://github.com/msfreaks/EvergreenAdmx/blob/master/LICENSE
+[twitter-follow-badge]: https://img.shields.io/twitter/follow/menschab?style=flat-square
+[twitter-follow]: https://twitter.com/menschab?ref_src=twsrc%5Etfw
