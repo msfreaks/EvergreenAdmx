@@ -32,7 +32,7 @@ This script processes all the products by default. Simply comment out any produc
 
 ## Admx files
 
-Also see [Change Log](https://github.com/msfreaks/EvergreenAdmx/blob/main/CHANGELOG.md) for a list of supported products.
+Also see [![Change Log][change-log]] for a list of supported products.
 
 Now supports
 *  Adobe Acrobat Reader DC
@@ -56,9 +56,10 @@ So this is what the script does for these packages: installing the package, copy
 
 [github-release-badge]: https://img.shields.io/github/release/msfreaks/EvergreenAdmx.svg?style=flat-square
 [github-release]: https://github.com/msfreaks/EvergreenAdmx/releases/latest
-[code-quality-badge]: https://app.codacy.com/project/badge/Grade/c0efab02b66442399bb16b0493cdfbef
+[code-quality-badge]: https://app.codacy.com/project/badge/Grade/c0efab02b66442399bb16b0493cdfbef?style=flat-square
 [code-quality]: https://www.codacy.com/gh/msfreaks/EvergreenAdmx/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=msfreaks/EvergreenAdmx&amp;utm_campaign=Badge_Grade
 [license-badge]: https://img.shields.io/github/license/msfreaks/EvergreenAdmx.svg?style=flat-square
 [license]: https://github.com/msfreaks/EvergreenAdmx/blob/master/LICENSE
 [twitter-follow-badge]: https://img.shields.io/twitter/follow/menschab?style=flat-square
 [twitter-follow]: https://twitter.com/menschab?ref_src=twsrc%5Etfw
+[change-log]: https://github.com/msfreaks/EvergreenAdmx/blob/main/CHANGELOG.md)(https://github.com/msfreaks/EvergreenAdmx/blob/main/CHANGELOG.md
