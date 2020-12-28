@@ -4,7 +4,6 @@
 [![Codacy][code-quality-badge]][code-quality]
 [![License][license-badge]][license]
 [![Twitter][twitter-follow-badge]][twitter-follow]
-[![MSFreaks][msfreaks-website-badge]][msfreaks-website]
 
 After deploying several Windows Virtual Desktop environments I decided I no longer wanted to manually download the Admx files I needed, and I wanted a way to keep them up-to-date.
 
@@ -63,5 +62,3 @@ So this is what the script does for these packages: installing the package, copy
 [license]: https://github.com/msfreaks/EvergreenAdmx/blob/master/LICENSE
 [twitter-follow-badge]: https://img.shields.io/twitter/follow/menschab?style=flat-square
 [twitter-follow]: https://twitter.com/menschab?ref_src=twsrc%5Etfw
-[msfreaks-website-badge]: https://img.shields.io/badge/website-https%3A%2F%2Fmsfreaks.wordpress.com-lightgrey?style=flat-square
-[msfreaks-website]: https://msfreaks.wordpress.com
