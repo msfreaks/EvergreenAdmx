@@ -1,36 +1,58 @@
-﻿<#
-    .SYNOPSIS
-    Script to download latest Admx files for several products.
+﻿<#PSScriptInfo
 
-    .DESCRIPTION
-    Script to download latest Admx files for several products.
-    Optionally copy the latest Admx files to a folder of your chosing, for example a Policy Store.
+.VERSION 2012.6
 
-    .PARAMETER WindowsVersion
-    The Windows 10 version to get the Admx files for.
-    If omitted the newest version supported by this script will be used.
+.GUID 999952b7-1337-4018-a1b9-499fad48e734
 
-    .PARAMETER WorkingDirectory
-    Optionally provide a Working Directory for the script.
-    The script will store Admx files in a subdirectory called "admx".
-    The script will store downloaded files in a subdirectory called "downloads".
-    If omitted the script will treat the script's folder as the working directory.
+.AUTHOR Arjan Mensch
 
-    .PARAMETER PolicyStore
-    Optionally provide a Policy Store location to copy the Admx files to after processing.
+.COMPANYNAME IT-WorXX
 
-    .PARAMETER Languages
-    Optionally provide an array of languages to process. Entries must be in 'xy-XY' format.
-    If omitted the script will process 'en-US'.
+.TAGS GroupPolicy GPO Admx Evergreen Automation
 
-    .PARAMETER UseProductFolders
-    When specified the extracted Admx files are copied to their respective product folders in a subfolder of 'Admx' in the WorkingDirectory.
+.LICENSEURI https://github.com/msfreaks/EvergreenAdmx/blob/main/LICENSE
 
-    .EXAMPLE
-    .\EvergreenAdmx.ps1 -WindowsVersion "20H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
+.PROJECTURI https://github.com/msfreaks/EvergreenAdmx
 
-    .LINK
-    https://msfreaks.wordpress.com
+.DESCRIPTION
+ Script to automatically download latest Admx files for several products.
+ Optionally copies the latest Admx files to a folder of your chosing, for example a Policy Store.
+
+#> 
+<#
+.SYNOPSIS
+ Script to automatically download latest Admx files for several products.
+
+.DESCRIPTION
+ Script to automatically download latest Admx files for several products.
+ Optionally copies the latest Admx files to a folder of your chosing, for example a Policy Store.
+
+.PARAMETER WindowsVersion
+ The Windows 10 version to get the Admx files for.
+ If omitted the newest version supported by this script will be used.
+
+.PARAMETER WorkingDirectory
+ Optionally provide a Working Directory for the script.
+ The script will store Admx files in a subdirectory called "admx".
+ The script will store downloaded files in a subdirectory called "downloads".
+ If omitted the script will treat the script's folder as the working directory.
+
+.PARAMETER PolicyStore
+ Optionally provide a Policy Store location to copy the Admx files to after processing.
+
+.PARAMETER Languages
+ Optionally provide an array of languages to process. Entries must be in 'xy-XY' format.
+ If omitted the script will process 'en-US'.
+
+.PARAMETER UseProductFolders
+ When specified the extracted Admx files are copied to their respective product folders in a subfolder of 'Admx' in the WorkingDirectory.
+
+.EXAMPLE
+ .\EvergreenAdmx.ps1 -WindowsVersion "20H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
+
+.LINK
+ https://github.com/msfreaks/EvergreenAdmx
+ https://msfreaks.wordpress.com
 
 #>
 [CmdletBinding()]
