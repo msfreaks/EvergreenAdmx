@@ -29,6 +29,46 @@ The above execution will keep the central Policy Store up-to-date on a daily bas
 A sample .xml file that you can import in Task Scheduler is provided with this script.
 
 This script processes all the products by default. Simply comment out any products you don't need and the script will skip those.
+This will change in a future release.
+
+```
+SYNTAX
+    D:\Personal Data\amensc\Gits\EvergreenAdmx\EvergreenAdmx.ps1 [[-WindowsVersion] <String>] [[-WorkingDirectory] <String>] [[-PolicyStore] <String>] [[-Languages] <String[]>] [-UseProductFolders] [<CommonParameters>]
+
+DESCRIPTION
+    Script to download latest Admx files for several products.
+    Optionally copy the latest Admx files to a folder of your chosing, for example a Policy Store.
+
+PARAMETERS
+    -WindowsVersion <String>
+        The Windows 10 version to get the Admx files for.
+        If omitted the newest version supported by this script will be used.
+
+    -WorkingDirectory <String>
+        Optionally provide a Working Directory for the script.
+        The script will store Admx files in a subdirectory called "admx".
+        The script will store downloaded files in a subdirectory called "downloads".
+        If omitted the script will treat the script's folder as the working directory.
+        
+    -PolicyStore <String>
+        Optionally provide a Policy Store location to copy the Admx files to after processing.
+
+    -Languages <String[]>
+        Optionally provide an array of languages to process. Entries must be in 'xy-XY' format.
+        If omitted the script will process 'en-US'.
+        
+    -UseProductFolders [<SwitchParameter>]
+        When specified the extracted Admx files are copied to their respective product folders in a subfolder of 'Admx' in the WorkingDirectory.
+
+    <CommonParameters>
+        This cmdlet supports the common parameters: Verbose, Debug,
+        ErrorAction, ErrorVariable, WarningAction, WarningVariable,
+        OutBuffer, PipelineVariable, and OutVariable. For more information, see
+        about_CommonParameters (https:/go.microsoft.com/fwlink/?LinkID=113216).
+    
+EXAMPLES
+    PS C:\>.\EvergreenAdmx.ps1 -WindowsVersion "20H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
+```
 
 ## Admx files
 

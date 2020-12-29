@@ -7,6 +7,15 @@
 *  Add notification options
 *  Provide easier way for users to define which products to process
 
+## 2012.6
+
+*  Added parameter 'UseProductFolders'
+*  Added parameter 'Languages'
+*  Added 'UseProductFolders' logic
+*  Added 'Languages' logic
+*  Fixed bug where extracting of .cab files would fail
+*  Updated verbose output
+
 ## 2012.5
 
 *  Added Admx for Base Image Script Framework (BIS-F)
