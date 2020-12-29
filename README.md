@@ -19,6 +19,11 @@ Quick start:
 *  Download the script to a location of your chosing (for example: C:\Scripts\EvergreenAdmx)
 *  Run or schedule the script
 
+You can also install the script from the PowerShell Gallery ([EvergreenAdmx][poshgallery-evergreenadmx]):
+```powershell
+Install-Script -Name EvergreenAdmx
+```
+
 I have scheduled the script to run daily:
 
 `
@@ -103,3 +108,4 @@ So this is what the script does for these packages: installing the package, copy
 [twitter-follow-badge]: https://img.shields.io/twitter/follow/menschab?style=flat-square
 [twitter-follow]: https://twitter.com/menschab?ref_src=twsrc%5Etfw
 [change-log]: https://github.com/msfreaks/EvergreenAdmx/blob/main/CHANGELOG.md
+[poshgallery-evergreenadmx]: https://www.powershellgallery.com/packages/EvergreenAdmx/
