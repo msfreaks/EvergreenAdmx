@@ -2,10 +2,23 @@
 
 ## To do
 
-*  Create module structure and publish to PowerShell Gallery
 *  Add logging options
 *  Add notification options
-*  Provide easier way for users to define which products to process
+
+## 2101.2
+
+`Breaking change introduced!` (See [README][read-me] for more info)
+
+*  Added parameter 'CustomPolicyLocation'
+*  Added 'CustomPolicyLocation' logic
+*  Added parameter 'Include' (`breaking change`)
+*  Added 'Include' logic
+*  Added parameter 'PreferLocalOneDrive'
+*  Added 'PreferLocalOneDrive' logic
+
+## 2101.1
+
+*  Internal version
 
 ## 2012.6
 
@@ -45,3 +58,5 @@
 *  Added Admx for Microsoft OneDrive
 *  Added Admx for Microsoft Office
 *  Added Admx for FSLogix
+
+[read-me]: https://github.com/msfreaks/EvergreenAdmx/blob/main/README.md

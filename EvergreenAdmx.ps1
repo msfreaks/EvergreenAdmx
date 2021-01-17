@@ -1,6 +1,6 @@
 ﻿<#PSScriptInfo
 
-.VERSION 2012.6
+.VERSION 2101.2
 
 .GUID 999952b7-1337-4018-a1b9-499fad48e734
 
@@ -14,11 +14,8 @@
 
 .PROJECTURI https://github.com/msfreaks/EvergreenAdmx
 
-.DESCRIPTION
- Script to automatically download latest Admx files for several products.
- Optionally copies the latest Admx files to a folder of your chosing, for example a Policy Store.
-
 #> 
+
 <#
 .SYNOPSIS
  Script to automatically download latest Admx files for several products.
@@ -47,9 +44,24 @@
 .PARAMETER UseProductFolders
  When specified the extracted Admx files are copied to their respective product folders in a subfolder of 'Admx' in the WorkingDirectory.
 
+.PARAMETER CustomPolicyStore
+ When specified processes a location for custom policy files. Can be UNC format or local folder.
+ The script will expect to find .admx files in this location, and at least one language folder holding the .adml file(s).
+ Versioning will be done based on the newest file found recursively in this location (any .admx or .adml).
+ Note that if any file has changed the script will process all files found in location.
+
+.PARAMETER Include
+ Array containing Admx products to include when checking for updates.
+ Defaults to "Windows 10", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office" if omitted.
+
+.PARAMETER PreferLocalOneDrive
+ Microsoft OneDrive Admx files are only available after installing OneDrive.
+ If this script is running on a machine that has OneDrive installed locally, use this switch to prevent automatically uninstalling OneDrive.
+
 .EXAMPLE
  .\EvergreenAdmx.ps1 -WindowsVersion "20H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
-
+ Will process the default set of products, storing results in product folders, for both English United States as Dutch languages, and copies the files to the Policy store.
+ 
 .LINK
  https://github.com/msfreaks/EvergreenAdmx
  https://msfreaks.wordpress.com
@@ -57,16 +69,22 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $false)][ValidateSet("1903", "1909", "2004", "20H2")]
-    [string]$WindowsVersion = "20H2",
-    [Parameter(Mandatory = $false)]
-    [string]$WorkingDirectory = $null,
-    [Parameter(Mandatory = $false)]
-    [string]$PolicyStore = $null,
-    [Parameter(Mandatory = $false)]
-    [string[]]$Languages = @("en-US"),
-    [Parameter(Mandatory = $false)]
-    [switch]$UseProductFolders
+    [Parameter(Mandatory = $False)][ValidateSet("1903", "1909", "2004", "20H2")]
+    [System.String] $WindowsVersion = "20H2",
+    [Parameter(Mandatory = $False)]
+    [System.String] $WorkingDirectory = $null,
+    [Parameter(Mandatory = $False)]
+    [System.String] $PolicyStore = $null,
+    [Parameter(Mandatory = $False)]
+    [System.String[]] $Languages = @("en-US"),
+    [Parameter(Mandatory = $False)]
+    [switch] $UseProductFolders,
+    [Parameter(Mandatory = $False)]
+    [System.String] $CustomPolicyStore = $null,
+    [Parameter(Mandatory = $False)][ValidateSet("Custom Policy Store", "Windows 10", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office", "FSLogix", "Adobe AcrobatReader DC", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client")]
+    [System.String[]] $Include = @("Windows 10", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office"),
+    [Parameter(Mandatory = $False)]
+    [switch] $PreferLocalOneDrive = $false
 )
 
 #region init
@@ -75,16 +93,27 @@ if (-not $WorkingDirectory) { $WorkingDirectory = $PSScriptRoot }
 if (Test-Path -Path "$($WorkingDirectory)\admxversions.xml") { $admxversions = Import-Clixml -Path "$($WorkingDirectory)\admxversions.xml" }
 if (-not (Test-Path -Path "$($WorkingDirectory)\admx")) { $null = mkdir -Path "$($WorkingDirectory)\admx" -Force }
 if (-not (Test-Path -Path "$($WorkingDirectory)\downloads")) { $null = mkdir -Path "$($WorkingDirectory)\downloads" -Force }
-if ($PolicyStore -and -not $PolicyStore.EndsWith("\")) { $policypath += "\" }
+if ($PolicyStore -and -not $PolicyStore.EndsWith("\")) { $PolicyStore += "\" }
 if ($Languages -notmatch "([A-Za-z]{2})-([A-Za-z]{2})$") { Write-Warning "Language not in expected format: $($Languages -notmatch "([A-Za-z]{2})-([A-Za-z]{2})$")" }
+if ($CustomPolicyStore -and -not (Test-Path -Path "$($CustomPolicyStore)" -ErrorAction SilentlyContinue)) { throw "'$($CustomPolicyStore)' is not a valid path." }
+if ($CustomPolicyStore -and -not $CustomPolicyStore.EndsWith("\")) { $CustomPolicyStore += "\" }
+if ($CustomPolicyStore -and (Get-ChildItem -Path $CustomPolicyStore -Directory) -notmatch "([A-Za-z]{2})-([A-Za-z]{2})$") { throw "'$($CustomPolicyStore)' does not contain at least one subfolder matching the language format (e.g 'en-US')." }
+if ($PreferLocalOneDrive -and $Include -notcontains "Microsoft OneDrive") { Write-Warning "PreferLocalOneDrive is used, but Microsoft OneDrive is not in the list of included products to process." }
+if ($PreferLocalOneDrive -and $Include -contains "Microsoft OneDrive" -and (-not (Test-Path -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive" -ErrorAction SilentlyContinue) -or -not (Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive").CurrentVersionPath)) {
+    throw "PreferLocalOneDrive will only work if OneDrive is machine installed. User installed OneDrive is not supported.`nLocal machine installed OneDrive not found."
+    break
+}
 
-Write-Verbose "Windows Version:`t`t$($WindowsVersion)"
-Write-Verbose "WorkingDirectory:`t`t$($WorkingDirectory)"
-Write-Verbose "PolicyStore:`t`t`t$($PolicyStore)"
-Write-Verbose "Languages:`t`t`t`t$($Languages)"
-Write-Verbose "Use product folders:`t$($UseProductFolders)"
-Write-Verbose "Admx path:`t`t`t`t$($WorkingDirectory)\admx"
-Write-Verbose "Download path:`t`t`t$($WorkingDirectory)\downloads"
+Write-Verbose "Windows Version:`t`t'$($WindowsVersion)'"
+Write-Verbose "WorkingDirectory:`t`t'$($WorkingDirectory)'"
+Write-Verbose "PolicyStore:`t`t`t'$($PolicyStore)'"
+Write-Verbose "CustomPolicyStore:`t`t'$($CustomPolicyStore)'"
+Write-Verbose "Languages:`t`t`t`t'$($Languages)'"
+Write-Verbose "Use product folders:`t'$($UseProductFolders)'"
+Write-Verbose "Admx path:`t`t`t`t'$($WorkingDirectory)\admx'"
+Write-Verbose "Download path:`t`t`t'$($WorkingDirectory)\downloads'"
+Write-Verbose "Included:`t`t`t`t'$($Include -join ',')'"
+Write-Verbose "PreferLocalOneDrive:`t'$($PreferLocalOneDrive)'"
 #endregion
 
 #region functions
@@ -110,7 +139,8 @@ function Copy-Admx {
         [string]$TargetFolder,
         [string]$PolicyStore = $null,
         [string]$ProductName,
-        [switch]$Quiet
+        [switch]$Quiet,
+        [string[]]$Languages = $null
     )
     if (-not (Test-Path -Path "$($TargetFolder)")) { $null = (mkdir -Path "$($TargetFolder)" -Force) }
 
@@ -129,8 +159,8 @@ function Copy-Admx {
         Copy-Item -Path "$($SourceFolder)\*.admx" -Destination "$($PolicyStore)" -Force
         foreach ($language in $Languages) {
             if (-not (Test-Path -Path "$($SourceFolder)\$($language)")) { $language = "en-US" }
-            if (-not (Test-Path -Path "$($PolicyStore)\$($language)")) { $null = (mkdir -Path "$($PolicyStore)\$($language)" -Force) }
-            Copy-Item -Path "$($SourceFolder)\$($language)\*.adml" -Destination "$($PolicyStore)\$($language)" -Force
+            if (-not (Test-Path -Path "$($PolicyStore)$($language)")) { $null = (mkdir -Path "$($PolicyStore)$($language)" -Force) }
+            Copy-Item -Path "$($SourceFolder)\$($language)\*.adml" -Destination "$($PolicyStore)$($language)" -Force
         }
     }
 }
@@ -239,22 +269,32 @@ function Get-OneDriveOnline {
     .SYNOPSIS
     Returns latest Version and Uri for OneDrive
 #>
+    param (
+        [bool] $PreferLocalOneDrive
+    )
 
-    try {
-        $ProgressPreference = 'SilentlyContinue'
-        $url = "https://go.microsoft.com/fwlink/p/?LinkID=844652"
-        # grab content without redirecting to the download
-        $web = Invoke-WebRequest -Uri $url -UseBasicParsing -MaximumRedirection 0 -ErrorAction Ignore
-        # grab uri
-        $URI = $web.Headers.Location
-        # grab version
-        $Version = ($URI.Split("/")[-2] | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
+    if ($PreferLocalOneDrive) {
+        $URI = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive").CurrentVersionPath)"
+        $Version = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive").Version)"
 
-        # return evergreen object
         return @{ Version = $Version; URI = $URI }
-    }
-    catch {
-        Throw $_
+    } else {
+        try {
+            $ProgressPreference = 'SilentlyContinue'
+            $url = "https://go.microsoft.com/fwlink/p/?LinkID=844652"
+            # grab content without redirecting to the download
+            $web = Invoke-WebRequest -Uri $url -UseBasicParsing -MaximumRedirection 0 -ErrorAction Ignore
+            # grab uri
+            $URI = $web.Headers.Location
+            # grab version
+            $Version = ($URI.Split("/")[-2] | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
+
+            # return evergreen object
+            return @{ Version = $Version; URI = $URI }
+        }
+        catch {
+            Throw $_
+        }
     }
 }
 
@@ -485,6 +525,25 @@ function Get-MDOPAdmxOnline {
     }
 }
 
+function Get-CustomPolicyOnline {
+<#
+    .SYNOPSIS
+    Returns latest Version and Uri for Custom Policies
+
+    .PARAMETER CustomPolicyStore
+    Folder where Custom Policies can be found
+#>
+    param(
+        [string] $CustomPolicyStore
+    )
+
+    $newestFileDate = Get-Date -Date ((Get-ChildItem -Path $CustomPolicyStore -Include "*.admx", "*.adml" -Recurse | Sort-Object LastWriteTime -Descending) | Select-Object -First 1).LastWriteTime
+
+    $version = Get-Date -Date $newestFileDate -Format "yyMM.dd.HHmmss"
+
+    return @{ Version = $version; URI = $CustomPolicyStore }
+}
+
 function Get-FSLogixAdmx {
 <#
     .SYNOPSIS
@@ -499,7 +558,8 @@ function Get-FSLogixAdmx {
 
     param(
         [string]$Version,
-        [string]$PolicyStore = $null
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
     )
 
     $evergreen = Get-FSLogixOnline
@@ -533,8 +593,8 @@ function Get-FSLogixAdmx {
             if ($PolicyStore) {
                 Write-Verbose "Copying Admx files from '$($sourceadmx)' to '$($PolicyStore)'"
                 Copy-Item -Path "$($sourceadmx)\*.admx" -Destination "$($PolicyStore)" -Force
-                if (-not (Test-Path -Path "$($PolicyStore)\en-US")) { $null = (mkdir -Path "$($PolicyStore)\en-US" -Force) }
-                Copy-Item -Path "$($sourceadmx)\*.adml" -Destination "$($PolicyStore)\en-US" -Force
+                if (-not (Test-Path -Path "$($PolicyStore)en-US")) { $null = (mkdir -Path "$($PolicyStore)en-US" -Force) }
+                Copy-Item -Path "$($sourceadmx)\*.adml" -Destination "$($PolicyStore)en-US" -Force
             }
 
             # cleanup
@@ -569,7 +629,8 @@ function Get-MicrosoftOfficeAdmx {
     param(
         [string]$Version,
         [string]$PolicyStore = $null,
-        [string]$Architecture = "x64"
+        [string]$Architecture = "x64",
+        [string[]]$Languages = $null
     )
 
     $evergreen = Get-MicrosoftOfficeAdmxOnline | Where-Object { $_.Architecture -like $Architecture }
@@ -595,7 +656,7 @@ function Get-MicrosoftOfficeAdmx {
             # copy
             $sourceadmx = "$($env:TEMP)\office\admx"
             $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname
+            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\office" -Recurse -Force
@@ -629,7 +690,8 @@ function Get-Windows10Admx {
     param(
         [string]$Version,
         [string]$PolicyStore = $null,
-        [string]$WindowsVersion
+        [string]$WindowsVersion,
+        [string[]]$Languages = $null
     )
     
     $id = Get-Windows10AdmxDownloadId -WindowsVersion $WindowsVersion
@@ -666,7 +728,7 @@ function Get-Windows10Admx {
             # copy
             $sourceadmx = "C:\Program Files (x86)\Microsoft Group Policy\$($installfolder.Name)\PolicyDefinitions"
             $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname
+            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
 
             # uninstall
             Write-Verbose "Uninstalling Windows 10 Admx installer"
@@ -693,14 +755,19 @@ function Get-OneDriveAdmx {
 
     .PARAMETER PolicyStore
     Destination for the Admx files
+
+    .PARAMETER PreferLocalOneDrive
+    Check locally only
 #>
 
     param(
-        [string]$Version,
-        [string]$PolicyStore = $null
+        [string] $Version,
+        [string] $PolicyStore = $null,
+        [bool] $PreferLocalOneDrive,
+        [string[]]$Languages = $null
     )
 
-    $evergreen = Get-OneDriveOnline
+    $evergreen = Get-OneDriveOnline -PreferLocalOneDrive $PreferLocalOneDrive
     $productname = "Microsoft OneDrive"
     $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
 
@@ -711,29 +778,32 @@ function Get-OneDriveAdmx {
         # download and process
         $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1])"
         try {
-            # download
-            $ProgressPreference = 'SilentlyContinue'
-            Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
-            Invoke-WebRequest -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
+            if (-not $PreferLocalOneDrive) {
+                # download
+                $ProgressPreference = 'SilentlyContinue'
+                Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
+                Invoke-WebRequest -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
 
-            # install
-            Write-Verbose "Installing downloaded OneDrive installer"
-            $null = Start-Process -FilePath $outfile -ArgumentList "/allusers" -PassThru
-            # wait for setup to complete
-            while (Get-Process -Name "OneDriveSetup" -ErrorAction SilentlyContinue) { Start-Sleep -Seconds 10 }
-            # onedrive starts automatically after setup. kill!
-            Stop-Process -Name "OneDrive" -Force
+                # install
+                Write-Verbose "Installing downloaded OneDrive installer"
+                $null = Start-Process -FilePath $outfile -ArgumentList "/allusers" -PassThru
+                # wait for setup to complete
+                while (Get-Process -Name "OneDriveSetup" -ErrorAction SilentlyContinue) { Start-Sleep -Seconds 10 }
+                # onedrive starts automatically after setup. kill!
+                Stop-Process -Name "OneDrive" -Force
 
-            # find uninstall info
-            Write-Verbose "Grabbing uninstallation info from registry for OneDrive installer"
-            $uninstall = Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\OneDriveSetup.exe"
-            Write-Verbose "Found '$($uninstall.DisplayName)'"
+                # find uninstall info
+                Write-Verbose "Grabbing uninstallation info from registry for OneDrive installer"
+                $uninstall = Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\OneDriveSetup.exe"
+                Write-Verbose "Found '$($uninstall.DisplayName)'"
 
-            # find installation path
-            Write-Verbose "Grabbing installation path for OneDrive installer"
-            $installfolder = $uninstall.DisplayIcon.Substring(0, $uninstall.DisplayIcon.IndexOf("\OneDriveSetup.exe"))
-            Write-Verbose "Found '$($installfolder)'"
-
+                # find installation path
+                Write-Verbose "Grabbing installation path for OneDrive installer"
+                $installfolder = $uninstall.DisplayIcon.Substring(0, $uninstall.DisplayIcon.IndexOf("\OneDriveSetup.exe"))
+                Write-Verbose "Found '$($installfolder)'"
+            } else {
+                $installfolder = $evergreen.URI
+            }
             # copy
             $sourceadmx = "$($installfolder)\adm"
             $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
@@ -753,9 +823,26 @@ function Get-OneDriveAdmx {
                 }
             }
 
-            # uninstall
-            Write-Verbose "Uninstalling OneDrive installer"
-            $null = Start-Process -FilePath "$($installfolder)\OneDriveSetup.exe" -ArgumentList "/uninstall /allusers" -PassThru -Wait
+            if ($PolicyStore) {
+                Write-Verbose "Copying Admx files from '$($sourceadmx)' to '$($PolicyStore)'"
+                Copy-Item -Path "$($sourceadmx)\*.admx" -Destination "$($PolicyStore)" -Force
+                foreach ($language in $Languages) {
+                    if (-not (Test-Path -Path "$($sourceadmx)\$($language)") -and -not (Test-Path -Path "$($sourceadmx)\$($language.Substring(0,2))")) {
+                        if (-not (Test-Path -Path "$($PolicyStore)en-US")) { $null = (mkdir -Path "$($PolicyStore)en-US" -Force) }
+                        Copy-Item -Path "$($sourceadmx)\*.adml" -Destination "$($PolicyStore)en-US" -Force    
+                    } else {
+                        $sourcelanguage = $language; if (-not (Test-Path -Path "$($sourceadmx)\$($language)")) { $sourcelanguage = $language.Substring(0,2) }
+                        if (-not (Test-Path -Path "$($PolicyStore)$($language)")) { $null = (mkdir -Path "$($PolicyStore)$($language)" -Force) }
+                        Copy-Item -Path "$($sourceadmx)\$($sourcelanguage)\*.adml" -Destination "$($PolicyStore)$($language)" -Force
+                    }
+                }
+            }
+
+            if (-not $PreferLocalOneDrive) {
+                # uninstall
+                Write-Verbose "Uninstalling OneDrive installer"
+                $null = Start-Process -FilePath "$($installfolder)\OneDriveSetup.exe" -ArgumentList "/uninstall /allusers" -PassThru -Wait
+            }
 
             return $evergreen
         }
@@ -782,7 +869,8 @@ function Get-MicrosoftEdgeAdmx {
 
     param(
         [string]$Version,
-        [string]$PolicyStore = $null
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
     )
 
     $evergreen = Get-MicrosoftEdgePolicyOnline
@@ -808,7 +896,7 @@ function Get-MicrosoftEdgeAdmx {
             # copy
             $sourceadmx = "$($env:TEMP)\microsoftedgepolicy\windows\admx"
             $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname
+            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\microsoftedgepolicy" -Recurse -Force
@@ -838,7 +926,8 @@ function Get-GoogleChromeAdmx {
 
     param(
         [string]$Version,
-        [string]$PolicyStore = $null
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
     )
 
     $evergreen = Get-GoogleChromeAdmxOnline
@@ -864,7 +953,7 @@ function Get-GoogleChromeAdmx {
             # copy
             $sourceadmx = "$($env:TEMP)\chromeadmx\windows\admx"
             $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname
+            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\chromeadmx" -Recurse -Force
@@ -884,7 +973,7 @@ function Get-GoogleChromeAdmx {
             # copy
             $sourceadmx = "$($env:TEMP)\chromeupdateadmx\GoogleUpdateAdmx"
             $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Quiet
+            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Quiet -Languages $Languages
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\chromeupdateadmx" -Recurse -Force
@@ -914,7 +1003,8 @@ function Get-AdobeAcrobatReaderDCAdmx {
 
     param(
         [string]$Version,
-        [string]$PolicyStore = $null
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
     )
 
     $evergreen = Get-AdobeAcrobatReaderDCAdmxOnline
@@ -940,7 +1030,7 @@ function Get-AdobeAcrobatReaderDCAdmx {
             # copy
             $sourceadmx = "$($env:TEMP)\acrobatreaderdc"
             $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname
+            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\acrobatreaderdc" -Recurse -Force
@@ -970,7 +1060,8 @@ function Get-CitrixWorkspaceAppAdmx {
 
     param(
         [string]$Version,
-        [string]$PolicyStore = $null
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
     )
 
     $evergreen = Get-CitrixWorkspaceAppAdmxOnline
@@ -996,7 +1087,7 @@ function Get-CitrixWorkspaceAppAdmx {
             # copy
             $sourceadmx = "$($env:TEMP)\citrixworkspaceapp\$([io.path]::GetFileNameWithoutExtension($evergreen.URI.Split("/")[-1].Split("?")[0]))\Configuration"
             $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname
+            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\citrixworkspaceapp" -Recurse -Force
@@ -1026,7 +1117,8 @@ function Get-MozillaFirefoxAdmx {
 
     param(
         [string]$Version,
-        [string]$PolicyStore = $null
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
     )
 
     $evergreen = Get-MozillaFirefoxAdmxOnline
@@ -1052,7 +1144,7 @@ function Get-MozillaFirefoxAdmx {
             # copy
             $sourceadmx = "$($env:TEMP)\firefoxadmx\windows"
             $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname
+            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\firefoxadmx" -Recurse -Force
@@ -1082,7 +1174,8 @@ function Get-ZoomDesktopClientAdmx {
 
     param(
         [string]$Version,
-        [string]$PolicyStore = $null
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
     )
 
     $evergreen = Get-ZoomDesktopClientAdmxOnline
@@ -1108,7 +1201,7 @@ function Get-ZoomDesktopClientAdmx {
             # copy
             $sourceadmx = "$($env:TEMP)\zoomclientadmx\$([io.path]::GetFileNameWithoutExtension($evergreen.URI.Split("/")[-1]))"
             $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname
+            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\zoomclientadmx" -Recurse -Force
@@ -1138,7 +1231,8 @@ function Get-BIS-FAdmx {
 
     param(
         [string]$Version,
-        [string]$PolicyStore = $null
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
     )
 
     $evergreen = Get-BIS-FAdmxOnline
@@ -1168,7 +1262,7 @@ function Get-BIS-FAdmx {
             # copy
             $sourceadmx = "$($env:TEMP)\bisfadmx\$($folder)\admx"
             $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname
+            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\bisfadmx" -Recurse -Force
@@ -1198,7 +1292,8 @@ function Get-MDOPAdmx {
 
     param(
         [string]$Version,
-        [string]$PolicyStore = $null
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
     )
 
     $evergreen = Get-MDOPAdmxOnline
@@ -1235,11 +1330,11 @@ function Get-MDOPAdmx {
             # copy
             $sourceadmx = "$($env:TEMP)\mdopadmx\$($appvfolder)"
             $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName "$($productname) - App-V"
+            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName "$($productname) - App-V" -Languages $Languages
             $sourceadmx = "$($env:TEMP)\mdopadmx\$($mbamfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName "$($productname) - MBAM"
+            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName "$($productname) - MBAM" -Languages $Languages
             $sourceadmx = "$($env:TEMP)\mdopadmx\$($uevfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName "$($productname) - UE-V"
+            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName "$($productname) - UE-V" -Languages $Languages
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\mdopadmx" -Recurse -Force
@@ -1254,55 +1349,169 @@ function Get-MDOPAdmx {
         return $null
     }
 }
+
+function Get-CustomPolicyAdmx {
+    <#
+        .SYNOPSIS
+        Process Custom Policy Admx files
+    
+        .PARAMETER Version
+        Current Version present
+    
+        .PARAMETER PolicyStore
+        Destination for the Admx files
+    #>
+    
+        param(
+            [string]$Version,
+            [string]$PolicyStore = $null,
+            [string]$CustomPolicyStore,
+            [string[]]$Languages = $null
+        )
+    
+        $evergreen = Get-CustomPolicyOnline -CustomPolicyStore $CustomPolicyStore
+        $productname = "Custom Policy Store"
+        $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
+    
+        # see if this is a newer version
+        if (-not $Version -or [version]$evergreen.Version -gt [version]$Version) {
+            Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
+    
+            # download and process
+            try {
+                # copy
+                $sourceadmx = "$($evergreen.URI)"
+                $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
+                Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName "$($productname)" -Languages $Languages
+    
+                return $evergreen
+            }
+            catch {
+                Throw $_
+            }
+        } else {
+            # version already processed
+            return $null
+        }
+}
 #endregion
 
-Write-Verbose "`nProcessing Admx files for Windows 10 $($WindowsVersion)"
-$admx = Get-Windows10Admx -Version $admxversions.Windows.Version -PolicyStore $PolicyStore -WindowsVersion $WindowsVersion
-if ($admx) { if ($admxversions.Windows) { $admxversions.Windows = $admx } else { $admxversions += @{ Windows = @{ Version = $admx.Version; URI = $admx.URI } } } }
+# Custom Policy Store
+if ($Include -notcontains 'Custom Policy Store') {
+    Write-Verbose "`nSkipping Custom Policy Store"
+} else {
+    Write-Verbose "`nProcessing Admx files for Custom Policy Store"
+    $admx = Get-CustomPolicyAdmx -Version $admxversions.CustomPolicyStore.Version -PolicyStore $PolicyStore -CustomPolicyStore $CustomPolicyStore -Languages $Languages
+    if ($admx) { if ($admxversions.CustomPolicyStore) { $admxversions.CustomPolicyStore = $admx } else { $admxversions += @{ CustomPolicyStore = @{ Version = $admx.Version; URI = $admx.URI } } } }
+}
 
-Write-Verbose "`nProcessing Admx files for Microsoft Edge (Chromium)"
-$admx = Get-MicrosoftEdgeAdmx -Version $admxversions.Edge.Version -PolicyStore $PolicyStore
-if ($admx) { if ($admxversions.Edge) { $admxversions.Edge = $admx } else { $admxversions += @{ Edge = @{ Version = $admx.Version; URI = $admx.URI } } } }
+# Windows 10
+if ($Include -notcontains 'Windows 10') {
+    Write-Verbose "`nSkipping Windows 10"
+} else {
+    Write-Verbose "`nProcessing Admx files for Windows 10 $($WindowsVersion)"
+    $admx = Get-Windows10Admx -Version $admxversions.Windows.Version -PolicyStore $PolicyStore -WindowsVersion $WindowsVersion -Languages $Languages
+    if ($admx) { if ($admxversions.Windows) { $admxversions.Windows = $admx } else { $admxversions += @{ Windows = @{ Version = $admx.Version; URI = $admx.URI } } } }
+}
 
-Write-Verbose "`nProcessing Admx files for Microsoft OneDrive"
-$admx = Get-OneDriveAdmx -Version $admxversions.OneDrive.Version -PolicyStore $PolicyStore
-if ($admx) { if ($admxversions.OneDrive) { $admxversions.OneDrive = $admx } else { $admxversions += @{ OneDrive = @{ Version = $admx.Version; URI = $admx.URI } } } }
+# Microsoft Edge (Chromium)
+if ($Include -notcontains 'Microsoft Edge') {
+    Write-Verbose "`nSkipping Microsoft Edge (Chromium)"
+} else {
+    Write-Verbose "`nProcessing Admx files for Microsoft Edge (Chromium)"
+    $admx = Get-MicrosoftEdgeAdmx -Version $admxversions.Edge.Version -PolicyStore $PolicyStore -Languages $Languages
+    if ($admx) { if ($admxversions.Edge) { $admxversions.Edge = $admx } else { $admxversions += @{ Edge = @{ Version = $admx.Version; URI = $admx.URI } } } }
+}
 
-Write-Verbose "`nProcessing Admx files for Microsoft Office"
-$admx = Get-MicrosoftOfficeAdmx -Version $admxversions.Office.Version -PolicyStore $PolicyStore -Architecture "x64"
-if ($admx) { if ($admxversions.Office) { $admxversions.Office = $admx } else { $admxversions += @{ Office = @{ Version = $admx.Version; URI = $admx.URI } } } }
+# Microsoft OneDrive
+if ($Include -notcontains 'Microsoft OneDrive') {
+    Write-Verbose "`nSkipping Microsoft OneDrive"
+} else {
+    Write-Verbose "`nProcessing Admx files for Microsoft OneDrive"
+    $admx = Get-OneDriveAdmx -Version $admxversions.OneDrive.Version -PolicyStore $PolicyStore -PreferLocalOneDrive $PreferLocalOneDrive -Languages $Languages
+    if ($admx) { if ($admxversions.OneDrive) { $admxversions.OneDrive = $admx } else { $admxversions += @{ OneDrive = @{ Version = $admx.Version; URI = $admx.URI } } } }
+}
 
-Write-Verbose "`nProcessing Admx files for FSLogix"
-$admx = Get-FSLogixAdmx -Version $admxversions.FSLogix.Version -PolicyStore $PolicyStore
-if ($admx) { if ($admxversions.FSLogix) { $admxversions.FSLogix = $admx } else { $admxversions += @{ FSLogix = @{ Version = $admx.Version; URI = $admx.URI } } } }
+# Microsoft Office
+if ($Include -notcontains 'Microsoft Office') {
+    Write-Verbose "`nSkipping Microsoft Office"
+} else {
+    Write-Verbose "`nProcessing Admx files for Microsoft Office"
+    $admx = Get-MicrosoftOfficeAdmx -Version $admxversions.Office.Version -PolicyStore $PolicyStore -Architecture "x64" -Languages $Languages
+    if ($admx) { if ($admxversions.Office) { $admxversions.Office = $admx } else { $admxversions += @{ Office = @{ Version = $admx.Version; URI = $admx.URI } } } }
+}
 
-Write-Verbose "`nProcessing Admx files for Adobe AcrobatReader DC"
-$admx = Get-AdobeAcrobatReaderDCAdmx -Version $admxversions.AdobeAcrobatReaderDC.Version -PolicyStore $PolicyStore
-if ($admx) { if ($admxversions.AdobeAcrobatReaderDC) { $admxversions.AdobeAcrobatReaderDC = $admx } else { $admxversions += @{ AdobeAcrobatReaderDC = @{ Version = $admx.Version; URI = $admx.URI } } } }
+# FSLogix
+if ($Include -notcontains 'FSLogix') {
+    Write-Verbose "`nSkipping FSLogix"
+} else {
+    Write-Verbose "`nProcessing Admx files for FSLogix"
+    $admx = Get-FSLogixAdmx -Version $admxversions.FSLogix.Version -PolicyStore $PolicyStore -Languages $Languages
+    if ($admx) { if ($admxversions.FSLogix) { $admxversions.FSLogix = $admx } else { $admxversions += @{ FSLogix = @{ Version = $admx.Version; URI = $admx.URI } } } }
+}
 
-Write-Verbose "`nProcessing Admx files for BIS-F"
-$admx = Get-BIS-FAdmx -Version $admxversions.BISF.Version -PolicyStore $PolicyStore
-if ($admx) { if ($admxversions.BISF) { $admxversions.BISF = $admx } else { $admxversions += @{ BISF = @{ Version = $admx.Version; URI = $admx.URI } } } }
+# Adobe AcrobatReader DC
+if ($Include -notcontains 'Adobe AcrobatReader DC') {
+    Write-Verbose "`nSkipping Adobe AcrobatReader DC"
+} else {
+    Write-Verbose "`nProcessing Admx files for Adobe AcrobatReader DC"
+    $admx = Get-AdobeAcrobatReaderDCAdmx -Version $admxversions.AdobeAcrobatReaderDC.Version -PolicyStore $PolicyStore -Languages $Languages
+    if ($admx) { if ($admxversions.AdobeAcrobatReaderDC) { $admxversions.AdobeAcrobatReaderDC = $admx } else { $admxversions += @{ AdobeAcrobatReaderDC = @{ Version = $admx.Version; URI = $admx.URI } } } }
+}
 
-Write-Verbose "`nProcessing Admx files for Citrix Workspace App"
-$admx = Get-CitrixWorkspaceAppAdmx -Version $admxversions.CitrixWorkspaceApp.Version -PolicyStore $PolicyStore
-if ($admx) { if ($admxversions.CitrixWorkspaceApp) { $admxversions.CitrixWorkspaceApp = $admx } else { $admxversions += @{ CitrixWorkspaceApp = @{ Version = $admx.Version; URI = $admx.URI } } } }
+# BIS-F
+if ($Include -notcontains 'BIS-F') {
+    Write-Verbose "`nSkipping BIS-F"
+} else {
+    Write-Verbose "`nProcessing Admx files for BIS-F"
+    $admx = Get-BIS-FAdmx -Version $admxversions.BISF.Version -PolicyStore $PolicyStore
+    if ($admx) { if ($admxversions.BISF) { $admxversions.BISF = $admx } else { $admxversions += @{ BISF = @{ Version = $admx.Version; URI = $admx.URI } } } }
+}
 
-Write-Verbose "`nProcessing Admx files for Google Chrome"
-$admx = Get-GoogleChromeAdmx -Version $admxversions.GoogleChrome.Version -PolicyStore $PolicyStore
-if ($admx) { if ($admxversions.GoogleChrome) { $admxversions.GoogleChrome = $admx } else { $admxversions += @{ GoogleChrome = @{ Version = $admx.Version; URI = $admx.URI } } } }
+# Citrix Workspace App
+if ($Include -notcontains 'Citrix Workspace App') {
+    Write-Verbose "`nSkipping Citrix Workspace App"
+} else {
+    Write-Verbose "`nProcessing Admx files for Citrix Workspace App"
+    $admx = Get-CitrixWorkspaceAppAdmx -Version $admxversions.CitrixWorkspaceApp.Version -PolicyStore $PolicyStore -Languages $Languages
+    if ($admx) { if ($admxversions.CitrixWorkspaceApp) { $admxversions.CitrixWorkspaceApp = $admx } else { $admxversions += @{ CitrixWorkspaceApp = @{ Version = $admx.Version; URI = $admx.URI } } } }
+}
 
-#Write-Verbose "`nProcessing Admx files for Microsoft Desktop Optimization Pack"
-#$admx = Get-MDOPAdmx -Version $admxversions.MDOP.Version -PolicyStore $PolicyStore
-#if ($admx) { if ($admxversions.MDOP) { $admxversions.MDOP = $admx } else { $admxversions += @{ MDOP = @{ Version = $admx.Version; URI = $admx.URI } } } }
+# Google Chrome
+if ($Include -notcontains 'Google Chrome') {
+    Write-Verbose "`nSkipping Google Chrome"
+} else {
+    Write-Verbose "`nProcessing Admx files for Google Chrome"
+    $admx = Get-GoogleChromeAdmx -Version $admxversions.GoogleChrome.Version -PolicyStore $PolicyStore -Languages $Languages
+    if ($admx) { if ($admxversions.GoogleChrome) { $admxversions.GoogleChrome = $admx } else { $admxversions += @{ GoogleChrome = @{ Version = $admx.Version; URI = $admx.URI } } } }
+}
 
-Write-Verbose "`nProcessing Admx files for Mozilla Firefox"
-$admx = Get-MozillaFirefoxAdmx -Version $admxversions.MozillaFirefox.Version -PolicyStore $PolicyStore
-if ($admx) { if ($admxversions.MozillaFirefox) { $admxversions.MozillaFirefox = $admx } else { $admxversions += @{ MozillaFirefox = @{ Version = $admx.Version; URI = $admx.URI } } } }
+# Microsoft Desktop Optimization Pack
+if ($Include -notcontains 'Microsoft Desktop Optimization Pack') {
+    Write-Verbose "`nSkipping Microsoft Desktop Optimization Pack"
+} else {
+    Write-Verbose "`nProcessing Admx files for Microsoft Desktop Optimization Pack"
+    $admx = Get-MDOPAdmx -Version $admxversions.MDOP.Version -PolicyStore $PolicyStore -Languages $Languages
+    if ($admx) { if ($admxversions.MDOP) { $admxversions.MDOP = $admx } else { $admxversions += @{ MDOP = @{ Version = $admx.Version; URI = $admx.URI } } } }
+}
 
-Write-Verbose "`nProcessing Admx files for Zoom Desktop Client"
-$admx = Get-ZoomDesktopClientAdmx -Version $admxversions.ZoomDesktopClient.Version -PolicyStore $PolicyStore
-if ($admx) { if ($admxversions.ZoomDesktopClient) { $admxversions.ZoomDesktopClient = $admx } else { $admxversions += @{ ZoomDesktopClient = @{ Version = $admx.Version; URI = $admx.URI } } } }
+# Mozilla Firefox
+if ($Include -notcontains 'Mozilla Firefox') {
+    Write-Verbose "`nSkipping Mozilla Firefox"
+} else {
+    Write-Verbose "`nProcessing Admx files for Mozilla Firefox"
+    $admx = Get-MozillaFirefoxAdmx -Version $admxversions.MozillaFirefox.Version -PolicyStore $PolicyStore -Languages $Languages
+    if ($admx) { if ($admxversions.MozillaFirefox) { $admxversions.MozillaFirefox = $admx } else { $admxversions += @{ MozillaFirefox = @{ Version = $admx.Version; URI = $admx.URI } } } }
+}
+
+# Zoom Desktop Client
+if ($Include -notcontains 'Zoom Desktop Client') {
+    Write-Verbose "`nSkipping Zoom Desktop Client"
+} else {
+    Write-Verbose "`nProcessing Admx files for Zoom Desktop Client"
+    $admx = Get-ZoomDesktopClientAdmx -Version $admxversions.ZoomDesktopClient.Version -PolicyStore $PolicyStore -Languages $Languages
+    if ($admx) { if ($admxversions.ZoomDesktopClient) { $admxversions.ZoomDesktopClient = $admx } else { $admxversions += @{ ZoomDesktopClient = @{ Version = $admx.Version; URI = $admx.URI } } } }
+}
 
 Write-Verbose "`nSaving Admx versions to '$($WorkingDirectory)\admxversions.xml'"
 $admxversions | Export-Clixml -Path "$($WorkingDirectory)\admxversions.xml" -Force

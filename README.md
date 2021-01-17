@@ -26,53 +26,132 @@ Install-Script -Name EvergreenAdmx
 
 I have scheduled the script to run daily:
 
-`
+```powershell
 EvergreenAdmx.ps1 -WindowsVersion "20H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions"
-`
+```
+
 The above execution will keep the central Policy Store up-to-date on a daily basis.
 
 A sample .xml file that you can import in Task Scheduler is provided with this script.
 
-This script processes all the products by default. Simply comment out any products you don't need and the script will skip those.
-This will change in a future release.
+
+
+`Breaking change starting from 2101.2`
+
+This script no longer processes all the products by default. There's no need to comment out any products you don't need anymore.
+
+In 2101.2 the parameter 'Include' was introduced which is an array you can use to specify all products that need to be processed. This parameter is required for the script to be able to run.  
+Valid entries are "Custom Policy Store", "Windows 10", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office", "FSLogix", "Adobe AcrobatReader DC", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client".
+
+
+By default, if you don't use this parameter, only "Windows 10", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office" is processed.
 
 ```
 SYNTAX
-    D:\Personal Data\amensc\Gits\EvergreenAdmx\EvergreenAdmx.ps1 [[-WindowsVersion] <String>] [[-WorkingDirectory] <String>] [[-PolicyStore] <String>] [[-Languages] <String[]>] [-UseProductFolders] [<CommonParameters>]
+    EvergreenAdmx.ps1 [[-WindowsVersion] <String>] [[-WorkingDirectory] <String>] [[-PolicyStore] <String>] [[-Languages] <String[]>] [-UseProductFolders] [[-CustomPolicyStore] <String>] [[-Include] <String[]>] [-PreferLocalOneDrive]
+    [<CommonParameters>]
+
 
 DESCRIPTION
-    Script to download latest Admx files for several products.
-    Optionally copy the latest Admx files to a folder of your chosing, for example a Policy Store.
+    Script to automatically download latest Admx files for several products.
+    Optionally copies the latest Admx files to a folder of your chosing, for example a Policy Store.
+
 
 PARAMETERS
     -WindowsVersion <String>
         The Windows 10 version to get the Admx files for.
         If omitted the newest version supported by this script will be used.
 
+        Required?                    false
+        Position?                    1
+        Default value                20H2
+        Accept pipeline input?       false
+        Accept wildcard characters?  false
+
     -WorkingDirectory <String>
         Optionally provide a Working Directory for the script.
         The script will store Admx files in a subdirectory called "admx".
         The script will store downloaded files in a subdirectory called "downloads".
         If omitted the script will treat the script's folder as the working directory.
+
+        Required?                    false
+        Position?                    2
+        Default value
+        Accept pipeline input?       false
+        Accept wildcard characters?  false
         
     -PolicyStore <String>
         Optionally provide a Policy Store location to copy the Admx files to after processing.
 
+        Required?                    false
+        Position?                    3
+        Default value
+        Accept pipeline input?       false
+        Accept wildcard characters?  false
+
     -Languages <String[]>
         Optionally provide an array of languages to process. Entries must be in 'xy-XY' format.
         If omitted the script will process 'en-US'.
-        
+
+        Required?                    false
+        Position?                    4
+        Default value                @("en-US")
+        Accept pipeline input?       false
+        Accept wildcard characters?  false
+
     -UseProductFolders [<SwitchParameter>]
         When specified the extracted Admx files are copied to their respective product folders in a subfolder of 'Admx' in the WorkingDirectory.
+
+        Required?                    false
+        Position?                    named
+        Default value                False
+        Accept pipeline input?       false
+        Accept wildcard characters?  false
+
+    -CustomPolicyStore <String>
+        When specified processes a location for custom policy files. Can be UNC format or local folder.
+        The script will expect to find .admx files in this location, and at least one language folder holding the .adml file(s).
+        Versioning will be done based on the newest file found recursively in this location (any .admx or .adml).
+        Note that if any file has changed the script will process all files found in location.
+
+        Required?                    false
+        Position?                    5
+        Default value
+        Accept pipeline input?       false
+        Accept wildcard characters?  false
+
+    -Include <String[]>
+        Array containing Admx products to include when checking for updates.
+        Defaults to "Windows 10", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office" if omitted.
+        
+        Required?                    false
+        Position?                    6
+        Default value                @("Windows 10", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office")
+        Accept pipeline input?       false
+        Accept wildcard characters?  false
+
+    -PreferLocalOneDrive [<SwitchParameter>]
+        Microsoft OneDrive Admx files are only available after installing OneDrive.
+        If this script is running on a machine that has OneDrive installed locally, use this switch to prevent automatically uninstalling OneDrive.
+
+        Required?                    false
+        Position?                    named
+        Default value                false
+        Accept pipeline input?       false
+        Accept wildcard characters?  false
 
     <CommonParameters>
         This cmdlet supports the common parameters: Verbose, Debug,
         ErrorAction, ErrorVariable, WarningAction, WarningVariable,
         OutBuffer, PipelineVariable, and OutVariable. For more information, see
         about_CommonParameters (https:/go.microsoft.com/fwlink/?LinkID=113216).
-    
-EXAMPLES
+
+    -------------------------- EXAMPLE 1 --------------------------
+
     PS C:\>.\EvergreenAdmx.ps1 -WindowsVersion "20H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
+
+    Will process the default set of products, storing results in product folders, for both English United States as Dutch languages, and copies the files to the Policy store.
+
 ```
 
 ## Admx files
@@ -80,6 +159,7 @@ EXAMPLES
 Also see [Change Log][change-log] for a list of supported products.
 
 Now supports
+*  Custom Policy Store
 *  Adobe Acrobat Reader DC
 *  Base Image Script Framework (BIS-F)
 *  Citrix Workspace App
@@ -88,7 +168,7 @@ Now supports
 *  Microsoft Desktop Optimization Pack
 *  Microsoft Edge (Chromium)
 *  Microsoft Office
-*  Microsoft OneDrive
+*  Microsoft OneDrive (installed or Evergreen)
 *  Microsoft Windows 10 (1903/1909/2004/20H2)
 *  Mozilla Firefox
 *  Zoom Desktop Client
@@ -96,7 +176,8 @@ Now supports
 ## Notes
 
 I have not tested this script on Windows Core.
-Some of the Admx files can only be obtained by installing the package that was downloaded. For instance, the Windows 10 Admx files are in an msi file, the OneDrive Admx files are in the installation folder after installing OneDrive.
+Some of the Admx files can only be obtained by installing the package that was downloaded.  
+For instance, the Windows 10 Admx files are in an msi file, the OneDrive Admx files are in the installation folder after installing OneDrive.  
 So this is what the script does for these packages: installing the package, copying the Admx files, uninstalling the package.
 
 [github-release-badge]: https://img.shields.io/github/release/msfreaks/EvergreenAdmx.svg?style=flat-square
