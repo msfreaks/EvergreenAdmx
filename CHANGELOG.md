@@ -5,6 +5,14 @@
 *  Add logging options
 *  Add notification options
 
+## 2106.2
+
+*  Fixed bug where script was unable to get the version for Citrix Workspace App Admx
+
+## 2106.1
+
+*  Added Admx for Microsoft Windows 10 (21H1) 
+
 ## 2101.2
 
 `Breaking change introduced!` (See [README][read-me] for more info)

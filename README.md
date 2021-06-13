@@ -27,7 +27,7 @@ Install-Script -Name EvergreenAdmx
 I have scheduled the script to run daily:
 
 ```powershell
-EvergreenAdmx.ps1 -WindowsVersion "20H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions"
+EvergreenAdmx.ps1 -WindowsVersion "21H1" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions"
 ```
 
 The above execution will keep the central Policy Store up-to-date on a daily basis.
@@ -64,7 +64,7 @@ PARAMETERS
 
         Required?                    false
         Position?                    1
-        Default value                20H2
+        Default value                21H1
         Accept pipeline input?       false
         Accept wildcard characters?  false
 

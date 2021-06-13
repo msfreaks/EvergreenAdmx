@@ -1,6 +1,6 @@
 ﻿<#PSScriptInfo
 
-.VERSION 2101.2
+.VERSION 2106.2
 
 .GUID 999952b7-1337-4018-a1b9-499fad48e734
 
@@ -69,8 +69,8 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $False)][ValidateSet("1903", "1909", "2004", "20H2")]
-    [System.String] $WindowsVersion = "20H2",
+    [Parameter(Mandatory = $False)][ValidateSet("1903", "1909", "2004", "20H2", "21H1")]
+    [System.String] $WindowsVersion = "21H1",
     [Parameter(Mandatory = $False)]
     [System.String] $WorkingDirectory = $null,
     [Parameter(Mandatory = $False)]
@@ -130,7 +130,7 @@ function Get-Windows10AdmxDownloadId {
         [string]$WindowsVersion
     )
 
-    return (@( @{ "1903" = "58495" }, @{ "1909" = "100591" }, @{ "2004" = "101445" }, @{ "20H2" = "102157" } ).$WindowsVersion)
+    return (@( @{ "1903" = "58495" }, @{ "1909" = "100591" }, @{ "2004" = "101445" }, @{ "20H2" = "102157" }, @{ "21H1" = "103124" } ).$WindowsVersion)
 }
 
 function Copy-Admx {
@@ -410,8 +410,9 @@ function Get-CitrixWorkspaceAppAdmxOnline {
         # extract url from ADMX download string
         $URI = "https:$(((Select-String '(\/\/)([^\s,]+)(?=")' -Input $str).Matches.Value))"
         # grab version
-        $Version = ($URI.Split("/")[-1] | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
-
+        $filename = $URI.Split("/")[-1].Split('?')[0].Split('_')[-1]
+        $Version = $filename.Replace(".zip", "") #($filename | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
+        if ($Version -notcontains '.') { $Version += ".0" }
         # return evergreen object
         return @{ Version = $Version; URI = $URI }
     }
