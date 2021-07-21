@@ -5,6 +5,11 @@
 *  Add logging options
 *  Add notification options
 
+## 2107.1
+
+* Fixed bug where Get-FSLogixOnline would fail using code provided by severud (thanks!)
+* Typo corrected for Windows 20 (21H1)
+
 ## 2106.2
 
 *  Fixed bug where script was unable to get the version for Citrix Workspace App Admx

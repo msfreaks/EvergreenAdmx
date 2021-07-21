@@ -1,6 +1,6 @@
 ﻿<#PSScriptInfo
 
-.VERSION 2106.2
+.VERSION 2107.1
 
 .GUID 999952b7-1337-4018-a1b9-499fad48e734
 
@@ -173,20 +173,36 @@ function Get-FSLogixOnline {
 
     try {
         $ProgressPreference = 'SilentlyContinue'
-        $url = "https://aka.ms/fslogix_download"
-        # grab content without redirecting to the download
-        $web = Invoke-WebRequest -Uri $url -UseBasicParsing -MaximumRedirection 0 -ErrorAction Ignore
-        $url = $web.Headers.Location
-        # grab content without redirecting to the download
-        $web = Invoke-WebRequest -Uri $url -UseBasicParsing -MaximumRedirection 0 -ErrorAction Ignore
-        # grab uri
-        $URI = $web.Headers.Location
+        # grab URI (redirected url)
+        $URI = Get-RedirectedUrl -Url 'https://aka.ms/fslogix/download'
         # grab version
         $Version = ($URI.Split("/")[-1] | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
 
         # return evergreen object
         return @{ Version = $Version; URI = $URI }
     }
+    catch {
+        Throw $_
+    }
+}
+
+function Get-RedirectedUrl {
+    param (
+        [Parameter(Mandatory = $true)]
+        [String]$Url
+    )
+
+    $request = [System.Net.WebRequest]::Create($url)
+    $request.AllowAutoRedirect = $true
+
+    try {
+        $response = $request.GetResponse()
+        $redirectedUrl = $response.ResponseUri.AbsoluteUri
+        $response.Close()
+
+        Write-Output -InputObject $redirectedUrl
+    }
+
     catch {
         Throw $_
     }

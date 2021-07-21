@@ -169,7 +169,7 @@ Now supports
 *  Microsoft Edge (Chromium)
 *  Microsoft Office
 *  Microsoft OneDrive (installed or Evergreen)
-*  Microsoft Windows 10 (1903/1909/2004/20H2)
+*  Microsoft Windows 10 (1903/1909/2004/20H2/21H1)
 *  Mozilla Firefox
 *  Zoom Desktop Client
 
