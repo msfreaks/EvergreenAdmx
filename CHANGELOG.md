@@ -5,6 +5,12 @@
 *  Add logging options
 *  Add notification options
 
+## 2109.1
+
+* Fixed bug where downloading the ADMX files for Citrix Workspace App would fail
+* Fixed bug where downloading the ADMX files for BIS-F would fail to copy the .adml file
+* Fixed bug where downloading the ADMX files for Microsoft Onedrive would fail
+
 ## 2107.1
 
 * Fixed bug where Get-FSLogixOnline would fail using code provided by severud (thanks!)

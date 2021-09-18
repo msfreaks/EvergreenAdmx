@@ -143,15 +143,21 @@ function Copy-Admx {
         [string[]]$Languages = $null
     )
     if (-not (Test-Path -Path "$($TargetFolder)")) { $null = (mkdir -Path "$($TargetFolder)" -Force) }
+    if (-not $Languages -or $Languages -eq "") { $Languages = @('en-US') }
 
     Write-Verbose "Copying Admx files from '$($SourceFolder)' to '$($TargetFolder)'"
     Copy-Item -Path "$($SourceFolder)\*.admx" -Destination "$($TargetFolder)" -Force
     foreach ($language in $Languages) {
         if (-not (Test-Path -Path "$($SourceFolder)\$($language)")) {
+            Write-Verbose "$($language) not found"
             if (-not $Quiet) { Write-Warning "Language '$($language)' not found for '$($ProductName)'. Processing 'en-US' instead." }
             $language = "en-US"
         }
-        if (-not (Test-Path -Path "$($TargetFolder)\$($language)")) { $null = (mkdir -Path "$($TargetFolder)\$($language)" -Force) }
+        if (-not (Test-Path -Path "$($TargetFolder)\$($language)")) { 
+            Write-Verbose "'$($TargetFolder)\$($language)' does not exist, creating folder"
+            $null = (mkdir -Path "$($TargetFolder)\$($language)" -Force)
+        }
+        Write-Verbose "Copying '$($SourceFolder)\$($language)\*.adml' to '$($TargetFolder)\$($language)'" 
         Copy-Item -Path "$($SourceFolder)\$($language)\*.adml" -Destination "$($TargetFolder)\$($language)" -Force
     }
     if ($PolicyStore) {
@@ -303,7 +309,7 @@ function Get-OneDriveOnline {
             # grab uri
             $URI = $web.Headers.Location
             # grab version
-            $Version = ($URI.Split("/")[-2] | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
+            $Version = ($URI | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
 
             # return evergreen object
             return @{ Version = $Version; URI = $URI }
@@ -426,7 +432,7 @@ function Get-CitrixWorkspaceAppAdmxOnline {
         # extract url from ADMX download string
         $URI = "https:$(((Select-String '(\/\/)([^\s,]+)(?=")' -Input $str).Matches.Value))"
         # grab version
-        $filename = $URI.Split("/")[-1].Split('?')[0].Split('_')[-1]
+        $filename = $URI.Split("?")[0].Split("/")[-1].Split('?')[0].Split('_')[-1]
         $Version = $filename.Replace(".zip", "") #($filename | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
         if ($Version -notcontains '.') { $Version += ".0" }
         # return evergreen object
@@ -1090,7 +1096,7 @@ function Get-CitrixWorkspaceAppAdmx {
         Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
 
         # download and process
-        $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1].Split("?")[0])"
+        $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("?")[0].Split("/")[-1])"
         try {
             # download
             $ProgressPreference = 'SilentlyContinue'
