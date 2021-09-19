@@ -5,6 +5,10 @@
 *  Add logging options
 *  Add notification options
 
+## 2109.2
+
+* Fixed bug where uninstall information for OneDrive would throw an error
+
 ## 2109.1
 
 * Fixed bug where downloading the ADMX files for Citrix Workspace App would fail
