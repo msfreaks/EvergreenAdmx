@@ -1,6 +1,6 @@
 ﻿<#PSScriptInfo
 
-.VERSION 2109.1
+.VERSION 2109.2
 
 .GUID 999952b7-1337-4018-a1b9-499fad48e734
 
@@ -817,13 +817,21 @@ function Get-OneDriveAdmx {
 
                 # find uninstall info
                 Write-Verbose "Grabbing uninstallation info from registry for OneDrive installer"
-                $uninstall = Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\OneDriveSetup.exe"
-                Write-Verbose "Found '$($uninstall.DisplayName)'"
+                $uninstall = Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\OneDriveSetup.exe" -ErrorAction SilentlyContinue
+                if ($null -eq $uninstall) {
+                    $uninstall = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\OneDriveSetup.exe" -ErrorAction SilentlyContinue
+                }
+                if ($null -eq $uninstall) { 
+                    Write-Warning -Message "Unable to find uninstall information for OneDrive."
+                }
+                else {
+                    Write-Verbose "Found '$($uninstall.DisplayName)'"
 
-                # find installation path
-                Write-Verbose "Grabbing installation path for OneDrive installer"
-                $installfolder = $uninstall.DisplayIcon.Substring(0, $uninstall.DisplayIcon.IndexOf("\OneDriveSetup.exe"))
-                Write-Verbose "Found '$($installfolder)'"
+                    # find installation path
+                    Write-Verbose "Grabbing installation path for OneDrive installer"
+                    $installfolder = $uninstall.DisplayIcon.Substring(0, $uninstall.DisplayIcon.IndexOf("\OneDriveSetup.exe"))
+                    Write-Verbose "Found '$($installfolder)'"
+                }
             } else {
                 $installfolder = $evergreen.URI
             }
