@@ -1,6 +1,6 @@
 ﻿<#PSScriptInfo
 
-.VERSION 2109.2
+.VERSION 2112.1
 
 .GUID 999952b7-1337-4018-a1b9-499fad48e734
 
@@ -24,8 +24,12 @@
  Script to automatically download latest Admx files for several products.
  Optionally copies the latest Admx files to a folder of your chosing, for example a Policy Store.
 
-.PARAMETER WindowsVersion
+.PARAMETER Windows10Version
  The Windows 10 version to get the Admx files for.
+ If omitted the newest version supported by this script will be used.
+
+.PARAMETER Windows11Version
+ The Windows 11 version to get the Admx files for.
  If omitted the newest version supported by this script will be used.
 
 .PARAMETER WorkingDirectory
@@ -52,14 +56,14 @@
 
 .PARAMETER Include
  Array containing Admx products to include when checking for updates.
- Defaults to "Windows 10", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office" if omitted.
+ Defaults to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office" if omitted.
 
 .PARAMETER PreferLocalOneDrive
  Microsoft OneDrive Admx files are only available after installing OneDrive.
  If this script is running on a machine that has OneDrive installed locally, use this switch to prevent automatically uninstalling OneDrive.
 
 .EXAMPLE
- .\EvergreenAdmx.ps1 -WindowsVersion "20H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
+ .\EvergreenAdmx.ps1 -Windows10Version "20H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
  Will process the default set of products, storing results in product folders, for both English United States as Dutch languages, and copies the files to the Policy store.
  
 .LINK
@@ -69,8 +73,10 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $False)][ValidateSet("1903", "1909", "2004", "20H2", "21H1")]
-    [System.String] $WindowsVersion = "21H1",
+    [Parameter(Mandatory = $False)][ValidateSet("1903", "1909", "2004", "20H2", "21H1", "21H2")]
+    [System.String] $Windows10Version = "21H2",
+    [Parameter(Mandatory = $False)][ValidateSet("21H2")]
+    [System.String] $Windows11Version = "21H2",
     [Parameter(Mandatory = $False)]
     [System.String] $WorkingDirectory = $null,
     [Parameter(Mandatory = $False)]
@@ -81,8 +87,8 @@ param(
     [switch] $UseProductFolders,
     [Parameter(Mandatory = $False)]
     [System.String] $CustomPolicyStore = $null,
-    [Parameter(Mandatory = $False)][ValidateSet("Custom Policy Store", "Windows 10", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office", "FSLogix", "Adobe AcrobatReader DC", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client")]
-    [System.String[]] $Include = @("Windows 10", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office"),
+    [Parameter(Mandatory = $False)][ValidateSet("Custom Policy Store", "Windows 10", "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office", "FSLogix", "Adobe AcrobatReader DC", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client")]
+    [System.String[]] $Include = @("Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office"),
     [Parameter(Mandatory = $False)]
     [switch] $PreferLocalOneDrive = $false
 )
@@ -104,7 +110,8 @@ if ($PreferLocalOneDrive -and $Include -contains "Microsoft OneDrive" -and (-not
     break
 }
 
-Write-Verbose "Windows Version:`t`t'$($WindowsVersion)'"
+Write-Verbose "Windows 10 Version:`t'$($Windows10Version)'"
+Write-Verbose "Windows 11 Version:`t'$($Windows11Version)'"
 Write-Verbose "WorkingDirectory:`t`t'$($WorkingDirectory)'"
 Write-Verbose "PolicyStore:`t`t`t'$($PolicyStore)'"
 Write-Verbose "CustomPolicyStore:`t`t'$($CustomPolicyStore)'"
@@ -117,7 +124,7 @@ Write-Verbose "PreferLocalOneDrive:`t'$($PreferLocalOneDrive)'"
 #endregion
 
 #region functions
-function Get-Windows10AdmxDownloadId {
+function Get-WindowsAdmxDownloadId {
 <#
     .SYNOPSIS
     Returns download Id for Admx file based on Windows 10 version
@@ -127,10 +134,20 @@ function Get-Windows10AdmxDownloadId {
 #>
 
     param (
-        [string]$WindowsVersion
+        [string]$WindowsVersion,
+        [int]$WindowsEdition
     )
 
-    return (@( @{ "1903" = "58495" }, @{ "1909" = "100591" }, @{ "2004" = "101445" }, @{ "20H2" = "102157" }, @{ "21H1" = "103124" } ).$WindowsVersion)
+    switch($WindowsEdition) {
+        10 {
+                return (@( @{ "1903" = "58495" }, @{ "1909" = "100591" }, @{ "2004" = "101445" }, @{ "20H2" = "102157" }, @{ "21H1" = "103124" }, @{ "21H2" = "103667" } ).$WindowsVersion)
+                break
+        }
+        11 {
+                return (@( @{ "21H2" = "103507" } ).$WindowsVersion)
+                break
+        }
+    }
 }
 
 function Copy-Admx {
@@ -245,17 +262,11 @@ function Get-MicrosoftOfficeAdmxOnline {
     }
 }
 
-function Get-Windows10AdmxOnline {
+function Get-WindowsAdmxOnline {
 <#
-    .SYNOPSIS
-    Returns latest Version and Uri for the Windows 10 Admx files
-
-    .PARAMETER DownloadId
-    Id returned from Get-WindowsAdmxDownloadId
-    #>
     <#
     .SYNOPSIS
-    Returns latest Version and Uri for the Windows 10 Admx files
+    Returns latest Version and Uri for the Windows 10 or Windows 11 Admx files
 
     .PARAMETER DownloadId
     Id returned from Get-WindowsAdmxDownloadId
@@ -695,10 +706,10 @@ function Get-MicrosoftOfficeAdmx {
     }
 }
 
-function Get-Windows10Admx {
+function Get-WindowsAdmx {
 <#
     .SYNOPSIS
-    Process Windows 10 Admx files
+    Process Windows 10 or Windows 11 Admx files
 
     .PARAMETER Version
     Current Version present
@@ -708,18 +719,25 @@ function Get-Windows10Admx {
 
     .PARAMETER WindowsVersion
     Official WindowsVersion format
+
+    .PARAMETER WindowsEdition
+    Differentiate between Windows 10 and Windows 11
+
+    .PARAMETER Languages
+    Languages to check
 #>
 
     param(
         [string]$Version,
         [string]$PolicyStore = $null,
         [string]$WindowsVersion,
+        [int]$WindowsEdition,
         [string[]]$Languages = $null
     )
     
-    $id = Get-Windows10AdmxDownloadId -WindowsVersion $WindowsVersion
-    $evergreen = Get-Windows10AdmxOnline -DownloadId $id
-    $productname = "Microsoft Windows 10 $($WindowsVersion)"
+    $id = Get-WindowsAdmxDownloadId -WindowsVersion $WindowsVersion -WindowsEdition $WindowsEdition
+    $evergreen = Get-WindowsAdmxOnline -DownloadId $id
+    $productname = "Microsoft Windows $($WindowsEdition) $($WindowsVersion)"
     $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
 
     # see if this is a newer version
@@ -735,16 +753,16 @@ function Get-Windows10Admx {
             Invoke-WebRequest -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
 
             # install
-            Write-Verbose "Installing downloaded Windows 10 Admx installer"
+            Write-Verbose "Installing downloaded Windows $($WindowsEdition) Admx installer"
             $null = Start-Process -FilePath "MsiExec.exe" -WorkingDirectory "$($WorkingDirectory)\downloads" -ArgumentList "/qn /norestart /I`"$($outfile.split('\')[-1])`"" -PassThru -Wait
 
             # find installation path
-            Write-Verbose "Grabbing installation path for Windows 10 Admx installer"
+            Write-Verbose "Grabbing installation path for Windows $($WindowsEdition) Admx installer"
             $installfolder = Get-ChildItem -Path "C:\Program Files (x86)\Microsoft Group Policy"
             Write-Verbose "Found '$($installfolder.Name)'"
 
             # find uninstall info
-            Write-Verbose "Grabbing uninstallation info from registry for Windows 10 Admx installer"
+            Write-Verbose "Grabbing uninstallation info from registry for Windows $($WindowsEdition) Admx installer"
             $uninstall = Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" | Where-Object { $_.DisplayName -like "*(.admx)*" }
             Write-Verbose "Found '$($uninstall.DisplayName)'"
 
@@ -754,7 +772,7 @@ function Get-Windows10Admx {
             Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
 
             # uninstall
-            Write-Verbose "Uninstalling Windows 10 Admx installer"
+            Write-Verbose "Uninstalling Windows $($WindowsEdition) Admx installer"
             $null = Start-Process -FilePath "MsiExec.exe" -ArgumentList "/qn /norestart /X$($uninstall.PSChildName)" -PassThru -Wait
 
             return $evergreen
@@ -813,7 +831,7 @@ function Get-OneDriveAdmx {
                 # wait for setup to complete
                 while (Get-Process -Name "OneDriveSetup" -ErrorAction SilentlyContinue) { Start-Sleep -Seconds 10 }
                 # onedrive starts automatically after setup. kill!
-                Stop-Process -Name "OneDrive" -Force
+                Get-Process -Name "OneDrive" -ErrorAction SilentlyContinue | Stop-Process -Force
 
                 # find uninstall info
                 Write-Verbose "Grabbing uninstallation info from registry for OneDrive installer"
@@ -1116,7 +1134,7 @@ function Get-CitrixWorkspaceAppAdmx {
             Expand-Archive -Path $outfile -DestinationPath "$($env:TEMP)\citrixworkspaceapp" -Force
 
             # copy
-            $sourceadmx = "$($env:TEMP)\citrixworkspaceapp\$([io.path]::GetFileNameWithoutExtension($evergreen.URI.Split("/")[-1].Split("?")[0]))\Configuration"
+            $sourceadmx = "$($env:TEMP)\citrixworkspaceapp\$($evergreen.URI.Split("/")[-2].Split("?")[0].SubString(0,$evergreen.URI.Split("/")[-2].Split("?")[0].IndexOf(".")))\Configuration"
             $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
             Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
 
@@ -1441,8 +1459,17 @@ if ($Include -notcontains 'Windows 10') {
     Write-Verbose "`nSkipping Windows 10"
 } else {
     Write-Verbose "`nProcessing Admx files for Windows 10 $($WindowsVersion)"
-    $admx = Get-Windows10Admx -Version $admxversions.Windows.Version -PolicyStore $PolicyStore -WindowsVersion $WindowsVersion -Languages $Languages
-    if ($admx) { if ($admxversions.Windows) { $admxversions.Windows = $admx } else { $admxversions += @{ Windows = @{ Version = $admx.Version; URI = $admx.URI } } } }
+    $admx = Get-WindowsAdmx -Version $admxversions.Windows10.Version -PolicyStore $PolicyStore -WindowsVersion $Windows10Version -WindowsEdition 10 -Languages $Languages
+    if ($admx) { if ($admxversions.Windows10) { $admxversions.Windows10 = $admx } else { $admxversions += @{ Windows10 = @{ Version = $admx.Version; URI = $admx.URI } } } }
+}
+
+# Windows 11
+if ($Include -notcontains 'Windows 11') {
+    Write-Verbose "`nSkipping Windows 11"
+} else {
+    Write-Verbose "`nProcessing Admx files for Windows 11 $($WindowsVersion)"
+    $admx = Get-WindowsAdmx -Version $admxversions.Windows11.Version -PolicyStore $PolicyStore -WindowsVersion $Windows11Version -WindowsEdition 11 -Languages $Languages
+    if ($admx) { if ($admxversions.Windows11) { $admxversions.Windows11 = $admx } else { $admxversions += @{ Windows11 = @{ Version = $admx.Version; URI = $admx.URI } } } }
 }
 
 # Microsoft Edge (Chromium)

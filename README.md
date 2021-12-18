@@ -5,7 +5,7 @@
 [![License][license-badge]][license]
 [![Twitter][twitter-follow-badge]][twitter-follow]
 
-After deploying several Windows Virtual Desktop environments I decided I no longer wanted to manually download the Admx files I needed, and I wanted a way to keep them up-to-date.
+After deploying several Azure Virtual Desktop environments I decided I no longer wanted to manually download the Admx files I needed, and I wanted a way to keep them up-to-date.
 
 This script solves both problems.
 *  Checks for newer versions of the Admx files that are present and processes the new version if found
@@ -27,7 +27,7 @@ Install-Script -Name EvergreenAdmx
 I have scheduled the script to run daily:
 
 ```powershell
-EvergreenAdmx.ps1 -WindowsVersion "21H1" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions"
+EvergreenAdmx.ps1 -Windows11Version "21H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions"
 ```
 
 The above execution will keep the central Policy Store up-to-date on a daily basis.
@@ -35,6 +35,12 @@ The above execution will keep the central Policy Store up-to-date on a daily bas
 A sample .xml file that you can import in Task Scheduler is provided with this script.
 
 
+`Breaking change starting from 2112.1`
+
+Windows 11 was added to the script, and that means the -WindowsVersion parameter was substituted with -Windows10Version and -Windows11Version.
+These MUST be used and for the same Windows version as any 'Include' options you provide.
+
+From this version the 'Includes' will default to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office".
 
 `Breaking change starting from 2101.2`
 
@@ -42,7 +48,6 @@ This script no longer processes all the products by default. There's no need to 
 
 In 2101.2 the parameter 'Include' was introduced which is an array you can use to specify all products that need to be processed. This parameter is required for the script to be able to run.  
 Valid entries are "Custom Policy Store", "Windows 10", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office", "FSLogix", "Adobe AcrobatReader DC", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client".
-
 
 By default, if you don't use this parameter, only "Windows 10", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office" is processed.
 
@@ -58,13 +63,25 @@ DESCRIPTION
 
 
 PARAMETERS
-    -WindowsVersion <String>
-        The Windows 10 version to get the Admx files for.
-        If omitted the newest version supported by this script will be used.
+    -Windows10Version <String>
+        The Windows 10 version to get the Admx files for. This value will be ignored if 'Windows 10' is
+        not specified with -Include parameter.
+        If omitted the newest version supported by this script will be used, if 'Windows 10' is included.
 
         Required?                    false
         Position?                    1
-        Default value                21H1
+        Default value                21H2
+        Accept pipeline input?       false
+        Accept wildcard characters?  false
+
+    -Windows11Version <String>
+        The Windows 11 version to get the Admx files for. This value will be ignored if 'Windows 11' is
+        not specified with -Include parameter.
+        If omitted the newest version supported by this script will be used, if 'Windows 11' is included.
+
+        Required?                    false
+        Position?                    1
+        Default value                21H2
         Accept pipeline input?       false
         Accept wildcard characters?  false
 
@@ -122,11 +139,11 @@ PARAMETERS
 
     -Include <String[]>
         Array containing Admx products to include when checking for updates.
-        Defaults to "Windows 10", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office" if omitted.
+        Defaults to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office" if omitted.
         
         Required?                    false
         Position?                    6
-        Default value                @("Windows 10", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office")
+        Default value                @("Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office")
         Accept pipeline input?       false
         Accept wildcard characters?  false
 
@@ -148,7 +165,7 @@ PARAMETERS
 
     -------------------------- EXAMPLE 1 --------------------------
 
-    PS C:\>.\EvergreenAdmx.ps1 -WindowsVersion "20H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
+    PS C:\>.\EvergreenAdmx.ps1 -Windows10Version "20H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
 
     Will process the default set of products, storing results in product folders, for both English United States as Dutch languages, and copies the files to the Policy store.
 
@@ -169,7 +186,8 @@ Now supports
 *  Microsoft Edge (Chromium)
 *  Microsoft Office
 *  Microsoft OneDrive (installed or Evergreen)
-*  Microsoft Windows 10 (1903/1909/2004/20H2/21H1)
+*  Microsoft Windows 10 (1903/1909/2004/20H2/21H1/21H2)
+*  Microsoft Windows 11 (21H2)
 *  Mozilla Firefox
 *  Zoom Desktop Client
 
@@ -177,7 +195,8 @@ Now supports
 
 I have not tested this script on Windows Core.
 Some of the Admx files can only be obtained by installing the package that was downloaded.  
-For instance, the Windows 10 Admx files are in an msi file, the OneDrive Admx files are in the installation folder after installing OneDrive.  
+For instance, the Windows 10 and Windows 11 Admx files are in an msi file, the OneDrive Admx files are in the installation folder after installing OneDrive.
+If you are going to use the script to download Windows 10 or Windows 11 Admx files, you will need to remove any installs of the Windows 10 or Windows 11 Admx msi, or the script will fail.
 So this is what the script does for these packages: installing the package, copying the Admx files, uninstalling the package.
 
 [github-release-badge]: https://img.shields.io/github/release/msfreaks/EvergreenAdmx.svg?style=flat-square

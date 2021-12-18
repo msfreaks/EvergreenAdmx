@@ -5,6 +5,22 @@
 *  Add logging options
 *  Add notification options
 
+## 2112.1
+
+`Breaking change introduced!` (See [README][read-me] for more info)
+
+* Added parameter 'Windows10Version' (`breaking change`)
+* Added parameter 'Windows11Version' (`breaking change`)
+* Removed parameter 'WindowsVersion' (`breaking change`)
+* Added Admx for Microsoft Windows 10 (21H2)
+* Added Admx for Microsoft Windows 11 (21H2)
+* Fixed bug where copying the ADMX files for Citrix Workspace App would fail
+* Fixed bug where terminating a running OneDrive process would fail if a process was not found
+
+## 2111.1
+
+*  Internal version
+
 ## 2109.2
 
 * Fixed bug where uninstall information for OneDrive would throw an error
