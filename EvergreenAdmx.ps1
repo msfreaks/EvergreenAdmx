@@ -1,6 +1,6 @@
 ﻿<#PSScriptInfo
 
-.VERSION 2112.1
+.VERSION 2112.2
 
 .GUID 999952b7-1337-4018-a1b9-499fad48e734
 
@@ -74,7 +74,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $False)][ValidateSet("1903", "1909", "2004", "20H2", "21H1", "21H2")]
-    [System.String] $Windows10Version = "21H2",
+    [System.String] $Windows10Version = "21H1",
     [Parameter(Mandatory = $False)][ValidateSet("21H2")]
     [System.String] $Windows11Version = "21H2",
     [Parameter(Mandatory = $False)]
@@ -109,7 +109,6 @@ if ($PreferLocalOneDrive -and $Include -contains "Microsoft OneDrive" -and (-not
     throw "PreferLocalOneDrive will only work if OneDrive is machine installed. User installed OneDrive is not supported.`nLocal machine installed OneDrive not found."
     break
 }
-
 Write-Verbose "Windows 10 Version:`t'$($Windows10Version)'"
 Write-Verbose "Windows 11 Version:`t'$($Windows11Version)'"
 Write-Verbose "WorkingDirectory:`t`t'$($WorkingDirectory)'"
@@ -831,7 +830,7 @@ function Get-OneDriveAdmx {
                 # wait for setup to complete
                 while (Get-Process -Name "OneDriveSetup" -ErrorAction SilentlyContinue) { Start-Sleep -Seconds 10 }
                 # onedrive starts automatically after setup. kill!
-                Get-Process -Name "OneDrive" -ErrorAction SilentlyContinue | Stop-Process -Force
+                Stop-Process -Name "OneDrive" -Force
 
                 # find uninstall info
                 Write-Verbose "Grabbing uninstallation info from registry for OneDrive installer"

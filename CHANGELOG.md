@@ -5,6 +5,10 @@
 *  Add logging options
 *  Add notification options
 
+## 2112.2
+
+* Fixed bug where Windows 10 would throw a WindowsVersion variable error
+
 ## 2112.1
 
 `Breaking change introduced!` (See [README][read-me] for more info)
