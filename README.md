@@ -52,8 +52,10 @@ By default, if you don't use this parameter, only "Windows 10", "Microsoft Edge"
 
 ```
 SYNTAX
-    C:\gits\github\EvergreenAdmx\EvergreenAdmx.ps1 [[-Windows10Version] <String>] [[-Windows11Version] <String>] [[-WorkingDirectory] <String>] [[-PolicyStore] <String>] [[-Languages] <String[]>] [-UseProductFolders] [[-CustomPolicyStore]
-    <String>] [[-Include] <String[]>] [-PreferLocalOneDrive] [<CommonParameters>]
+    C:\gits\github\EvergreenAdmx\EvergreenAdmx.ps1 [[-Windows10Version] <String>] [[-Windows11Version] 
+    <String>] [[-WorkingDirectory] <String>] [[-PolicyStore] <String>] [[-Languages] <String[]>]
+    [-UseProductFolders] [[-CustomPolicyStore] <String>] [[-Include] <String[]>] [-PreferLocalOneDrive]
+    [<CommonParameters>]
 
 DESCRIPTION
     Script to automatically download latest Admx files for several products.
