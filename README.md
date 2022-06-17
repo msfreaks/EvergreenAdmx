@@ -189,7 +189,7 @@ Now supports
 *  Microsoft Windows 10 (1903/1909/2004/20H2/21H1/21H2)
 *  Microsoft Windows 11 (21H2)
 *  Mozilla Firefox
-*  Zoom Desktop Client
+*  ~~Zoom Desktop Client~~
 
 ## Notes
 
@@ -199,11 +199,11 @@ For instance, the Windows 10 and Windows 11 Admx files are in an msi file, the O
 If you are going to use the script to download Windows 10 or Windows 11 Admx files, you will need to remove any installs of the Windows 10 or Windows 11 Admx msi, or the script will fail.
 So this is what the script does for these packages: installing the package, copying the Admx files, uninstalling the package.
 
-[github-release-badge]: https://img.shields.io/github/release/msfreaks/EvergreenAdmx.svg?style=flat-square
+[github-release-badge]: https://img.shields.io/github/v/release/msfreaks/EvergreenAdmx.svg?style=flat-square
 [github-release]: https://github.com/msfreaks/EvergreenAdmx/releases/latest
 [code-quality-badge]: https://app.codacy.com/project/badge/Grade/c0efab02b66442399bb16b0493cdfbef?style=flat-square
 [code-quality]: https://www.codacy.com/gh/msfreaks/EvergreenAdmx/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=msfreaks/EvergreenAdmx&amp;utm_campaign=Badge_Grade
-[license-badge]: https://img.shields.io/github/license/msfreaks/EvergreenAdmx.svg?style=flat-square
+[license-badge]: https://img.shields.io/github/license/msfreaks/EvergreenADMX?style=flat-square
 [license]: https://github.com/msfreaks/EvergreenAdmx/blob/master/LICENSE
 [twitter-follow-badge]: https://img.shields.io/twitter/follow/menschab?style=flat-square
 [twitter-follow]: https://twitter.com/menschab?ref_src=twsrc%5Etfw

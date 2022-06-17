@@ -2,8 +2,15 @@
 
 ## To do
 
-*  Add logging options
-*  Add notification options
+*  Add logging options (yep, since the beginning)
+*  Add notification options (yep, also since the beginning)
+
+## 2206.1
+
+* Added requirement for elevation to prevent running unelevated
+* Added paramater -UseDefaultCredentials to all Invoke-WebRequest commands, except for Adobe since that is ftp :(
+* Fixed bug where Amd64 OneDrive would mess everything up
+* Removed support for Zoom Desktop Client (403 error when checking for new version)
 
 ## 2112.2
 
