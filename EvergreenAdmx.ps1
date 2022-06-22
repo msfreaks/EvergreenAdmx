@@ -452,9 +452,9 @@ function Get-CitrixWorkspaceAppAdmxOnline {
         # extract url from ADMX download string
         $URI = "https:$(((Select-String '(\/\/)([^\s,]+)(?=")' -Input $str).Matches.Value))"
         # grab version
-        $filename = $URI.Split("?")[0].Split("/")[-1].Split('?')[0].Split('_')[-1]
-        $Version = $filename.Replace(".zip", "") #($filename | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
-        if ($Version -notcontains '.') { $Version += ".0" }
+        $str = ($web.Content -split "`r`n" | Select-String -Pattern "Version:")[2].ToString().Trim()
+        $Version = ($str | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
+
         # return evergreen object
         return @{ Version = $Version; URI = $URI }
     }
