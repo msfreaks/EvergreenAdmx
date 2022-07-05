@@ -5,6 +5,10 @@
 *  Add logging options (yep, since the beginning)
 *  Add notification options (yep, also since the beginning)
 
+## 2207.1
+
+* Fixed bug where Citrix Workspace App would fail, thanks to Jonathan Pitre! (https://github.com/JonathanPitre)
+
 ## 2206.1
 
 * Added requirement for elevation to prevent running unelevated

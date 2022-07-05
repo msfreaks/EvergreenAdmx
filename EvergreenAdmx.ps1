@@ -2,7 +2,7 @@
 
 <#PSScriptInfo
 
-.VERSION 2206.1
+.VERSION 2207.1
 
 .GUID 999952b7-1337-4018-a1b9-499fad48e734
 
@@ -446,14 +446,14 @@ function Get-CitrixWorkspaceAppAdmxOnline {
         $ProgressPreference = 'SilentlyContinue'
         $url = "https://www.citrix.com/downloads/workspace-app/windows/workspace-app-for-windows-latest.html"
         # grab content
-        $web = Invoke-WebRequest -UseDefaultCredentials -Uri $url -UseBasicParsing -ErrorAction Ignore
+        $web = (Invoke-WebRequest -UseDefaultCredentials -Uri $url -UseBasicParsing -DisableKeepAlive -ErrorAction Ignore).RawContent
         # find line with ADMX download
-        $str = ($web.Content -split "`r`n" | Select-String -Pattern "_ADMX_")[0].ToString().Trim()
+        $str = ($web -split "`r`n" | Select-String -Pattern "_ADMX_")[0].ToString().Trim()
         # extract url from ADMX download string
         $URI = "https:$(((Select-String '(\/\/)([^\s,]+)(?=")' -Input $str).Matches.Value))"
         # grab version
-        $str = ($web.Content -split "`r`n" | Select-String -Pattern "Version:")[2].ToString().Trim()
-        $Version = ($str | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
+        $VersionRegEx = "Version\: ((?:\d+\.)+(?:\d+)) \((.+)\)"
+        $Version = ($web | Select-String -Pattern $VersionRegEx).Matches.Groups[1].Value
 
         # return evergreen object
         return @{ Version = $Version; URI = $URI }
@@ -1122,43 +1122,43 @@ function Get-CitrixWorkspaceAppAdmx {
         [string[]]$Languages = $null
     )
 
-    $evergreen = Get-CitrixWorkspaceAppAdmxOnline
-    $productname = "Citrix Workspace App"
-    $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
+$evergreen = Get-CitrixWorkspaceAppAdmxOnline
+$productname = "Citrix Workspace App"
+$productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
 
-    # see if this is a newer version
-    if (-not $Version -or [version]$evergreen.Version -gt [version]$Version) {
-        Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
+# see if this is a newer version
+if (-not $Version -or [version]$evergreen.Version -gt [version]$Version) {
+    Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
 
-        # download and process
-        $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("?")[0].Split("/")[-1])"
-        try {
-            # download
-            $ProgressPreference = 'SilentlyContinue'
-            Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
-            Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
+    # download and process
+    $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("?")[0].Split("/")[-1])"
+    try {
+        # download
+        $ProgressPreference = 'SilentlyContinue'
+        Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
+        Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
 
-            # extract
-            Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\citrixworkspaceapp'"
-            Expand-Archive -Path $outfile -DestinationPath "$($env:TEMP)\citrixworkspaceapp" -Force
+        # extract
+        Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\citrixworkspaceapp'"
+        Expand-Archive -Path $outfile -DestinationPath "$($env:TEMP)\citrixworkspaceapp" -Force
 
-            # copy
-            $sourceadmx = "$($env:TEMP)\citrixworkspaceapp\$($evergreen.URI.Split("/")[-2].Split("?")[0].SubString(0,$evergreen.URI.Split("/")[-2].Split("?")[0].IndexOf(".")))\Configuration"
-            $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
+        # copy
+        $sourceadmx = "$($env:TEMP)\citrixworkspaceapp\$($evergreen.URI.Split("/")[-2].Split("?")[0].SubString(0,$evergreen.URI.Split("/")[-2].Split("?")[0].IndexOf(".")))"
+        $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
+        Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
 
-            # cleanup
-            Remove-Item -Path "$($env:TEMP)\citrixworkspaceapp" -Recurse -Force
+        # cleanup
+        Remove-Item -Path "$($env:TEMP)\citrixworkspaceapp" -Recurse -Force
 
-            return $evergreen
-        }
-        catch {
-            Throw $_
-        }
-    } else {
-        # version already processed
-        return $null
+        return $evergreen
     }
+    catch {
+        Throw $_
+    }
+} else {
+    # version already processed
+    return $null
+}
 }
 
 function Get-MozillaFirefoxAdmx {
