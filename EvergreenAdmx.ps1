@@ -2,7 +2,7 @@
 
 <#PSScriptInfo
 
-.VERSION 2207.2
+.VERSION 2209.1
 
 .GUID 999952b7-1337-4018-a1b9-499fad48e734
 
@@ -65,7 +65,7 @@
  If this script is running on a machine that has OneDrive installed locally, use this switch to prevent automatically uninstalling OneDrive.
 
 .EXAMPLE
- .\EvergreenAdmx.ps1 -Windows10Version "21H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
+ .\EvergreenAdmx.ps1 -Windows10Version "22H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
  Will process the default set of products, storing results in product folders, for both English United States as Dutch languages, and copies the files to the Policy store.
  
 .LINK
