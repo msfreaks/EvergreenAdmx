@@ -2,7 +2,7 @@
 
 <#PSScriptInfo
 
-.VERSION 2207.1
+.VERSION 2209.1
 
 .GUID 999952b7-1337-4018-a1b9-499fad48e734
 
@@ -65,7 +65,7 @@
  If this script is running on a machine that has OneDrive installed locally, use this switch to prevent automatically uninstalling OneDrive.
 
 .EXAMPLE
- .\EvergreenAdmx.ps1 -Windows10Version "21H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
+ .\EvergreenAdmx.ps1 -Windows10Version "22H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
  Will process the default set of products, storing results in product folders, for both English United States as Dutch languages, and copies the files to the Policy store.
 
 .LINK
@@ -77,8 +77,8 @@
 param(
     [Parameter(Mandatory = $False)][ValidateSet("1903", "1909", "2004", "20H2", "21H1", "21H2")]
     [System.String] $Windows10Version = "21H2",
-    [Parameter(Mandatory = $False)][ValidateSet("21H2")]
-    [System.String] $Windows11Version = "21H2",
+    [Parameter(Mandatory = $False)][ValidateSet("21H2", "22H2")]
+    [System.String] $Windows11Version = "22H2",
     [Parameter(Mandatory = $False)]
     [System.String] $WorkingDirectory = $null,
     [Parameter(Mandatory = $False)]
@@ -89,8 +89,7 @@ param(
     [switch] $UseProductFolders,
     [Parameter(Mandatory = $False)]
     [System.String] $CustomPolicyStore = $null,
-    [Parameter(Mandatory = $False)][ValidateSet("Custom Policy Store", "Windows 10", "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office", "FSLogix", "Adobe AcrobatReader DC", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox")]
-    #, "Zoom Desktop Client"
+    [Parameter(Mandatory = $False)][ValidateSet("Custom Policy Store", "Windows 10", "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office", "FSLogix", "Adobe AcrobatReader DC", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client")]
      [System.String[]] $Include = @("Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office"),
     [Parameter(Mandatory = $False)]
     [switch] $PreferLocalOneDrive = $false
@@ -130,6 +129,10 @@ Write-Verbose "Admx path:`t`t`t`t'$($WorkingDirectory)\admx'"
 Write-Verbose "Download path:`t`t`t'$($WorkingDirectory)\downloads'"
 Write-Verbose "Included:`t`t`t`t'$($Include -join ',')'"
 Write-Verbose "PreferLocalOneDrive:`t'$($PreferLocalOneDrive)'"
+
+$ProgressPreference    = "SilentlyContinue"
+$ErrorActionPreference = "SilentlyContinue"
+
 #endregion
 
 #region functions
@@ -149,11 +152,11 @@ function Get-WindowsAdmxDownloadId {
 
     switch ($WindowsEdition) {
         10 {
-                return (@( @{ "1903" = "58495" }, @{ "1909" = "100591" }, @{ "2004" = "101445" }, @{ "20H2" = "102157" }, @{ "21H1" = "103124" }, @{ "21H2" = "103667" } ).$WindowsVersion)
+                return (@( @{ "1903" = "58495" }, @{ "1909" = "100591" }, @{ "2004" = "101445" }, @{ "20H2" = "102157" }, @{ "21H1" = "103124" }, @{ "21H2" = "104042" } ).$WindowsVersion)
                 break
         }
         11 {
-                return (@( @{ "21H2" = "103507" } ).$WindowsVersion)
+                return (@( @{ "21H2" = "103507" }, @{ "22H2" = "104593" } ).$WindowsVersion)
                 break
         }
     }
@@ -204,7 +207,6 @@ function Get-FSLogixOnline {
 #>
 
     try {
-        $ProgressPreference = 'SilentlyContinue'
         # grab URI (redirected url)
         $URI = Get-RedirectedUrl -Url 'https://aka.ms/fslogix/download'
         # grab version
@@ -250,7 +252,7 @@ function Get-MicrosoftOfficeAdmxOnline {
     $urlversion = "https://www.microsoft.com/en-us/download/details.aspx?id=$($id)"
     $urldownload = "https://www.microsoft.com/en-us/download/confirmation.aspx?id=$($id)"
     try {
-        $ProgressPreference = 'SilentlyContinue'
+        
         # load page for version scrape
         $web = Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urlversion -ErrorAction SilentlyContinue
         $str = ($web.ToString() -split "[`r`n]" | Select-String "Version:").ToString()
@@ -288,7 +290,7 @@ function Get-WindowsAdmxOnline {
     $urlversion = "https://www.microsoft.com/en-us/download/details.aspx?id=$($DownloadId)"
     $urldownload = "https://www.microsoft.com/en-us/download/confirmation.aspx?id=$($DownloadId)"
     try {
-        $ProgressPreference = 'SilentlyContinue'
+        
         # load page for version scrape
         $web = Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urlversion -ErrorAction SilentlyContinue
         $str = ($web.ToString() -split "[`r`n]" | Select-String "Version:").ToString()
@@ -316,27 +318,20 @@ function Get-OneDriveOnline
         [bool]$PreferLocalOneDrive
     )
 
-    if ($PreferLocalOneDrive)
-    {
-
-        if (Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive" -ErrorAction SilentlyContinue)
-        {
+    if ($PreferLocalOneDrive){
+        if (Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive" -ErrorAction SilentlyContinue) {
             $URI = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive").CurrentVersionPath)"
             $Version = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive").Version)"
         }
-        if ((Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\OneDrive" -ErrorAction SilentlyContinue))
-        {
+        if ((Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\OneDrive" -ErrorAction SilentlyContinue)) {
             $URI = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\OneDrive").CurrentVersionPath)"
             $Version = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\OneDrive").Version)"
         }
 
         return @{ Version = $Version; URI = $URI }
     }
-    else
-    {
-        try
-        {
-            $ProgressPreference = 'SilentlyContinue'
+    else {
+        try {
             $url = "https://go.microsoft.com/fwlink/p/?LinkID=844652"
             # grab content without redirecting to the download
             $web = Invoke-WebRequest -UseDefaultCredentials -Uri $url -UseBasicParsing -MaximumRedirection 0 -ErrorAction Ignore
@@ -348,8 +343,7 @@ function Get-OneDriveOnline
             # return evergreen object
             return @{ Version = $Version; URI = $URI }
         }
-        catch
-        {
+        catch {
             Throw $_
         }
     }
@@ -362,7 +356,7 @@ function Get-MicrosoftEdgePolicyOnline {
 #>
 
     try {
-        $ProgressPreference = 'SilentlyContinue'
+        
         $url = "https://edgeupdates.microsoft.com/api/products?view=enterprise"
         # grab json containing product info
         $json = Invoke-WebRequest -UseDefaultCredentials -Uri $url -UseBasicParsing -MaximumRedirection 0 -ErrorAction Ignore | ConvertFrom-Json
@@ -371,7 +365,7 @@ function Get-MicrosoftEdgePolicyOnline {
         # grab version
         $Version = $release.ProductVersion
         # grab uri
-        $URI = ($release.Artifacts | Where-Object { $_.ArtifactName -like "zip" }).Location
+        $URI = $release.Artifacts[0].Location
 
         # return evergreen object
         return @{ Version = $Version; URI = $URI }
@@ -389,15 +383,20 @@ function Get-GoogleChromeAdmxOnline {
 #>
 
     try {
-        $ProgressPreference = 'SilentlyContinue'
+        
         $URI = "https://dl.google.com/dl/edgedl/chrome/policy/policy_templates.zip"
         # download the file
         Invoke-WebRequest -UseDefaultCredentials -Uri $URI -OutFile "$($env:TEMP)\policy_templates.zip"
         # extract the file
         Expand-Archive -Path "$($env:TEMP)\policy_templates.zip" -DestinationPath "$($env:TEMP)\chromeadmx" -Force
+        
         # open the version file
         $versionfile = (Get-Content -Path "$($env:TEMP)\chromeadmx\VERSION").Split('=')
         $Version = "$($versionfile[1]).$($versionfile[3]).$($versionfile[5]).$($versionfile[7])"
+
+        # cleanup
+        Remove-Item -Path "$($env:TEMP)\policy_templates.zip" -Force
+        Remove-Item -Path "$($env:TEMP)\chromeadmx" -Recurse -Force
 
         # return evergreen object
         return @{ Version = $Version; URI = $URI }
@@ -414,7 +413,7 @@ function Get-AdobeAcrobatReaderDCAdmxOnline {
 #>
 
     try {
-        $ProgressPreference = 'SilentlyContinue'
+        
         $file = "ReaderADMTemplate.zip"
         $url = "ftp://ftp.adobe.com/pub/adobe/reader/win/AcrobatDC/misc/"
 
@@ -458,7 +457,7 @@ function Get-CitrixWorkspaceAppAdmxOnline {
 #>
 
     try {
-        $ProgressPreference = 'SilentlyContinue'
+        
         $url = "https://www.citrix.com/downloads/workspace-app/windows/workspace-app-for-windows-latest.html"
         # grab content
         $web = (Invoke-WebRequest -UseDefaultCredentials -Uri $url -UseBasicParsing -DisableKeepAlive -ErrorAction Ignore).RawContent
@@ -485,7 +484,7 @@ function Get-MozillaFirefoxAdmxOnline {
 #>
 
     try {
-        $ProgressPreference = 'SilentlyContinue'
+        
         # define github repo
         $repo = "mozilla/policy-templates"
         # grab latest release properties
@@ -511,7 +510,7 @@ function Get-BIS-FAdmxOnline {
 #>
 
     try {
-        $ProgressPreference = 'SilentlyContinue'
+        
         # define github repo
         $repo = "EUCweb/BIS-F"
         # grab latest release properties
@@ -540,7 +539,7 @@ function Get-MDOPAdmxOnline {
     $urlversion = "https://www.microsoft.com/en-us/download/details.aspx?id=$($id)"
     $urldownload = "https://www.microsoft.com/en-us/download/confirmation.aspx?id=$($id)"
     try {
-        $ProgressPreference = 'SilentlyContinue'
+        
         # load page for version scrape
         $web = Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urlversion -ErrorAction SilentlyContinue
         $str = ($web.ToString() -split "[`r`n]" | Select-String "Version:").ToString()
@@ -566,10 +565,11 @@ function Get-ZoomDesktopClientAdmxOnline {
 #>
 
     try {
-        $ProgressPreference = 'SilentlyContinue'
+        # https://assets.zoom.us/docs/msi-templates/Zoom_5.11.3.zip
+        
         $url = "https://support.zoom.us/hc/en-us/articles/360039100051"
         # grab content
-        $web = Invoke-WebRequest -UseDefaultCredentials -Uri $url -UseBasicParsing -ErrorAction Ignore
+        $web = Invoke-WebRequest -UseDefaultCredentials -Uri $url -UseBasicParsing
         # find ADMX download
         $URI = (($web.Links | Where-Object {$_.href -like "*msi-templates*.zip"})[-1]).href
         # grab version
@@ -632,7 +632,7 @@ function Get-FSLogixAdmx {
         $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1])"
         try {
             # download
-            $ProgressPreference = 'SilentlyContinue'
+            
             Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
             Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
 
@@ -703,7 +703,7 @@ function Get-MicrosoftOfficeAdmx {
         $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1])"
         try {
             # download
-            $ProgressPreference = 'SilentlyContinue'
+            
             Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
             Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
 
@@ -772,7 +772,7 @@ function Get-WindowsAdmx {
         $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1])"
         try {
             # download
-            $ProgressPreference = 'SilentlyContinue'
+            
             Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
             Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
 
@@ -845,7 +845,7 @@ function Get-OneDriveAdmx {
         try {
             if (-not $PreferLocalOneDrive) {
                 # download
-                $ProgressPreference = 'SilentlyContinue'
+                
                 Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
                 Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
 
@@ -955,16 +955,17 @@ function Get-MicrosoftEdgeAdmx {
         Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
 
         # download and process
-        $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1])"
+        $outfile = "$($WorkingDirectory)\downloads\MicrosoftEdgePolicyTemplates.cab"
         try {
             # download
-            $ProgressPreference = 'SilentlyContinue'
+            
             Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
             Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
 
             # extract
             Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\microsoftedgepolicy'"
-            Expand-Archive -Path $outfile -DestinationPath "$($env:TEMP)\microsoftedgepolicy" -Force
+            Start-Process -FilePath "$env:windir\System32\cmd.exe" -ArgumentList "/C $env:windir\System32\expand.exe `"$outfile`" `"$($env:TEMP)\microsoftedgepolicy\MicrosoftEdgePolicyTemplates.zip`"" -WindowStyle Hidden
+            Expand-Archive -Path "$($env:TEMP)\microsoftedgepolicy\MicrosoftEdgePolicyTemplates.zip" -DestinationPath "$($env:TEMP)\microsoftedgepolicy\" -Force
 
             # copy
             $sourceadmx = "$($env:TEMP)\microsoftedgepolicy\windows\admx"
@@ -1015,7 +1016,7 @@ function Get-GoogleChromeAdmx {
         $outfile = "$($WorkingDirectory)\downloads\googlechromeadmx.zip"
         try {
             # download
-            $ProgressPreference = 'SilentlyContinue'
+            
             Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
             Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
 
@@ -1092,7 +1093,7 @@ function Get-AdobeAcrobatReaderDCAdmx {
         $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1])"
         try {
             # download
-            $ProgressPreference = 'SilentlyContinue'
+            
             Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
             Invoke-WebRequest -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile -ErrorAction Ignore
 
@@ -1149,7 +1150,7 @@ if (-not $Version -or [version]$evergreen.Version -gt [version]$Version) {
     $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("?")[0].Split("/")[-1])"
     try {
         # download
-        $ProgressPreference = 'SilentlyContinue'
+        
         Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
         Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
 
@@ -1158,7 +1159,8 @@ if (-not $Version -or [version]$evergreen.Version -gt [version]$Version) {
         Expand-Archive -Path $outfile -DestinationPath "$($env:TEMP)\citrixworkspaceapp" -Force
 
         # copy
-        $sourceadmx = "$($env:TEMP)\citrixworkspaceapp\$($evergreen.URI.Split("/")[-2].Split("?")[0].SubString(0,$evergreen.URI.Split("/")[-2].Split("?")[0].IndexOf(".")))"
+        # $sourceadmx = "$($env:TEMP)\citrixworkspaceapp\$($evergreen.URI.Split("/")[-2].Split("?")[0].SubString(0,$evergreen.URI.Split("/")[-2].Split("?")[0].IndexOf(".")))"
+        $sourceadmx = (Get-ChildItem -Path "$($env:TEMP)\citrixworkspaceapp\$($evergreen.URI.Split("/")[-2].Split("?")[0].SubString(0,$evergreen.URI.Split("/")[-2].Split("?")[0].IndexOf(".")))" -Include "*.admx" -Recurse)[0].DirectoryName
         $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
         Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
 
@@ -1206,7 +1208,7 @@ function Get-MozillaFirefoxAdmx {
         $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1])"
         try {
             # download
-            $ProgressPreference = 'SilentlyContinue'
+            
             Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
             Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
 
@@ -1263,9 +1265,9 @@ function Get-ZoomDesktopClientAdmx {
         $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1])"
         try {
             # download
-            $ProgressPreference = 'SilentlyContinue'
+            
             Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
-            Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
+            Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile -Method POST
 
             # extract
             Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\zoomclientadmx'"
@@ -1320,7 +1322,7 @@ function Get-BIS-FAdmx {
         $outfile = "$($WorkingDirectory)\downloads\bis-f.$($evergreen.Version).zip"
         try {
             # download
-            $ProgressPreference = 'SilentlyContinue'
+            
             Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
             Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
 
@@ -1381,7 +1383,7 @@ function Get-MDOPAdmx {
         $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1])"
         try {
             # download
-            $ProgressPreference = 'SilentlyContinue'
+            
             Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
             Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
 

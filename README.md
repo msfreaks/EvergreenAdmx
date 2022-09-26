@@ -26,7 +26,7 @@ Install-Script -Name EvergreenAdmx
 I have scheduled the script to run daily:
 
 ```powershell
-EvergreenAdmx.ps1 -Windows11Version "21H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions"
+EvergreenAdmx.ps1 -Windows11Version "22H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions"
 ```
 
 The above execution will keep the central Policy Store up-to-date on a daily basis.
@@ -81,7 +81,7 @@ PARAMETERS
 
         Required?                    false
         Position?                    1
-        Default value                21H2
+        Default value                22H2
         Accept pipeline input?       false
         Accept wildcard characters?  false
 
@@ -198,6 +198,8 @@ Some of the Admx files can only be obtained by installing the package that was d
 For instance, the Windows 10 and Windows 11 Admx files are in an msi file, the OneDrive Admx files are in the installation folder after installing OneDrive.
 If you are going to use the script to download Windows 10 or Windows 11 Admx files, you will need to remove any installs of the Windows 10 or Windows 11 Admx msi, or the script will fail.
 So this is what the script does for these packages: installing the package, copying the Admx files, uninstalling the package.
+
+Thank you Jonathan Pitre (@PitreJonathan) for keeping me sharp, providing fixes and improvements!
 
 [github-release-badge]: https://img.shields.io/github/v/release/msfreaks/EvergreenAdmx.svg?style=flat-square
 [github-release]: https://github.com/msfreaks/EvergreenAdmx/releases/latest

@@ -5,6 +5,14 @@
 *  Add logging options (yep, since the beginning)
 *  Add notification options (yep, also since the beginning)
 
+## 2209.1
+
+* Fixed bug for Microsoft OneDrive, thanks Jonathan!
+* Fixed bug for Citrix Workspace App
+* Added Admx for Microsoft Windows 11 (22H2)
+* Added cleanup logic for Google Chrome ADMX version checking, thanks for noticing Jonathan!
+* Cleanup on code, thanks Jonathan!
+
 ## 2207.1
 
 * Fixed bug where Citrix Workspace App would fail, thanks to Jonathan Pitre! (https://github.com/JonathanPitre)
