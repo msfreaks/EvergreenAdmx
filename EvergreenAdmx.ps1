@@ -338,13 +338,22 @@ function Get-OneDriveOnline
     Returns latest Version and Uri for OneDrive
 #>
     param (
-        [bool] $PreferLocalOneDrive
+        [bool]$PreferLocalOneDrive
     )
 
     if ($PreferLocalOneDrive)
     {
-        $URI = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive").CurrentVersionPath)"
-        $Version = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive").Version)"
+
+        if (Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive" -ErrorAction SilentlyContinue)
+        {
+            $URI = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive").CurrentVersionPath)"
+            $Version = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive").Version)"
+        }
+        if ((Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\OneDrive" -ErrorAction SilentlyContinue))
+        {
+            $URI = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\OneDrive").CurrentVersionPath)"
+            $Version = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\OneDrive").Version)"
+        }
 
         return @{ Version = $Version; URI = $URI }
     }
@@ -875,13 +884,10 @@ function Get-OneDriveAdmx
     <#
     .SYNOPSIS
     Process OneDrive Admx files
-
     .PARAMETER Version
     Current Version present
-
     .PARAMETER PolicyStore
     Destination for the Admx files
-
     .PARAMETER PreferLocalOneDrive
     Check locally only
 #>
@@ -1009,6 +1015,7 @@ function Get-OneDriveAdmx
         return $null
     }
 }
+
 
 function Get-MicrosoftEdgeAdmx
 {
