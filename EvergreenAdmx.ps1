@@ -16,7 +16,7 @@
 
 .PROJECTURI https://github.com/msfreaks/EvergreenAdmx
 
-#> 
+#>
 
 <#
 .SYNOPSIS
@@ -67,7 +67,7 @@
 .EXAMPLE
  .\EvergreenAdmx.ps1 -Windows10Version "21H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
  Will process the default set of products, storing results in product folders, for both English United States as Dutch languages, and copies the files to the Policy store.
- 
+
 .LINK
  https://github.com/msfreaks/EvergreenAdmx
  https://msfreaks.wordpress.com
@@ -179,11 +179,11 @@ function Copy-Admx {
             if (-not $Quiet) { Write-Warning "Language '$($language)' not found for '$($ProductName)'. Processing 'en-US' instead." }
             $language = "en-US"
         }
-        if (-not (Test-Path -Path "$($TargetFolder)\$($language)")) { 
+        if (-not (Test-Path -Path "$($TargetFolder)\$($language)")) {
             Write-Verbose "'$($TargetFolder)\$($language)' does not exist, creating folder"
             $null = (mkdir -Path "$($TargetFolder)\$($language)" -Force)
         }
-        Write-Verbose "Copying '$($SourceFolder)\$($language)\*.adml' to '$($TargetFolder)\$($language)'" 
+        Write-Verbose "Copying '$($SourceFolder)\$($language)\*.adml' to '$($TargetFolder)\$($language)'"
         Copy-Item -Path "$($SourceFolder)\$($language)\*.adml" -Destination "$($TargetFolder)\$($language)" -Force
     }
     if ($PolicyStore) {
@@ -306,22 +306,36 @@ function Get-WindowsAdmxOnline {
     }
 }
 
-function Get-OneDriveOnline {
-<#
+function Get-OneDriveOnline
+{
+    <#
     .SYNOPSIS
     Returns latest Version and Uri for OneDrive
 #>
     param (
-        [bool] $PreferLocalOneDrive
+        [bool]$PreferLocalOneDrive
     )
 
-    if ($PreferLocalOneDrive) {
-        $URI = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive").CurrentVersionPath)"
-        $Version = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive").Version)"
+    if ($PreferLocalOneDrive)
+    {
+
+        if (Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive" -ErrorAction SilentlyContinue)
+        {
+            $URI = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive").CurrentVersionPath)"
+            $Version = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive").Version)"
+        }
+        if ((Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\OneDrive" -ErrorAction SilentlyContinue))
+        {
+            $URI = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\OneDrive").CurrentVersionPath)"
+            $Version = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\OneDrive").Version)"
+        }
 
         return @{ Version = $Version; URI = $URI }
-    } else {
-        try {
+    }
+    else
+    {
+        try
+        {
             $ProgressPreference = 'SilentlyContinue'
             $url = "https://go.microsoft.com/fwlink/p/?LinkID=844652"
             # grab content without redirecting to the download
@@ -334,7 +348,8 @@ function Get-OneDriveOnline {
             # return evergreen object
             return @{ Version = $Version; URI = $URI }
         }
-        catch {
+        catch
+        {
             Throw $_
         }
     }
@@ -423,7 +438,7 @@ function Get-AdobeAcrobatReaderDCAdmxOnline {
         $listResponse.Dispose()
 
         Write-Verbose "received $($line.Length) characters response"
-        
+
         # parse response to get Version
         $tokens = $lines[0].Split(" ", 9, [StringSplitOptions]::RemoveEmptyEntries)
         $Version = Get-Date -Date "$($tokens[6])/$($tokens[5])/$($tokens[7])" -Format "yy.M.d"
@@ -567,7 +582,7 @@ function Get-ZoomDesktopClientAdmxOnline {
         Throw $_
     }
 }
-    
+
 function Get-CustomPolicyOnline {
 <#
     .SYNOPSIS
@@ -743,7 +758,7 @@ function Get-WindowsAdmx {
         [int]$WindowsEdition,
         [string[]]$Languages = $null
     )
-    
+
     $id = Get-WindowsAdmxDownloadId -WindowsVersion $WindowsVersion -WindowsEdition $WindowsEdition
     $evergreen = Get-WindowsAdmxOnline -DownloadId $id
     $productname = "Microsoft Windows $($WindowsEdition) $($WindowsVersion)"
@@ -848,7 +863,7 @@ function Get-OneDriveAdmx {
                 if ($null -eq $uninstall) {
                     $uninstall = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\OneDriveSetup.exe" -ErrorAction SilentlyContinue
                 }
-                if ($null -eq $uninstall) { 
+                if ($null -eq $uninstall) {
                     Write-Warning -Message "Unable to find uninstall information for OneDrive."
                 }
                 else {
@@ -873,7 +888,7 @@ function Get-OneDriveAdmx {
                 if (-not (Test-Path -Path "$($sourceadmx)\$($language)") -and -not (Test-Path -Path "$($sourceadmx)\$($language.Substring(0,2))")) {
                     if ($language -notlike "en-us") { Write-Warning "Language '$($language)' not found for '$($productname)'. Processing 'en-US' instead." }
                     if (-not (Test-Path -Path "$($targetadmx)\en-US")) { $null = (mkdir -Path "$($targetadmx)\en-US" -Force) }
-                    Copy-Item -Path "$($sourceadmx)\*.adml" -Destination "$($targetadmx)\en-US" -Force    
+                    Copy-Item -Path "$($sourceadmx)\*.adml" -Destination "$($targetadmx)\en-US" -Force
                 } else {
                     $sourcelanguage = $language; if (-not (Test-Path -Path "$($sourceadmx)\$($language)")) { $sourcelanguage = $language.Substring(0,2) }
                     if (-not (Test-Path -Path "$($targetadmx)\$($language)")) { $null = (mkdir -Path "$($targetadmx)\$($language)" -Force) }
@@ -887,7 +902,7 @@ function Get-OneDriveAdmx {
                 foreach ($language in $Languages) {
                     if (-not (Test-Path -Path "$($sourceadmx)\$($language)") -and -not (Test-Path -Path "$($sourceadmx)\$($language.Substring(0,2))")) {
                         if (-not (Test-Path -Path "$($PolicyStore)en-US")) { $null = (mkdir -Path "$($PolicyStore)en-US" -Force) }
-                        Copy-Item -Path "$($sourceadmx)\*.adml" -Destination "$($PolicyStore)en-US" -Force    
+                        Copy-Item -Path "$($sourceadmx)\*.adml" -Destination "$($PolicyStore)en-US" -Force
                     } else {
                         $sourcelanguage = $language; if (-not (Test-Path -Path "$($sourceadmx)\$($language)")) { $sourcelanguage = $language.Substring(0,2) }
                         if (-not (Test-Path -Path "$($PolicyStore)$($language)")) { $null = (mkdir -Path "$($PolicyStore)$($language)" -Force) }
@@ -1412,36 +1427,36 @@ function Get-CustomPolicyAdmx {
     <#
         .SYNOPSIS
         Process Custom Policy Admx files
-    
+
         .PARAMETER Version
         Current Version present
-    
+
         .PARAMETER PolicyStore
         Destination for the Admx files
     #>
-    
+
         param(
             [string]$Version,
             [string]$PolicyStore = $null,
             [string]$CustomPolicyStore,
             [string[]]$Languages = $null
         )
-    
+
         $evergreen = Get-CustomPolicyOnline -CustomPolicyStore $CustomPolicyStore
         $productname = "Custom Policy Store"
         $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
-    
+
         # see if this is a newer version
         if (-not $Version -or [version]$evergreen.Version -gt [version]$Version) {
             Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
-    
+
             # download and process
             try {
                 # copy
                 $sourceadmx = "$($evergreen.URI)"
                 $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
                 Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName "$($productname)" -Languages $Languages
-    
+
                 return $evergreen
             }
             catch {
