@@ -7,7 +7,7 @@
 
 ## 2209.1
 
-* Fixed bug for Microsoft Edge, thanks again Jonathan!
+* Fixed bug for Microsoft OneDrive, thanks Jonathan!
 * Fixed bug for Citrix Workspace App
 * Added Admx for Microsoft Windows 11 (22H2)
 * Added cleanup logic for Google Chrome ADMX version checking, thanks for noticing Jonathan!
