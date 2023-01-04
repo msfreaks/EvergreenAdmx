@@ -5,6 +5,15 @@
 *  Add logging options (yep, since the beginning)
 *  Add notification options (yep, also since the beginning)
 
+## 2203.1
+
+* Added Admx for Microsoft Windows 10 (22H2)
+* Added Admx for Adobe Reader and Adobe Acrobat (`breaking change`)
+* Fixed Microsoft Edge (Chromium) Admx download
+* Fixed Zoom Desktop Client Admx downloads (hardcoded version)
+* Replaced mkdir command by native posh one
+* Cleanup code
+
 ## 2209.1
 
 * Fixed bug for Microsoft OneDrive, thanks Jonathan!
@@ -65,7 +74,7 @@
 
 ## 2106.1
 
-*  Added Admx for Microsoft Windows 10 (21H1) 
+*  Added Admx for Microsoft Windows 10 (21H1)
 
 ## 2101.2
 
