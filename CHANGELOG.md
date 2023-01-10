@@ -5,6 +5,15 @@
 *  Add logging options (yep, since the beginning)
 *  Add notification options (yep, also since the beginning)
 
+## 2301.1
+
+* Added Admx for Microsoft Windows 10 (22H2)
+* Added Admx for Adobe Reader and Adobe Acrobat (`breaking change`)
+* Fixed Microsoft Edge (Chromium) Admx download
+* Fixed Zoom Desktop Client Admx downloads (hardcoded version)
+* Replaced mkdir command by native posh one
+* Cleanup code
+
 ## 2209.1
 
 * Fixed bug for Microsoft OneDrive, thanks Jonathan!
@@ -20,7 +29,7 @@
 ## 2206.1
 
 * Added requirement for elevation to prevent running unelevated
-* Added paramater -UseDefaultCredentials to all Invoke-WebRequest commands, except for Adobe since that is ftp :(
+* Added parameter -UseDefaultCredentials to all Invoke-WebRequest commands, except for Adobe since that is ftp :(
 * Fixed bug where Amd64 OneDrive would mess everything up
 * Removed support for Zoom Desktop Client (403 error when checking for new version)
 
@@ -52,7 +61,7 @@
 
 * Fixed bug where downloading the ADMX files for Citrix Workspace App would fail
 * Fixed bug where downloading the ADMX files for BIS-F would fail to copy the .adml file
-* Fixed bug where downloading the ADMX files for Microsoft Onedrive would fail
+* Fixed bug where downloading the ADMX files for Microsoft OneDrive would fail
 
 ## 2107.1
 
@@ -65,7 +74,7 @@
 
 ## 2106.1
 
-*  Added Admx for Microsoft Windows 10 (21H1) 
+*  Added Admx for Microsoft Windows 10 (21H1)
 
 ## 2101.2
 

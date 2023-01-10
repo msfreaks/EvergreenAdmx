@@ -33,6 +33,9 @@ The above execution will keep the central Policy Store up-to-date on a daily bas
 
 A sample .xml file that you can import in Task Scheduler is provided with this script.
 
+`Breaking change starting from 2301.1`
+
+Valid entries are "Custom Policy Store", "Windows 10", "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office", "FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client".
 
 `Breaking change starting from 2112.1`
 
@@ -45,21 +48,21 @@ From this version the 'Includes' will default to "Windows 11", "Microsoft Edge",
 
 This script no longer processes all the products by default. There's no need to comment out any products you don't need anymore.
 
-In 2101.2 the parameter 'Include' was introduced which is an array you can use to specify all products that need to be processed. This parameter is required for the script to be able to run.  
+In 2101.2 the parameter 'Include' was introduced which is an array you can use to specify all products that need to be processed. This parameter is required for the script to be able to run.
 Valid entries are "Custom Policy Store", "Windows 10", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office", "FSLogix", "Adobe AcrobatReader DC", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client".
 
 By default, if you don't use this parameter, only "Windows 10", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office" is processed.
 
 ```
 SYNTAX
-    C:\gits\github\EvergreenAdmx\EvergreenAdmx.ps1 [[-Windows10Version] <String>] [[-Windows11Version] 
+    C:\gits\github\EvergreenAdmx\EvergreenAdmx.ps1 [[-Windows10Version] <String>] [[-Windows11Version]
     <String>] [[-WorkingDirectory] <String>] [[-PolicyStore] <String>] [[-Languages] <String[]>]
     [-UseProductFolders] [[-CustomPolicyStore] <String>] [[-Include] <String[]>] [-PreferLocalOneDrive]
     [<CommonParameters>]
 
 DESCRIPTION
     Script to automatically download latest Admx files for several products.
-    Optionally copies the latest Admx files to a folder of your chosing, for example a Policy Store.
+    Optionally copies the latest Admx files to a folder of your choosing, for example a Policy Store.
 
 
 PARAMETERS
@@ -70,7 +73,7 @@ PARAMETERS
 
         Required?                    false
         Position?                    1
-        Default value                21H2
+        Default value                22H2
         Accept pipeline input?       false
         Accept wildcard characters?  false
 
@@ -96,7 +99,7 @@ PARAMETERS
         Default value
         Accept pipeline input?       false
         Accept wildcard characters?  false
-        
+
     -PolicyStore <String>
         Optionally provide a Policy Store location to copy the Admx files to after processing.
 
@@ -140,7 +143,7 @@ PARAMETERS
     -Include <String[]>
         Array containing Admx products to include when checking for updates.
         Defaults to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office" if omitted.
-        
+
         Required?                    false
         Position?                    6
         Default value                @("Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office")
@@ -165,7 +168,7 @@ PARAMETERS
 
     -------------------------- EXAMPLE 1 --------------------------
 
-    PS C:\>.\EvergreenAdmx.ps1 -Windows10Version "20H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
+    PS C:\>.\EvergreenAdmx.ps1 -Windows10Version "22H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
 
     Will process the default set of products, storing results in product folders, for both English United States as Dutch languages, and copies the files to the Policy store.
 
@@ -177,7 +180,8 @@ Also see [Change Log][change-log] for a list of supported products.
 
 Now supports
 *  Custom Policy Store
-*  Adobe Acrobat Reader DC
+*  Adobe Acrobat
+*  Adobe Reader
 *  Base Image Script Framework (BIS-F)
 *  Citrix Workspace App
 *  FSLogix
@@ -186,15 +190,15 @@ Now supports
 *  Microsoft Edge (Chromium)
 *  Microsoft Office
 *  Microsoft OneDrive (installed or Evergreen)
-*  Microsoft Windows 10 (1903/1909/2004/20H2/21H1/21H2)
-*  Microsoft Windows 11 (21H2)
+*  Microsoft Windows 10 (1903/1909/2004/20H2/21H1/21H2/22H2)
+*  Microsoft Windows 11 (21H2/22H2)
 *  Mozilla Firefox
-*  ~~Zoom Desktop Client~~
+*  Zoom Desktop Client
 
 ## Notes
 
 I have not tested this script on Windows Core.
-Some of the Admx files can only be obtained by installing the package that was downloaded.  
+Some of the Admx files can only be obtained by installing the package that was downloaded.
 For instance, the Windows 10 and Windows 11 Admx files are in an msi file, the OneDrive Admx files are in the installation folder after installing OneDrive.
 If you are going to use the script to download Windows 10 or Windows 11 Admx files, you will need to remove any installs of the Windows 10 or Windows 11 Admx msi, or the script will fail.
 So this is what the script does for these packages: installing the package, copying the Admx files, uninstalling the package.
