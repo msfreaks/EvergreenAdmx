@@ -2,7 +2,7 @@
 
 <#PSScriptInfo
 
-.VERSION 2301.1
+.VERSION 2301.2
 
 .GUID 999952b7-1337-4018-a1b9-499fad48e734
 
@@ -750,7 +750,7 @@ function Get-FSLogixAdmx
             # copy
             $sourceadmx = "$($env:TEMP)\fslogix"
             $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            if (-not (Test-Path -Path "$($targetadmx)\en-US")) { $null = (New-Ietm -Path "$($targetadmx)\en-US" -ItemType Directory -Force) }
+            if (-not (Test-Path -Path "$($targetadmx)\en-US")) { $null = (New-Item -Path "$($targetadmx)\en-US" -ItemType Directory -Force) }
 
             Write-Verbose "Copying Admx files from '$($sourceadmx)' to '$($targetadmx)'"
             Copy-Item -Path "$($sourceadmx)\*.admx" -Destination "$($targetadmx)" -Force
