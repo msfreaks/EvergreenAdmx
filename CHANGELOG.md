@@ -5,6 +5,10 @@
 *  Add logging options (yep, since the beginning)
 *  Add notification options (yep, also since the beginning)
 
+## 2312
+
+* Added Admx for Microsoft Windows 10 (23H2)
+
 ## 2301.2
 
 * Fixed typo in New-Item command (thanks for pointing it out, riebest!)

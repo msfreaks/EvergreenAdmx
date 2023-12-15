@@ -2,7 +2,7 @@
 
 <#PSScriptInfo
 
-.VERSION 2301.2
+.VERSION 2312.0
 
 .GUID 999952b7-1337-4018-a1b9-499fad48e734
 
@@ -65,7 +65,7 @@
  If this script is running on a machine that has OneDrive installed locally, use this switch to prevent automatically uninstalling OneDrive.
 
 .EXAMPLE
- .\EvergreenAdmx.ps1 -Windows10Version "22H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
+ .\EvergreenAdmx.ps1 -Windows11Version "23H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
  Will process the default set of products, storing results in product folders, for both English United States as Dutch languages, and copies the files to the Policy store.
 
 .LINK
@@ -77,8 +77,9 @@
 param(
     [Parameter(Mandatory = $False)][ValidateSet("1903", "1909", "2004", "20H2", "21H1", "21H2", "22H2")]
     [System.String] $Windows10Version = "22H2",
-    [Parameter(Mandatory = $False)][ValidateSet("21H2", "22H2")]
-    [System.String] $Windows11Version = "22H2",
+    [Parameter(Mandatory = $False)][ValidateSet("21H2", "22H2", "23H2")]
+    [Alias("WindowsVersion")]
+    [System.String] $Windows11Version = "23H2",
     [Parameter(Mandatory = $False)]
     [System.String] $WorkingDirectory = $null,
     [Parameter(Mandatory = $False)]
@@ -164,7 +165,7 @@ function Get-WindowsAdmxDownloadId
         }
         11
         {
-            return (@( @{ "21H2" = "103507" }, @{ "22H2" = "104593" } ).$WindowsVersion)
+            return (@( @{ "21H2" = "103507" }, @{ "22H2" = "104593" }, @{ "23H2" = "105667" } ).$WindowsVersion)
             break
         }
     }
