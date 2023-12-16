@@ -67,9 +67,12 @@ DESCRIPTION
 
 PARAMETERS
     -Windows10Version <String>
-        The Windows 10 version to get the Admx files for. This value will be ignored if 'Windows 10' is
-        not specified with -Include parameter.
-        If omitted the newest version supported by this script will be used, if 'Windows 10' is included.
+       The Windows 10 version to get the Admx files for. This value will be ignored if 'Windows 10' is
+       not specified with -Include parameter.
+       If the -Include parameter contains 'Windows 10', the latest Windows 10 version will be used.
+       Defaults to "Windows11Version" if omitted.
+
+       Note: Windows 11 23H2 policy definitions now supports Windows 10.
 
         Required?                    false
         Position?                    1
@@ -78,9 +81,9 @@ PARAMETERS
         Accept wildcard characters?  false
 
     -Windows11Version <String>
-        The Windows 11 version to get the Admx files for. This value will be ignored if 'Windows 11' is
-        not specified with -Include parameter.
-        If omitted the newest version supported by this script will be used, if 'Windows 11' is included.
+       The Windows 11 version to get the Admx files for. This value will be ignored if 'Windows 10' is
+       not specified with -Include parameter.
+       If omitted, defaults to latest version available.
 
         Required?                    false
         Position?                    1

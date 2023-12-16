@@ -2,12 +2,28 @@
 
 ## To do
 
+*  Fix PreferLocalOneDrive parameter
+*  Replace Invoke-WebRequest by Invoke-Download to improve download speed
+*  Fix Get-MDOPAdmxOnline version detection
 *  Add logging options (yep, since the beginning)
 *  Add notification options (yep, also since the beginning)
 
 ## 2312
 
-* Added Admx for Microsoft Windows 10 (23H2)
+* Added Admx for Microsoft Windows 10 (23H2) [#38](https://github.com/msfreaks/EvergreenAdmx/issues/38)
+* Added back WindowsVersion parameter as an alias for Windows11Version
+* Added new functions [Get-Link](https://github.com/DanGough/Nevergreen/blob/main/Nevergreen/Private/Get-Link.ps1), [Get-Version(https://github.com/DanGough/Nevergreen/blob/main/Nevergreen/Private/Get-Version.ps1) and [Resolve-Uri](https://github.com/DanGough/Nevergreen/blob/main/Nevergreen/Private/Resolve-Uri.ps1). Thanks [Dan Gough](https://github.com/DanGough)!
+* Added new function [Invoke-Download](https://github.com/DanGough/PsDownload/blob/main/PsDownload/Public/Invoke-Download.ps1) to improve download speed and get last modified date. Thanks [Dan Gough](https://github.com/DanGough)!
+* Replace Get-RedirectUrl function by Resolve-Uri
+* Fixed and improved Zoom Desktop Client version and url detection. Now works on PowerShell 5.1 as well! Thanks [Dan Gough](https://github.com/DanGough)!
+* Fixed Zoom Desktop Client admx copy to policy definitions
+* Fixed and improved Get-MicrosoftOfficeAdmxOnline version detection
+* Improved Get-FSLogixOnline
+* Fixed and improved Get-OneDriveOnline, now use [EvergreenApi](https://stealthpuppy.com/evergreen/invoke/) method for version and url detection
+https://evergreen-api.stealthpuppy.com/app/MicrosoftOneDrive
+* OneDrive now install silently
+* Fixed typo
+* Updated help
 
 ## 2301.2
 

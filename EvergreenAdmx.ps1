@@ -27,12 +27,17 @@
  Optionally copies the latest Admx files to a folder of your chosing, for example a Policy Store.
 
 .PARAMETER Windows10Version
- The Windows 10 version to get the Admx files for.
- If omitted the newest version supported by this script will be used.
+ The Windows 10 version to get the Admx files for. This value will be ignored if 'Windows 10' is
+ not specified with -Include parameter.
+ If the -Include parameter contains 'Windows 10', the latest Windows 10 version will be used.
+ Defaults to "Windows11Version" if omitted.
+
+ Note: Windows 11 23H2 policy definitions now supports Windows 10.
 
 .PARAMETER Windows11Version
- The Windows 11 version to get the Admx files for.
- If omitted the newest version supported by this script will be used.
+ The Windows 11 version to get the Admx files for. This value will be ignored if 'Windows 10' is
+ not specified with -Include parameter.
+ If omitted, defaults to latest version available .
 
 .PARAMETER WorkingDirectory
  Optionally provide a Working Directory for the script.
@@ -45,7 +50,7 @@
 
 .PARAMETER Languages
  Optionally provide an array of languages to process. Entries must be in 'xy-XY' format.
- If omitted the script will process 'en-US'.
+ If omitted the script will default to 'en-US'.
 
 .PARAMETER UseProductFolders
  When specified the extracted Admx files are copied to their respective product folders in a subfolder of 'Admx' in the WorkingDirectory.
@@ -62,22 +67,22 @@
 
 .PARAMETER PreferLocalOneDrive
  Microsoft OneDrive Admx files are only available after installing OneDrive.
- If this script is running on a machine that has OneDrive installed locally, use this switch to prevent automatically uninstalling OneDrive.
+ If this script is running on a machine that has OneDrive installed, this switch will prevent automaticic uninstallation of OneDrive.
 
 .EXAMPLE
  .\EvergreenAdmx.ps1 -Windows11Version "23H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
- Will process the default set of products, storing results in product folders, for both English United States as Dutch languages, and copies the files to the Policy store.
+Get policy default set of products, storing results in product folders, for both en-us and nl-NL languages, and copies the files to the Policy store.
 
 .LINK
  https://github.com/msfreaks/EvergreenAdmx
  https://msfreaks.wordpress.com
 
 #>
-[CmdletBinding()]
+[CmdletBinding(DefaultParameterSetName = 'Windows11Version')]
 param(
-    [Parameter(Mandatory = $False)][ValidateSet("1903", "1909", "2004", "20H2", "21H1", "21H2", "22H2")]
+    [Parameter(Mandatory = $False, ParameterSetName = "Windows10Version", Position = 0)][ValidateSet("1903", "1909", "2004", "20H2", "21H1", "21H2", "22H2")]
     [System.String] $Windows10Version = "22H2",
-    [Parameter(Mandatory = $False)][ValidateSet("21H2", "22H2", "23H2")]
+    [Parameter(Mandatory = $False, ParameterSetName = "Windows11Version", Position = 0)][ValidateSet("21H2", "22H2", "23H2")]
     [Alias("WindowsVersion")]
     [System.String] $Windows11Version = "23H2",
     [Parameter(Mandatory = $False)]
@@ -141,6 +146,748 @@ Write-Verbose "PreferLocalOneDrive:`t'$($PreferLocalOneDrive)'"
 #endregion
 
 #region functions
+function Get-Link
+{
+    <#
+    .SYNOPSIS
+        Returns a specific link from a web page.
+
+    .DESCRIPTION
+        Returns a specific link from a web page.
+
+    .NOTES
+        Site: https://packageology.com
+        Author: Dan Gough
+        Twitter: @packageologist
+
+    .LINK
+        https://github.com/DanGough/Nevergreen
+
+    .PARAMETER Uri
+        The URI to query.
+
+    .PARAMETER MatchProperty
+        Which property the RegEx pattern should be applied to, e.g. href, outerHTML, class, title.
+
+    .PARAMETER Pattern
+        The RegEx pattern to apply to the selected property. Supply an array of patterns to receive multiple links.
+
+    .PARAMETER ReturnProperty
+        Optional. Specifies which property to return from the link. Defaults to href, but 'data-filename' can also be useful to retrieve.
+
+    .PARAMETER UserAgent
+        Optional parameter to provide a user agent for Invoke-WebRequest to use. Examples are:
+
+        Googlebot: 'Googlebot/2.1 (+http://www.google.com/bot.html)'
+        Microsoft Edge: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246'
+
+    .EXAMPLE
+        Get-Link -Uri 'http://somewhere.com' -MatchProperty href -Pattern '\.exe$'
+
+        Description:
+        Returns first download link matching *.exe from http://somewhere.com.
+    #>
+    [CmdletBinding(SupportsShouldProcess = $False)]
+    param (
+        [Parameter(
+            Mandatory = $true,
+            Position = 0,
+            ValueFromPipeline)]
+        [ValidatePattern('^(http|https)://')]
+        [Alias('Url')]
+        [String] $Uri,
+        [Parameter(
+            Mandatory = $true,
+            Position = 1)]
+        [ValidateNotNullOrEmpty()]
+        #[ValidateSet('href', 'outerHTML', 'innerHTML', 'outerText', 'innerText', 'class', 'title', 'tagName', 'data-filename')]
+        [String] $MatchProperty,
+        [Parameter(
+            Mandatory = $true,
+            Position = 2)]
+        [ValidateNotNullOrEmpty()]
+        [String[]] $Pattern,
+        [Parameter(
+            Mandatory = $false,
+            Position = 3)]
+        [ValidateNotNullOrEmpty()]
+        [String] $ReturnProperty = 'href',
+        [Parameter(
+            Mandatory = $false)]
+        [String] $UserAgent,
+        [System.Collections.Hashtable] $Headers,
+        [Switch] $PrefixDomain,
+        [Switch] $PrefixParent
+    )
+
+    $ProgressPreference = 'SilentlyContinue'
+
+    $ParamHash = @{
+        Uri              = $Uri
+        Method           = 'GET'
+        UseBasicParsing  = $True
+        DisableKeepAlive = $True
+        ErrorAction      = 'Stop'
+    }
+
+    if ($UserAgent)
+    {
+        $ParamHash.UserAgent = $UserAgent
+    }
+
+    if ($Headers)
+    {
+        $ParamHash.Headers = $Headers
+    }
+
+    try
+    {
+        $Response = Invoke-WebRequest @ParamHash
+
+        foreach ($CurrentPattern in $Pattern)
+        {
+            $Link = $Response.Links | Where-Object $MatchProperty -Match $CurrentPattern | Select-Object -First 1 -ExpandProperty $ReturnProperty
+
+            if ($PrefixDomain)
+            {
+                $BaseURL = ($Uri -split '/' | Select-Object -First 3) -join '/'
+                $Link = Set-UriPrefix -Uri $Link -Prefix $BaseURL
+            }
+            elseif ($PrefixParent)
+            {
+                $BaseURL = ($Uri -split '/' | Select-Object -SkipLast 1) -join '/'
+                $Link = Set-UriPrefix -Uri $Link -Prefix $BaseURL
+            }
+
+            $Link
+
+        }
+    }
+    catch
+    {
+        Write-Error "$($MyInvocation.MyCommand): $($_.Exception.Message)"
+    }
+
+}
+
+function Get-Version
+{
+    <#
+    .SYNOPSIS
+        Extracts a version number from either a string or the content of a web page using a chosen or pre-defined match pattern.
+
+    .DESCRIPTION
+        Extracts a version number from either a string or the content of a web page using a chosen or pre-defined match pattern.
+
+    .NOTES
+        Site: https://packageology.com
+        Author: Dan Gough
+        Twitter: @packageologist
+
+    .LINK
+        https://github.com/DanGough/Nevergreen
+
+    .PARAMETER String
+        The string to process.
+
+    .PARAMETER Uri
+        The Uri to load web content from to process.
+
+    .PARAMETER UserAgent
+        Optional parameter to provide a user agent for Invoke-WebRequest to use. Examples are:
+
+        Googlebot: 'Googlebot/2.1 (+http://www.google.com/bot.html)'
+        Microsoft Edge: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246'
+
+    .PARAMETER Pattern
+        Optional RegEx pattern to use for version matching. Pattern to return must be included in parentheses.
+
+    .PARAMETER ReplaceWithDot
+        Switch to automatically replace characters - or _ with . in detected version.
+
+    .EXAMPLE
+        Get-Version -String 'http://somewhere.com/somefile_1.2.3.exe'
+
+        Description:
+        Returns '1.2.3'
+    #>
+    [CmdletBinding(SupportsShouldProcess = $False)]
+    param (
+        [Parameter(
+            Mandatory = $true,
+            Position = 0,
+            ValueFromPipeline = $true,
+            ParameterSetName = 'String')]
+        [ValidateNotNullOrEmpty()]
+        [String[]] $String,
+        [Parameter(
+            Mandatory = $true,
+            ParameterSetName = 'Uri')]
+        [ValidatePattern('^(http|https)://')]
+        [String] $Uri,
+        [Parameter(
+            Mandatory = $false,
+            ParameterSetName = 'Uri')]
+        [String] $UserAgent,
+        [Parameter(
+            Mandatory = $false,
+            Position = 1)]
+        [ValidateNotNullOrEmpty()]
+        [String] $Pattern = '((?:\d+\.)+\d+)',
+        [Switch] $ReplaceWithDot
+    )
+
+    begin
+    {
+
+    }
+
+    process
+    {
+
+        if ($PsCmdlet.ParameterSetName -eq 'Uri')
+        {
+
+            $ProgressPreference = 'SilentlyContinue'
+
+            try
+            {
+                $ParamHash = @{
+                    Uri              = $Uri
+                    Method           = 'GET'
+                    UseBasicParsing  = $True
+                    DisableKeepAlive = $True
+                    ErrorAction      = 'Stop'
+                }
+
+                if ($UserAgent)
+                {
+                    $ParamHash.UserAgent = $UserAgent
+                }
+
+                $String = (Invoke-WebRequest @ParamHash).Content
+            }
+            catch
+            {
+                Write-Error "Unable to query URL '$Uri': $($_.Exception.Message)"
+            }
+
+        }
+
+        foreach ($CurrentString in $String)
+        {
+            if ($ReplaceWithDot)
+            {
+                $CurrentString = $CurrentString.Replace('-', '.').Replace('+', '.').Replace('_', '.')
+            }
+            if ($CurrentString -match $Pattern)
+            {
+                $matches[1]
+            }
+            else
+            {
+                Write-Warning "No version found within $CurrentString using pattern $Pattern"
+            }
+
+        }
+
+    }
+
+    end
+    {
+    }
+
+}
+
+# Replace Get-RedirectedUrl function
+function Resolve-Uri
+{
+    <#
+    .SYNOPSIS
+        Resolves a URI and also returns the filename and last modified date if found.
+
+    .DESCRIPTION
+        Resolves a URI and also returns the filename and last modified date if found.
+
+    .NOTES
+        Site: https://packageology.com
+        Author: Dan Gough
+        Twitter: @packageologist
+
+    .LINK
+        https://github.com/DanGough/Nevergreen
+
+    .PARAMETER Uri
+        The URI resolve. Accepts an array of strings or pipeline input.
+
+    .PARAMETER UserAgent
+        Optional parameter to provide a user agent for Invoke-WebRequest to use. Examples are:
+
+        Googlebot: 'Googlebot/2.1 (+http://www.google.com/bot.html)'
+        Microsoft Edge: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/42.0.2311.135 Safari/537.36 Edge/12.246'
+
+    .EXAMPLE
+        Resolve-Uri -Uri 'http://somewhere.com/somefile.exe'
+
+        Description:
+        Returns the absolute redirected URI, filename and last modified date.
+    #>
+    [CmdletBinding(SupportsShouldProcess = $False)]
+    param (
+        [Parameter(
+            Mandatory = $true,
+            Position = 0,
+            ValueFromPipeline,
+            ValueFromPipelineByPropertyName)]
+        [ValidatePattern('^(http|https)://')]
+        [Alias('Url')]
+        [String[]] $Uri,
+        [Parameter(
+            Mandatory = $false,
+            Position = 1)]
+        [String] $UserAgent,
+        [System.Collections.Hashtable] $Headers
+    )
+
+    begin
+    {
+        $ProgressPreference = 'SilentlyContinue'
+    }
+
+    process
+    {
+
+        foreach ($UriToResolve in $Uri)
+        {
+
+            try
+            {
+
+                $ParamHash = @{
+                    Uri              = $UriToResolve
+                    Method           = 'Head'
+                    UseBasicParsing  = $True
+                    DisableKeepAlive = $True
+                    ErrorAction      = 'Stop'
+                }
+
+                if ($UserAgent)
+                {
+                    $ParamHash.UserAgent = $UserAgent
+                }
+
+                if ($Headers)
+                {
+                    $ParamHash.Headers = $Headers
+                }
+
+                $Response = Invoke-WebRequest @ParamHash
+
+                if ($IsCoreCLR)
+                {
+                    $ResolvedUri = $Response.BaseResponse.RequestMessage.RequestUri.AbsoluteUri
+                }
+                else
+                {
+                    $ResolvedUri = $Response.BaseResponse.ResponseUri.AbsoluteUri
+                }
+
+                Write-Verbose "$($MyInvocation.MyCommand): URI resolved to: $ResolvedUri"
+
+                #PowerShell 7 returns each header value as single unit arrays instead of strings which messes with the -match operator coming up, so use Select-Object:
+                $ContentDisposition = $Response.Headers.'Content-Disposition' | Select-Object -First 1
+
+                if ($ContentDisposition -match 'filename="?([^\\/:\*\?"<>\|]+)')
+                {
+                    $FileName = $matches[1]
+                    Write-Verbose "$($MyInvocation.MyCommand): Content-Disposition header found: $ContentDisposition"
+                    Write-Verbose "$($MyInvocation.MyCommand): File name determined from Content-Disposition header: $FileName"
+                }
+                else
+                {
+                    $Slug = [uri]::UnescapeDataString($ResolvedUri.Split('?')[0].Split('/')[-1])
+                    if ($Slug -match '^[^\\/:\*\?"<>\|]+\.[^\\/:\*\?"<>\|]+$')
+                    {
+                        Write-Verbose "$($MyInvocation.MyCommand): URI slug is a valid file name: $FileName"
+                        $FileName = $Slug
+                    }
+                    else
+                    {
+                        $FileName = $null
+                    }
+                }
+
+                try
+                {
+                    $LastModified = [DateTime]($Response.Headers.'Last-Modified' | Select-Object -First 1)
+                    Write-Verbose "$($MyInvocation.MyCommand): Last modified date: $LastModified"
+                }
+                catch
+                {
+                    Write-Verbose "$($MyInvocation.MyCommand): Unable to parse date from last modified header: $($Response.Headers.'Last-Modified')"
+                    $LastModified = $null
+                }
+
+            }
+            catch
+            {
+                Throw "$($MyInvocation.MyCommand): Unable to resolve URI: $($_.Exception.Message)"
+            }
+
+            if ($ResolvedUri)
+            {
+                [PSCustomObject]@{
+                    Uri          = $ResolvedUri
+                    FileName     = $FileName
+                    LastModified = $LastModified
+                }
+            }
+
+        }
+    }
+
+    end
+    {
+    }
+
+}
+
+# Replace Invoke-WebRequest (FASTER DOWNLOADS!)
+function Invoke-Download
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Position = 0, Mandatory = $true, ValueFromPipeline = $true)]
+        [Alias('URI')]
+        [ValidateNotNullOrEmpty()]
+        [string]$URL,
+
+        [Parameter(Position = 1)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Destination = $PWD.Path,
+
+        [Parameter(Position = 2)]
+        [string]$FileName,
+
+        [string[]]$UserAgent = @('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36', 'Googlebot/2.1 (+http://www.google.com/bot.html)'),
+
+        [string]$TempPath = [System.IO.Path]::GetTempPath(),
+
+        [switch]$IgnoreDate,
+        [switch]$BlockFile,
+        [switch]$NoClobber,
+        [switch]$NoProgress,
+        [switch]$PassThru
+    )
+
+    begin
+    {
+        # Required on Windows Powershell only
+        if ($PSEdition -eq 'Desktop')
+        {
+            Add-Type -AssemblyName System.Net.Http
+            Add-Type -AssemblyName System.Web
+        }
+
+        # Enable TLS 1.2 in addition to whatever is pre-configured
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+
+        # Create one single client object for the pipeline
+        $HttpClient = New-Object System.Net.Http.HttpClient
+    }
+
+    process
+    {
+
+        Write-Verbose "Requesting headers from URL '$URL'"
+
+        foreach ($UserAgentString in $UserAgent)
+        {
+            $HttpClient.DefaultRequestHeaders.Remove('User-Agent') | Out-Null
+            if ($UserAgentString)
+            {
+                Write-Verbose "Using UserAgent '$UserAgentString'"
+                $HttpClient.DefaultRequestHeaders.Add('User-Agent', $UserAgentString)
+            }
+
+            # This sends a GET request but only retrieves the headers
+            $ResponseHeader = $HttpClient.GetAsync($URL, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).Result
+
+            # Exit the foreach if success
+            if ($ResponseHeader.IsSuccessStatusCode)
+            {
+                break
+            }
+        }
+
+        if ($ResponseHeader.IsSuccessStatusCode)
+        {
+            Write-Verbose 'Successfully retrieved headers'
+
+            if ($ResponseHeader.RequestMessage.RequestUri.AbsoluteUri -ne $URL)
+            {
+                Write-Verbose "URL '$URL' redirects to '$($ResponseHeader.RequestMessage.RequestUri.AbsoluteUri)'"
+            }
+
+            try
+            {
+                $FileSize = $null
+                $FileSize = [int]$ResponseHeader.Content.Headers.GetValues('Content-Length')[0]
+                $FileSizeReadable = switch ($FileSize)
+                {
+                    { $_ -gt 1TB } { '{0:n2} TB' -f ($_ / 1TB); Break }
+                    { $_ -gt 1GB } { '{0:n2} GB' -f ($_ / 1GB); Break }
+                    { $_ -gt 1MB } { '{0:n2} MB' -f ($_ / 1MB); Break }
+                    { $_ -gt 1KB } { '{0:n2} KB' -f ($_ / 1KB); Break }
+                    default { '{0} B' -f $_ }
+                }
+                Write-Verbose "File size: $FileSize bytes ($FileSizeReadable)"
+            }
+            catch
+            {
+                Write-Verbose 'Unable to determine file size'
+            }
+
+            # Try to get the last modified date from the "Last-Modified" header, use error handling in case string is in invalid format
+            try
+            {
+                $LastModified = $null
+                $LastModified = [DateTime]::ParseExact($ResponseHeader.Content.Headers.GetValues('Last-Modified')[0], 'r', [System.Globalization.CultureInfo]::InvariantCulture)
+                Write-Verbose "Last modified: $($LastModified.ToString())"
+            }
+            catch
+            {
+                Write-Verbose 'Last-Modified header not found'
+            }
+
+            if ($FileName)
+            {
+                $FileName = $FileName.Trim()
+                Write-Verbose "Will use supplied filename '$FileName'"
+            }
+            else
+            {
+                # Get the file name from the "Content-Disposition" header if available
+                try
+                {
+                    $ContentDispositionHeader = $null
+                    $ContentDispositionHeader = $ResponseHeader.Content.Headers.GetValues('Content-Disposition')[0]
+                    Write-Verbose "Content-Disposition header found: $ContentDispositionHeader"
+                }
+                catch
+                {
+                    Write-Verbose 'Content-Disposition header not found'
+                }
+                if ($ContentDispositionHeader)
+                {
+                    $ContentDispositionRegEx = @'
+^.*filename\*?\s*=\s*"?(?:UTF-8|iso-8859-1)?(?:'[^']*?')?([^";]+)
+'@
+                    if ($ContentDispositionHeader -match $ContentDispositionRegEx)
+                    {
+                        # GetFileName ensures we are not getting a full path with slashes. UrlDecode will convert characters like %20 back to spaces.
+                        $FileName = [System.IO.Path]::GetFileName([System.Web.HttpUtility]::UrlDecode($matches[1]))
+                        # If any further invalid filename characters are found, convert them to spaces.
+                        [IO.Path]::GetinvalidFileNameChars() | ForEach-Object { $FileName = $FileName.Replace($_, ' ') }
+                        $FileName = $FileName.Trim()
+                        Write-Verbose "Extracted filename '$FileName' from Content-Disposition header"
+                    }
+                    else
+                    {
+                        Write-Verbose 'Failed to extract filename from Content-Disposition header'
+                    }
+                }
+
+                if ([string]::IsNullOrEmpty($FileName))
+                {
+                    # If failed to parse Content-Disposition header or if it's not available, extract the file name from the absolute URL to capture any redirections.
+                    # GetFileName ensures we are not getting a full path with slashes. UrlDecode will convert characters like %20 back to spaces. The URL is split with ? to ensure we can strip off any API parameters.
+                    $FileName = [System.IO.Path]::GetFileName([System.Web.HttpUtility]::UrlDecode($ResponseHeader.RequestMessage.RequestUri.AbsoluteUri.Split('?')[0]))
+                    [IO.Path]::GetinvalidFileNameChars() | ForEach-Object { $FileName = $FileName.Replace($_, ' ') }
+                    $FileName = $FileName.Trim()
+                    Write-Verbose "Extracted filename '$FileName' from absolute URL '$($ResponseHeader.RequestMessage.RequestUri.AbsoluteUri)'"
+                }
+            }
+
+        }
+        else
+        {
+            Write-Verbose 'Failed to retrieve headers'
+        }
+
+        if ([string]::IsNullOrEmpty($FileName))
+        {
+            # If still no filename set, extract the file name from the original URL.
+            # GetFileName ensures we are not getting a full path with slashes. UrlDecode will convert characters like %20 back to spaces. The URL is split with ? to ensure we can strip off any API parameters.
+            $FileName = [System.IO.Path]::GetFileName([System.Web.HttpUtility]::UrlDecode($URL.Split('?')[0]))
+            [System.IO.Path]::GetInvalidFileNameChars() | ForEach-Object { $FileName = $FileName.Replace($_, ' ') }
+            $FileName = $FileName.Trim()
+            Write-Verbose "Extracted filename '$FileName' from original URL '$URL'"
+        }
+
+        $DestinationFilePath = Join-Path $Destination $FileName
+
+        # Exit if -NoClobber specified and file exists.
+        if ($NoClobber -and (Test-Path -LiteralPath $DestinationFilePath -PathType Leaf))
+        {
+            Write-Error 'NoClobber switch specified and file already exists'
+            return
+        }
+
+        # Open the HTTP stream
+        $ResponseStream = $HttpClient.GetStreamAsync($URL).Result
+
+        if ($ResponseStream.CanRead)
+        {
+
+            # Check TempPath exists and create it if not
+            if (-not (Test-Path -LiteralPath $TempPath -PathType Container))
+            {
+                Write-Verbose "Temp folder '$TempPath' does not exist"
+                try
+                {
+                    New-Item -Path $Destination -ItemType Directory -Force | Out-Null
+                    Write-Verbose "Created temp folder '$TempPath'"
+                }
+                catch
+                {
+                    Write-Error "Unable to create temp folder '$TempPath': $_"
+                    return
+                }
+            }
+
+            # Generate temp file name
+            $TempFileName = (New-Guid).ToString('N') + ".tmp"
+            $TempFilePath = Join-Path $TempPath $TempFileName
+
+            # Check Destiation exists and create it if not
+            if (-not (Test-Path -LiteralPath $Destination -PathType Container))
+            {
+                Write-Verbose "Output folder '$Destination' does not exist"
+                try
+                {
+                    New-Item -Path $Destination -ItemType Directory -Force | Out-Null
+                    Write-Verbose "Created output folder '$Destination'"
+                }
+                catch
+                {
+                    Write-Error "Unable to create output folder '$Destination': $_"
+                    return
+                }
+            }
+
+            # Open file stream
+            try
+            {
+                $FileStream = [System.IO.File]::Create($TempFilePath)
+            }
+            catch
+            {
+                Write-Error "Unable to create file '$TempFilePath': $_"
+                return
+            }
+
+            if ($FileStream.CanWrite)
+            {
+                Write-Verbose "Downloading to temp file '$TempFilePath'..."
+
+                $Buffer = New-Object byte[] 64KB
+                $BytesDownloaded = 0
+                $ProgressIntervalMs = 250
+                $ProgressTimer = (Get-Date).AddMilliseconds(-$ProgressIntervalMs)
+
+                while ($true)
+                {
+                    try
+                    {
+                        # Read stream into buffer
+                        $ReadBytes = $ResponseStream.Read($Buffer, 0, $Buffer.Length)
+
+                        # Track bytes downloaded and display progress bar if enabled and file size is known
+                        $BytesDownloaded += $ReadBytes
+                        if (!$NoProgress -and (Get-Date) -gt $ProgressTimer.AddMilliseconds($ProgressIntervalMs))
+                        {
+                            if ($FileSize)
+                            {
+                                $PercentComplete = [System.Math]::Floor($BytesDownloaded / $FileSize * 100)
+                                Write-Progress -Activity "Downloading $FileName" -Status "$BytesDownloaded of $FileSize bytes ($PercentComplete%)" -PercentComplete $PercentComplete
+                            }
+                            else
+                            {
+                                Write-Progress -Activity "Downloading $FileName" -Status "$BytesDownloaded of ? bytes" -PercentComplete 0
+                            }
+                            $ProgressTimer = Get-Date
+                        }
+
+                        # If end of stream
+                        if ($ReadBytes -eq 0)
+                        {
+                            Write-Progress -Activity "Downloading $FileName" -Completed
+                            $FileStream.Close()
+                            $FileStream.Dispose()
+                            try
+                            {
+                                Write-Verbose "Moving temp file to destination '$DestinationFilePath'"
+                                $DownloadedFile = Move-Item -LiteralPath $TempFilePath -Destination $DestinationFilePath -Force -PassThru
+                            }
+                            catch
+                            {
+                                Write-Error "Error moving file from '$TempFilePath' to '$DestinationFilePath': $_"
+                                return
+                            }
+                            if ($IsWindows)
+                            {
+                                if ($BlockFile)
+                                {
+                                    Write-Verbose 'Marking file as downloaded from the internet'
+                                    Set-Content -LiteralPath $DownloadedFile -Stream 'Zone.Identifier' -Value "[ZoneTransfer]`nZoneId=3"
+                                }
+                                else
+                                {
+                                    Unblock-File -LiteralPath $DownloadedFile
+                                }
+                            }
+                            if ($LastModified -and -not $IgnoreDate)
+                            {
+                                Write-Verbose 'Setting Last Modified date'
+                                $DownloadedFile.LastWriteTime = $LastModified
+                            }
+                            Write-Verbose 'Download complete!'
+                            if ($PassThru)
+                            {
+                                $DownloadedFile
+                            }
+                            break
+                        }
+                        $FileStream.Write($Buffer, 0, $ReadBytes)
+                    }
+                    catch
+                    {
+                        Write-Error "Error downloading file: $_"
+                        Write-Progress -Activity "Downloading $FileName" -Completed
+                        $FileStream.Close()
+                        $FileStream.Dispose()
+                        break
+                    }
+                }
+
+            }
+        }
+        else
+        {
+            Write-Error 'Failed to start download'
+        }
+
+        # Reset this to avoid reusing the same name when fed multiple URLs via the pipeline
+        $FileName = $null
+    }
+
+    end
+    {
+        $HttpClient.Dispose()
+    }
+}
+
 function Get-WindowsAdmxDownloadId
 {
     <#
@@ -225,38 +972,14 @@ function Get-FSLogixOnline
     try
     {
         # grab URI (redirected url)
-        $URI = Get-RedirectedUrl -Url 'https://aka.ms/fslogix/download'
+        $URL = 'https://aka.ms/fslogix/download'
+        $URI = (Resolve-Uri -Uri $URL).URI
         # grab version
-        $Version = ($URI.Split("/")[-1] | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
+        $Version = Get-Version -String $URI -Pattern "(\d+(\.\d+){1,4})"
 
         # return evergreen object
         return @{ Version = $Version; URI = $URI }
     }
-    catch
-    {
-        Throw $_
-    }
-}
-
-function Get-RedirectedUrl
-{
-    param (
-        [Parameter(Mandatory = $true)]
-        [String]$Url
-    )
-
-    $request = [System.Net.WebRequest]::Create($url)
-    $request.AllowAutoRedirect = $true
-
-    try
-    {
-        $response = $request.GetResponse()
-        $redirectedUrl = $response.ResponseUri.AbsoluteUri
-        $response.Close()
-
-        Write-Output -InputObject $redirectedUrl
-    }
-
     catch
     {
         Throw $_
@@ -271,16 +994,20 @@ function Get-MicrosoftOfficeAdmxOnline
 #>
 
     $id = "49030"
-    $urlversion = "https://www.microsoft.com/en-us/download/details.aspx?id=$($id)"
+    $url = "https://www.microsoft.com/en-us/download/details.aspx?id=$($id)"
     $urldownload = "https://www.microsoft.com/en-us/download/confirmation.aspx?id=$($id)"
+
+    Get-Link -Uri '$urlversion' -MatchProperty href -Pattern '\.exe'
+
     try
     {
 
         # load page for version scrape
-        $web = Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urlversion
-        $str = ($web.ToString() -split "[`r`n]" | Select-String "Version:").ToString()
+        $web = (Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $url).RawContent
         # grab version
-        $Version = ($str | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
+        $regEx = '(version\":")((?:\d+\.)+(?:\d+))"'
+        $version = ($web | Select-String -Pattern $regEx).Matches.Groups[2].Value
+
         # load page for uri scrape
         $web = Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urldownload -MaximumRedirection 0
         # grab x64 version
@@ -341,36 +1068,44 @@ function Get-OneDriveOnline
     .SYNOPSIS
     Returns latest Version and Uri for OneDrive
 #>
+    [CmdletBinding()]
     param (
         [bool]$PreferLocalOneDrive
     )
 
-    if ($PreferLocalOneDrive)
-    {
-        if (Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive")
-        {
-            $URI = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive").CurrentVersionPath)"
-            $Version = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive").Version)"
-        }
-        if ((Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\OneDrive"))
-        {
-            $URI = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\OneDrive").CurrentVersionPath)"
-            $Version = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\OneDrive").Version)"
-        }
+    # detect if OneDrive is installed
+    $localOneDrive = (Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | Where-Object {$_.DisplayName -like "*OneDrive*"}) | Sort-Object -Property Version -Descending | Select-Object -First 1
+    If (-Not $localOneDrive ) {
+        $localOneDrive = (Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | Where-Object {$_.DisplayName -like "*OneDrive*"}) | Sort-Object -Property Version -Descending | Select-Object -First 1
+    }
+    If (-Not $localOneDrive ) {
+       $localOneDrive  = (Get-ItemProperty HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | Where-Object {$_.DisplayName -like "*OneDrive*"}) | Sort-Object -Property Version -Descending | Select-Object -First 1
+    }
 
+
+    if (($PreferLocalOneDrive) -and [bool]($localOneDrive))
+    {
+        $URI = "$((Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive").CurrentVersionPath)"
+        $Version = $localOneDrive.DisplayVersion
         return @{ Version = $Version; URI = $URI }
     }
-    else
+    elseIf (-Not $PreferLocalOneDrive)
     {
         try
         {
-            $url = "https://go.microsoft.com/fwlink/p/?LinkID=844652"
-            # grab content without redirecting to the download
-            $web = Invoke-WebRequest -UseDefaultCredentials -Uri $url -UseBasicParsing -MaximumRedirection 0
-            # grab uri
-            $URI = $web.Headers.Location
+            $url = "https://evergreen-api.stealthpuppy.com/app/MicrosoftOneDrive"
+            $architecture = "AMD64"
+            $ring = "Insider"
+            $type = "exe"
+            $evergreen = Invoke-RestMethod -Uri $url
+            $evergreen =  $evergreen | Where-Object { $_.Architecture -eq $architecture -and $_.Ring -eq $ring -and $_.Type -eq $type } | `
+            Sort-Object -Property @{ Expression = { [System.Version]$_.Version }; Descending = $true } | Select-Object -First 1
+
+            # grab download uri
+            $URI = $evergreen.URI
+
             # grab version
-            $Version = ($URI | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
+            $Version = $evergreen.Version
 
             # return evergreen object
             return @{ Version = $Version; URI = $URI }
@@ -667,17 +1402,14 @@ function Get-ZoomDesktopClientAdmxOnline
 
     try
     {
-        $Version = "5.13.0"
-        #$ZoomADMX = Split-Path -Path $ZoomADMXUrl -Leaf
+        $url = "https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0065466"
 
-        #$url = "https://support.zoom.us/hc/en-us/articles/360039100051"
         # grab content
-        #$web = Invoke-WebRequest -UseDefaultCredentials -Uri $url -UseBasicParsing
+        $web = Invoke-WebRequest -UseDefaultCredentials -Uri $url -UseBasicParsing -UserAgent 'Googlebot/2.1 (+http://www.google.com/bot.html)'
         # find ADMX download
-        #$URI = (($web.Links | Where-Object {$_.href -like "*msi-templates*.zip"})[-1]).href
-        $URI = "https://assets.zoom.us/docs/msi-templates/Zoom_$($Version).zip"
+        $URI = (($web.Links | Where-Object { $_.href -like "*msi-templates*.zip" })[-1]).href
         # grab version
-        #$Version = ($URI.Split("/")[-1] | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
+        $Version = ($URI.Split("/")[-1] | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
 
         # return evergreen object
         return @{ Version = $Version; URI = $URI }
@@ -948,6 +1680,7 @@ function Get-OneDriveAdmx
     Check locally only
 #>
 
+    [CmdletBinding()]
     param(
         [string] $Version,
         [string] $PolicyStore = $null,
@@ -955,7 +1688,12 @@ function Get-OneDriveAdmx
         [string[]]$Languages = $null
     )
 
-    $evergreen = Get-OneDriveOnline -PreferLocalOneDrive $PreferLocalOneDrive
+    if ($PreferLocalOneDrive) {
+        $evergreen = Get-OneDriveOnline -PreferLocalOneDrive $PreferLocalOneDrive
+    } else {
+        $evergreen = Get-OneDriveOnline
+    }
+
     $productname = "Microsoft OneDrive"
     $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
 
@@ -976,7 +1714,7 @@ function Get-OneDriveAdmx
 
                 # install
                 Write-Verbose "Installing downloaded OneDrive installer"
-                $null = Start-Process -FilePath $outfile -ArgumentList "/allusers" -PassThru
+                $null = Start-Process -FilePath $outfile -ArgumentList "/allusers /silent" -PassThru
                 # wait for setup to complete
                 while (Get-Process -Name "OneDriveSetup") { Start-Sleep -Seconds 10 }
                 # onedrive starts automatically after setup. kill!
@@ -1510,9 +2248,17 @@ function Get-ZoomDesktopClientAdmx
             Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\zoomclientadmx'"
             Expand-Archive -Path $outfile -DestinationPath "$($env:TEMP)\zoomclientadmx" -Force
 
+            # cleanup folder structure
+            $sourceadmx = Get-ChildItem -Path "$($env:TEMP)\zoomclientadmx\" -Exclude *.adm -Include *.admx -Recurse | Where-Object { -Not $_.PSIsContainer }
+            $sourceadml = Get-ChildItem -Path "$($env:TEMP)\zoomclientadmx\" -Exclude *.adm -Include *.adml -Recurse | Where-Object { -Not $_.PSIsContainer }
+            $null = (New-Item -Path "$($env:TEMP)\clean-zoomclientadmx\" -ItemType Directory -Force)
+            $null = (New-Item -Path "$($env:TEMP)\clean-zoomclientadmx\en-us" -ItemType Directory -Force)
+            Copy-Item -Path $sourceadmx -Destination "$($env:TEMP)\clean-zoomclientadmx\" -Force
+            Copy-Item -Path $sourceadml -Destination "$($env:TEMP)\clean-zoomclientadmx\en-us" -Force
+            Remove-Item -Path "$($env:TEMP)\zoomclientadmx" -Recurse -Force
+            Rename-Item -Path "$($env:TEMP)\clean-zoomclientadmx" -NewName "zoomclientadmx" -Force
             # copy
-            $sourceadmx = "$($env:TEMP)\zoomclientadmx\$([io.path]::GetFileNameWithoutExtension($evergreen.URI.Split("/")[-1]))"
-            $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
+            $sourceadmx = "$($env:TEMP)\zoomclientadmx"
             Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
 
             # cleanup
