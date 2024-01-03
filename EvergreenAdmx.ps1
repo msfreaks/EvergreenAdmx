@@ -15,67 +15,66 @@
 .LICENSEURI https://github.com/msfreaks/EvergreenAdmx/blob/main/LICENSE
 
 .PROJECTURI https://github.com/msfreaks/EvergreenAdmx
-
 #>
 
 <#
 .SYNOPSIS
- Script to automatically download latest Admx files for several products.
+    Script to automatically download latest Admx files for several products.
 
 .DESCRIPTION
- Script to automatically download latest Admx files for several products.
- Optionally copies the latest Admx files to a folder of your chosing, for example a Policy Store.
+    Script to automatically download latest Admx files for several products.
+    Optionally copies the latest Admx files to a folder of your chosing, for example a Policy Store.
 
 .PARAMETER Windows10Version
- The Windows 10 version to get the Admx files for. This value will be ignored if 'Windows 10' is
- not specified with -Include parameter.
- If the -Include parameter contains 'Windows 10', the latest Windows 10 version will be used.
- Defaults to "Windows11Version" if omitted.
+    The Windows 10 version to get the Admx files for. This value will be ignored if 'Windows 10' is
+    not specified with -Include parameter.
+    If the -Include parameter contains 'Windows 10', the latest Windows 10 version will be used.
+    Defaults to "Windows11Version" if omitted.
 
  Note: Windows 11 23H2 policy definitions now supports Windows 10.
 
 .PARAMETER Windows11Version
- The Windows 11 version to get the Admx files for. This value will be ignored if 'Windows 10' is
- not specified with -Include parameter.
- If omitted, defaults to latest version available .
+    The Windows 11 version to get the Admx files for. This value will be ignored if 'Windows 10' is
+    not specified with -Include parameter.
+    If omitted, defaults to latest version available .
 
 .PARAMETER WorkingDirectory
- Optionally provide a Working Directory for the script.
- The script will store Admx files in a subdirectory called "admx".
- The script will store downloaded files in a subdirectory called "downloads".
- If omitted the script will treat the script's folder as the working directory.
+    Optionally provide a Working Directory for the script.
+    The script will store Admx files in a subdirectory called "admx".
+    The script will store downloaded files in a subdirectory called "downloads".
+    If omitted the script will treat the script's folder as the working directory.
 
 .PARAMETER PolicyStore
- Optionally provide a Policy Store location to copy the Admx files to after processing.
+    Optionally provide a Policy Store location to copy the Admx files to after processing.
 
 .PARAMETER Languages
- Optionally provide an array of languages to process. Entries must be in 'xy-XY' format.
- If omitted the script will default to 'en-US'.
+    Optionally provide an array of languages to process. Entries must be in 'xy-XY' format.
+    If omitted the script will default to 'en-US'.
 
 .PARAMETER UseProductFolders
- When specified the extracted Admx files are copied to their respective product folders in a subfolder of 'Admx' in the WorkingDirectory.
+    When specified the extracted Admx files are copied to their respective product folders in a subfolder of 'Admx' in the WorkingDirectory.
 
 .PARAMETER CustomPolicyStore
- When specified processes a location for custom policy files. Can be UNC format or local folder.
- The script will expect to find .admx files in this location, and at least one language folder holding the .adml file(s).
- Versioning will be done based on the newest file found recursively in this location (any .admx or .adml).
- Note that if any file has changed the script will process all files found in location.
+    When specified processes a location for custom policy files. Can be UNC format or local folder.
+    The script will expect to find .admx files in this location, and at least one language folder holding the .adml file(s).
+    Versioning will be done based on the newest file found recursively in this location (any .admx or .adml).
+    Note that if any file has changed the script will process all files found in location.
 
 .PARAMETER Include
- Array containing Admx products to include when checking for updates.
- Defaults to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office" if omitted.
+    Array containing Admx products to include when checking for updates.
+    Defaults to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office" if omitted.
 
 .PARAMETER PreferLocalOneDrive
- Microsoft OneDrive Admx files are only available after installing OneDrive.
- If this script is running on a machine that has OneDrive installed, this switch will prevent automaticic uninstallation of OneDrive.
+    Microsoft OneDrive Admx files are only available after installing OneDrive.
+    If this script is running on a machine that has OneDrive installed, this switch will prevent automaticic uninstallation of OneDrive.
 
 .EXAMPLE
- .\EvergreenAdmx.ps1 -Windows11Version "23H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
-Get policy default set of products, storing results in product folders, for both en-us and nl-NL languages, and copies the files to the Policy store.
+    .\EvergreenAdmx.ps1 -Windows11Version "23H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
+    Get policy default set of products, storing results in product folders, for both en-us and nl-NL languages, and copies the files to the Policy store.
 
 .LINK
- https://github.com/msfreaks/EvergreenAdmx
- https://msfreaks.wordpress.com
+    https://github.com/msfreaks/EvergreenAdmx
+    https://msfreaks.wordpress.com
 
 #>
 [CmdletBinding(DefaultParameterSetName = 'Windows11Version')]
@@ -892,11 +891,11 @@ function Get-WindowsAdmxDownloadId
 {
     <#
     .SYNOPSIS
-    Returns download Id for Admx file based on Windows 10 version
+        Returns download Id for Admx file based on Windows 10 version
 
     .PARAMETER WindowsVersion
-    Official WindowsVersion format
-#>
+        Official WindowsVersion format
+    #>
 
     param (
         [string]$WindowsVersion,
@@ -966,8 +965,8 @@ function Get-FSLogixOnline
 {
     <#
     .SYNOPSIS
-    Returns latest Version and Uri for FSLogix
-#>
+        Returns latest Version and Uri for FSLogix
+    #>
 
     try
     {
@@ -990,8 +989,8 @@ function Get-MicrosoftOfficeAdmxOnline
 {
     <#
     .SYNOPSIS
-    Returns latest Version and Uri for the Office Admx files (both x64 and x86)
-#>
+        Returns latest Version and Uri for the Office Admx files (both x64 and x86)
+    #>
 
     $id = "49030"
     $url = "https://www.microsoft.com/en-us/download/details.aspx?id=$($id)"
@@ -1025,13 +1024,12 @@ function Get-MicrosoftOfficeAdmxOnline
 function Get-WindowsAdmxOnline
 {
     <#
-    <#
     .SYNOPSIS
-    Returns latest Version and Uri for the Windows 10 or Windows 11 Admx files
+        Returns latest Version and Uri for the Windows 10 or Windows 11 Admx files
 
     .PARAMETER DownloadId
-    Id returned from Get-WindowsAdmxDownloadId
-#>
+        Id returned from Get-WindowsAdmxDownloadId
+    #>
 
     param(
         [string]$DownloadId
@@ -1064,8 +1062,9 @@ function Get-OneDriveOnline
 {
     <#
     .SYNOPSIS
-    Returns latest Version and Uri for OneDrive
-#>
+        Returns latest Version and Uri for OneDrive
+    #>
+
     [CmdletBinding()]
     param (
         [bool]$PreferLocalOneDrive
@@ -1119,8 +1118,8 @@ function Get-MicrosoftEdgePolicyOnline
 {
     <#
     .SYNOPSIS
-    Returns latest Version and Uri for the Microsoft Edge Admx files
-#>
+        Returns latest Version and Uri for the Microsoft Edge Admx files
+    #>
 
     try
     {
@@ -1149,8 +1148,8 @@ function Get-GoogleChromeAdmxOnline
 {
     <#
     .SYNOPSIS
-    Returns latest Version and Uri for the Google Chrome Admx files
-#>
+        Returns latest Version and Uri for the Google Chrome Admx files
+    #>
 
     try
     {
@@ -1182,8 +1181,59 @@ function Get-AdobeAcrobatAdmxOnline
 {
     <#
     .SYNOPSIS
-    Returns latest Version and Uri for the Adobe Acrobat Continuous track Admx files
-#>
+        Returns latest Version and Uri for the Adobe Acrobat Continuous track Admx files
+    #>
+
+    try
+    {
+
+        $url = "https://www.adobe.com/devnet-docs/acrobatetk/tools/DesktopDeployment/gpo.html#gpo-registry-template"
+        Get-Link -Uri $url -MatchProperty href -Pattern "\.zip$"
+
+
+        $file = "AcrobatADMTemplate.zip"
+        $url = "ftp://ftp.adobe.com/pub/adobe/acrobat/win/AcrobatDC/misc/"
+
+        # grab ftp response from $url
+        Write-Verbose "FTP $($url)"
+        $listRequest = [Net.WebRequest]::Create($url)
+        $listRequest.Method = [System.Net.WebRequestMethods+Ftp]::ListDirectoryDetails
+        $lines = New-Object System.Collections.ArrayList
+
+        # process response
+        $listResponse = $listRequest.GetResponse()
+        $listStream = $listResponse.GetResponseStream()
+        $listReader = New-Object System.IO.StreamReader($listStream)
+        while (!$listReader.EndOfStream)
+        {
+            $line = $listReader.ReadLine()
+            if ($line.Contains($file)) { $lines.Add($line) | Out-Null }
+        }
+        $listReader.Dispose()
+        $listStream.Dispose()
+        $listResponse.Dispose()
+
+        Write-Verbose "received $($line.Length) characters response"
+
+        # parse response to get Version
+        $tokens = $lines[0].Split(" ", 9, [StringSplitOptions]::RemoveEmptyEntries)
+        $Version = Get-Date -Date "$($tokens[6])/$($tokens[5])/$($tokens[7])" -Format "yy.M.d"
+
+        # return evergreen object
+        return @{ Version = $Version; URI = "$($url)$($file)" }
+    }
+    catch
+    {
+        Throw $_
+    }
+}
+
+function Get-AdobeAcrobatAdmxOnline
+{
+    <#
+    .SYNOPSIS
+        Returns latest Version and Uri for the Adobe Acrobat Continuous track Admx files
+    #>
 
     try
     {
@@ -1229,8 +1279,8 @@ function Get-AdobeReaderAdmxOnline
 {
     <#
     .SYNOPSIS
-    Returns latest Version and Uri for the Adobe Reader Continuous track Admx files
-#>
+        Returns latest Version and Uri for the Adobe Reader Continuous track Admx files
+    #>
 
     try
     {
@@ -1275,8 +1325,8 @@ function Get-CitrixWorkspaceAppAdmxOnline
 {
     <#
     .SYNOPSIS
-    Returns latest Version and Uri for Citrix Workspace App ADMX files
-#>
+        Returns latest Version and Uri for Citrix Workspace App ADMX files
+    #>
 
     try
     {
@@ -1305,8 +1355,8 @@ function Get-MozillaFirefoxAdmxOnline
 {
     <#
     .SYNOPSIS
-    Returns latest Version and Uri for Mozilla Firefox ADMX files
-#>
+        Returns latest Version and Uri for Mozilla Firefox ADMX files
+    #>
 
     try
     {
@@ -1334,8 +1384,8 @@ function Get-BIS-FAdmxOnline
 {
     <#
     .SYNOPSIS
-    Returns latest Version and Uri for BIS-F ADMX files
-#>
+        Returns latest Version and Uri for BIS-F ADMX files
+    #>
 
     try
     {
@@ -1363,8 +1413,8 @@ function Get-MDOPAdmxOnline
 {
     <#
     .SYNOPSIS
-    Returns latest Version and Uri for the Desktop Optimization Pack Admx files (both x64 and x86)
-#>
+        Returns latest Version and Uri for the Desktop Optimization Pack Admx files (both x64 and x86)
+    #>
 
     $id = "55531"
     $urlversion = "https://www.microsoft.com/en-us/download/details.aspx?id=$($id)"
@@ -1395,8 +1445,8 @@ function Get-ZoomDesktopClientAdmxOnline
 {
     <#
     .SYNOPSIS
-    Returns latest Version and Uri for Zoom Desktop Client ADMX files
-#>
+        Returns latest Version and Uri for Zoom Desktop Client ADMX files
+    #>
 
     try
     {
@@ -1422,11 +1472,12 @@ function Get-CustomPolicyOnline
 {
     <#
     .SYNOPSIS
-    Returns latest Version and Uri for Custom Policies
+        Returns latest Version and Uri for Custom Policies
 
     .PARAMETER CustomPolicyStore
-    Folder where Custom Policies can be found
-#>
+        Folder where Custom Policies can be found
+    #>
+
     param(
         [string] $CustomPolicyStore
     )
@@ -1442,8 +1493,8 @@ function Get-AzureVirtualDesktopAdmxOnline
 {
     <#
     .SYNOPSIS
-    Returns latest Version and Uri for Azure Virtual Desktop ADMX files
-#>
+        Returns latest Version and Uri for Azure Virtual Desktop ADMX files
+    #>
 
     try
     {
@@ -1469,14 +1520,14 @@ function Get-FSLogixAdmx
 {
     <#
     .SYNOPSIS
-    Process FSLogix Admx files
+        Process FSLogix Admx files
 
     .PARAMETER Version
-    Current Version present
+        Current Version present
 
     .PARAMETER PolicyStore
-    Destination for the Admx files
-#>
+        Destination for the Admx files
+    #>
 
     param(
         [string]$Version,
@@ -1542,17 +1593,17 @@ function Get-MicrosoftOfficeAdmx
 {
     <#
     .SYNOPSIS
-    Process Office Admx files
+        Process Office Admx files
 
     .PARAMETER Version
-    Current Version present
+        Current Version present
 
     .PARAMETER PolicyStore
-    Destination for the Admx files
+        Destination for the Admx files
 
     .PARAMETER Architecture
-    Architecture (x86 or x64)
-#>
+        Architecture (x86 or x64)
+    #>
 
     param(
         [string]$Version,
@@ -1608,23 +1659,23 @@ function Get-WindowsAdmx
 {
     <#
     .SYNOPSIS
-    Process Windows 10 or Windows 11 Admx files
+        Process Windows 10 or Windows 11 Admx files
 
     .PARAMETER Version
-    Current Version present
+        Current Version present
 
     .PARAMETER PolicyStore
-    Destination for the Admx files
+        Destination for the Admx files
 
     .PARAMETER WindowsVersion
-    Official WindowsVersion format
+        Official WindowsVersion format
 
     .PARAMETER WindowsEdition
-    Differentiate between Windows 10 and Windows 11
+        Differentiate between Windows 10 and Windows 11
 
     .PARAMETER Languages
-    Languages to check
-#>
+        Languages to check
+    #>
 
     param(
         [string]$Version,
@@ -1693,17 +1744,17 @@ function Get-OneDriveAdmx
 {
     <#
     .SYNOPSIS
-    Process OneDrive Admx files
+        Process OneDrive Admx files
 
     .PARAMETER Version
-    Current Version present
+        Current Version present
 
     .PARAMETER PolicyStore
-    Destination for the Admx files
+        Destination for the Admx files
 
     .PARAMETER PreferLocalOneDrive
-    Check locally only
-#>
+        Check locally only
+    #>
 
     [CmdletBinding()]
     param(
@@ -1838,14 +1889,14 @@ function Get-MicrosoftEdgeAdmx
 {
     <#
     .SYNOPSIS
-    Process Microsoft Edge Admx files
+        Process Microsoft Edge Admx files
 
     .PARAMETER Version
-    Current Version present
+        Current Version present
 
     .PARAMETER PolicyStore
-    Destination for the Admx files
-#>
+        Destination for the Admx files
+    #>
 
     param(
         [string]$Version,
@@ -1905,14 +1956,14 @@ function Get-GoogleChromeAdmx
 {
     <#
     .SYNOPSIS
-    Process Google Chrome Admx files
+        Process Google Chrome Admx files
 
     .PARAMETER Version
-    Current Version present
+        Current Version present
 
     .PARAMETER PolicyStore
-    Destination for the Admx files
-#>
+        Destination for the Admx files
+    #>
 
     param(
         [string]$Version,
@@ -1987,14 +2038,14 @@ function Get-AdobeAcrobatAdmx
 {
     <#
     .SYNOPSIS
-    Process Adobe Acrobat Admx files
+        Process Adobe Acrobat Admx files
 
     .PARAMETER Version
-    Current Version present
+        Current Version present
 
     .PARAMETER PolicyStore
-    Destination for the Admx files
-#>
+        Destination for the Admx files
+    #>
 
     param(
         [string]$Version,
@@ -2049,14 +2100,14 @@ function Get-AdobeReaderAdmx
 {
     <#
     .SYNOPSIS
-    Process Adobe Reader Admx files
+        Process Adobe Reader Admx files
 
     .PARAMETER Version
-    Current Version present
+        Current Version present
 
     .PARAMETER PolicyStore
-    Destination for the Admx files
-#>
+        Destination for the Admx files
+    #>
 
     param(
         [string]$Version,
@@ -2111,14 +2162,14 @@ function Get-CitrixWorkspaceAppAdmx
 {
     <#
     .SYNOPSIS
-    Process Citrix Workspace App Admx files
+        Process Citrix Workspace App Admx files
 
     .PARAMETER Version
-    Current Version present
+        Current Version present
 
     .PARAMETER PolicyStore
-    Destination for the Admx files
-#>
+        Destination for the Admx files
+    #>
 
     param(
         [string]$Version,
@@ -2174,14 +2225,14 @@ function Get-MozillaFirefoxAdmx
 {
     <#
     .SYNOPSIS
-    Process Mozilla Firefox Admx files
+        Process Mozilla Firefox Admx files
 
     .PARAMETER Version
-    Current Version present
+        Current Version present
 
     .PARAMETER PolicyStore
-    Destination for the Admx files
-#>
+        Destination for the Admx files
+    #>
 
     param(
         [string]$Version,
@@ -2307,14 +2358,14 @@ function Get-BIS-FAdmx
 {
     <#
     .SYNOPSIS
-    Process BIS-F Admx files
+        Process BIS-F Admx files
 
     .PARAMETER Version
-    Current Version present
+        Current Version present
 
     .PARAMETER PolicyStore
-    Destination for the Admx files
-#>
+        Destination for the Admx files
+    #>
 
     param(
         [string]$Version,
@@ -2373,14 +2424,14 @@ function Get-MDOPAdmx
 {
     <#
     .SYNOPSIS
-    Process MDOP Admx files
+        Process MDOP Admx files
 
     .PARAMETER Version
-    Current Version present
+        Current Version present
 
     .PARAMETER PolicyStore
-    Destination for the Admx files
-#>
+        Destination for the Admx files
+    #>
 
     param(
         [string]$Version,
@@ -2449,13 +2500,13 @@ function Get-MDOPAdmx
 function Get-CustomPolicyAdmx
 {
     <#
-        .SYNOPSIS
+    .SYNOPSIS
         Process Custom Policy Admx files
 
-        .PARAMETER Version
+    .PARAMETER Version
         Current Version present
 
-        .PARAMETER PolicyStore
+    .PARAMETER PolicyStore
         Destination for the Admx files
     #>
 
@@ -2504,11 +2555,11 @@ function Get-AzureVirtualDesktopAdmx
     Process Azure Virtual Desktop Admx files
 
     .PARAMETER Version
-    Current Version present
+        Current Version present
 
     .PARAMETER PolicyStore
-    Destination for the Admx files
-#>
+        Destination for the Admx files
+    #>
 
     param(
         [string]$Version,
