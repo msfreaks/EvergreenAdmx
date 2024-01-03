@@ -95,10 +95,10 @@ param(
     [switch] $UseProductFolders,
     [Parameter(Mandatory = $False)]
     [System.String] $CustomPolicyStore = $null,
-    [Parameter(Mandatory = $False)][ValidateSet("Custom Policy Store", "Windows 10", "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office", "FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client")]
+    [Parameter(Mandatory = $False)][ValidateSet("Custom Policy Store", "Windows 10", "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office", "FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client", "Azure Virtual Desktop")]
     [System.String[]] $Include = @("Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office"),
     [Parameter(Mandatory = $False)]
-    [switch] $PreferLocalOneDrive = $false
+    [switch] $PreferLocalOneDrive = $False
 )
 
 #region init
@@ -997,8 +997,6 @@ function Get-MicrosoftOfficeAdmxOnline
     $url = "https://www.microsoft.com/en-us/download/details.aspx?id=$($id)"
     $urldownload = "https://www.microsoft.com/en-us/download/confirmation.aspx?id=$($id)"
 
-    Get-Link -Uri '$urlversion' -MatchProperty href -Pattern '\.exe'
-
     try
     {
 
@@ -1097,15 +1095,15 @@ function Get-OneDriveOnline
             $architecture = "AMD64"
             $ring = "Insider"
             $type = "exe"
-            $evergreen = Invoke-RestMethod -Uri $url
-            $evergreen =  $evergreen | Where-Object { $_.Architecture -eq $architecture -and $_.Ring -eq $ring -and $_.Type -eq $type } | `
+            $Evergreen = Invoke-RestMethod -Uri $url
+            $Evergreen =  $Evergreen | Where-Object { $_.Architecture -eq $architecture -and $_.Ring -eq $ring -and $_.Type -eq $type } | `
             Sort-Object -Property @{ Expression = { [System.Version]$_.Version }; Descending = $true } | Select-Object -First 1
 
             # grab download uri
-            $URI = $evergreen.URI
+            $URI = $Evergreen.URI
 
             # grab version
-            $Version = $evergreen.Version
+            $Version = $Evergreen.Version
 
             # return evergreen object
             return @{ Version = $Version; URI = $URI }
@@ -1373,12 +1371,12 @@ function Get-MDOPAdmxOnline
     $urldownload = "https://www.microsoft.com/en-us/download/confirmation.aspx?id=$($id)"
     try
     {
-
         # load page for version scrape
         $web = Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urlversion
-        $str = ($web.ToString() -split "[`r`n]" | Select-String "Version:").ToString()
         # grab version
-        $Version = ($str | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
+        $regEx = '(version\":")((?:\d+\.)+(?:\d+))"'
+        $version = ($web | Select-String -Pattern $regEx).Matches.Groups[2].Value
+
         # load page for uri scrape
         $web = Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urldownload -MaximumRedirection 0
         # grab download url
@@ -1440,6 +1438,33 @@ function Get-CustomPolicyOnline
     return @{ Version = $version; URI = $CustomPolicyStore }
 }
 
+function Get-AzureVirtualDesktopAdmxOnline
+{
+    <#
+    .SYNOPSIS
+    Returns latest Version and Uri for Azure Virtual Desktop ADMX files
+#>
+
+    try
+    {
+        $URL = "https://aka.ms/avdgpo"
+
+        # grab uri
+        $URI= (Resolve-Uri -Uri $url).URI
+
+        # grab version
+        $LastModifiedDate = (Resolve-Uri -Uri $URL).LastModified
+        [version]$Version = $LastModifiedDate.ToString("yyyy.MM.dd")
+
+        # return evergreen object
+        return @{ Version = $Version; URI = $URI }
+    }
+    catch
+    {
+        Throw $_
+    }
+}
+
 function Get-FSLogixAdmx
 {
     <#
@@ -1459,47 +1484,47 @@ function Get-FSLogixAdmx
         [string[]]$Languages = $null
     )
 
-    $evergreen = Get-FSLogixOnline
-    $productname = "FSLogix"
-    $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
+    $Evergreen = Get-FSLogixOnline
+    $ProductName = "FSLogix"
+    $ProductFolder = ""; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
 
     # see if this is a newer version
-    if (-not $Version -or [version]$evergreen.Version -gt [version]$Version)
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version)
     {
-        Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
 
         # download and process
-        $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1])"
+        $OutFile = "$($WorkingDirectory)\downloads\$($Evergreen.URI.Split("/")[-1])"
         try
         {
             # download
-            Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
-            Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+            Invoke-WebRequest -UseDefaultCredentials -Uri $Evergreen.URI -UseBasicParsing -OutFile $OutFile
 
             # extract
-            Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\fslogix'"
-            Expand-Archive -Path $outfile -DestinationPath "$($env:TEMP)\fslogix" -Force
+            Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\fslogix'"
+            Expand-Archive -Path $OutFile -DestinationPath "$($env:TEMP)\fslogix" -Force
 
             # copy
-            $sourceadmx = "$($env:TEMP)\fslogix"
-            $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            if (-not (Test-Path -Path "$($targetadmx)\en-US")) { $null = (New-Item -Path "$($targetadmx)\en-US" -ItemType Directory -Force) }
+            $SourceAdmx = "$($env:TEMP)\fslogix"
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            if (-not (Test-Path -Path "$($TargetAdmx)\en-US")) { $null = (New-Item -Path "$($TargetAdmx)\en-US" -ItemType Directory -Force) }
 
-            Write-Verbose "Copying Admx files from '$($sourceadmx)' to '$($targetadmx)'"
-            Copy-Item -Path "$($sourceadmx)\*.admx" -Destination "$($targetadmx)" -Force
-            Copy-Item -Path "$($sourceadmx)\*.adml" -Destination "$($targetadmx)\en-US" -Force
+            Write-Verbose "Copying Admx files from '$($SourceAdmx)' to '$($TargetAdmx)'"
+            Copy-Item -Path "$($SourceAdmx)\*.admx" -Destination "$($TargetAdmx)" -Force
+            Copy-Item -Path "$($SourceAdmx)\*.adml" -Destination "$($TargetAdmx)\en-US" -Force
             if ($PolicyStore)
             {
-                Write-Verbose "Copying Admx files from '$($sourceadmx)' to '$($PolicyStore)'"
-                Copy-Item -Path "$($sourceadmx)\*.admx" -Destination "$($PolicyStore)" -Force
+                Write-Verbose "Copying Admx files from '$($SourceAdmx)' to '$($PolicyStore)'"
+                Copy-Item -Path "$($SourceAdmx)\*.admx" -Destination "$($PolicyStore)" -Force
                 if (-not (Test-Path -Path "$($PolicyStore)en-US")) { $null = (New-Item -Path "$($PolicyStore)en-US" -ItemType Directory -Force) }
-                Copy-Item -Path "$($sourceadmx)\*.adml" -Destination "$($PolicyStore)en-US" -Force
+                Copy-Item -Path "$($SourceAdmx)\*.adml" -Destination "$($PolicyStore)en-US" -Force
             }
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\fslogix" -Recurse -Force
 
-            return $evergreen
+            return $Evergreen
         }
         catch
         {
@@ -1536,36 +1561,36 @@ function Get-MicrosoftOfficeAdmx
         [string[]]$Languages = $null
     )
 
-    $evergreen = Get-MicrosoftOfficeAdmxOnline | Where-Object { $_.Architecture -like $Architecture }
-    $productname = "Microsoft Office $($Architecture)"
-    $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
+    $Evergreen = Get-MicrosoftOfficeAdmxOnline | Where-Object { $_.Architecture -like $Architecture }
+    $ProductName = "Microsoft Office $($Architecture)"
+    $ProductFolder = ""; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
 
     # see if this is a newer version
-    if (-not $Version -or [version]$evergreen.Version -gt [version]$Version)
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version)
     {
-        Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
 
         # download and process
-        $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1])"
+        $OutFile = "$($WorkingDirectory)\downloads\$($Evergreen.URI.Split("/")[-1])"
         try
         {
             # download
-            Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
-            Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+            Invoke-WebRequest -UseDefaultCredentials -Uri $Evergreen.URI -UseBasicParsing -OutFile $OutFile
 
             # extract
-            Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\office'"
-            $null = Start-Process -FilePath $outfile -ArgumentList "/quiet /norestart /extract:`"$($env:TEMP)\office`"" -PassThru -Wait
+            Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\office'"
+            $null = Start-Process -FilePath $OutFile -ArgumentList "/quiet /norestart /extract:`"$($env:TEMP)\office`"" -PassThru -Wait
 
             # copy
-            $sourceadmx = "$($env:TEMP)\office\admx"
-            $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
+            $SourceAdmx = "$($env:TEMP)\office\admx"
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\office" -Recurse -Force
 
-            return $evergreen
+            return $Evergreen
         }
         catch
         {
@@ -1610,26 +1635,26 @@ function Get-WindowsAdmx
     )
 
     $id = Get-WindowsAdmxDownloadId -WindowsVersion $WindowsVersion -WindowsEdition $WindowsEdition
-    $evergreen = Get-WindowsAdmxOnline -DownloadId $id
-    $productname = "Microsoft Windows $($WindowsEdition) $($WindowsVersion)"
-    $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
+    $Evergreen = Get-WindowsAdmxOnline -DownloadId $id
+    $ProductName = "Microsoft Windows $($WindowsEdition) $($WindowsVersion)"
+    $ProductFolder = ""; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
 
     # see if this is a newer version
-    if (-not $Version -or [version]$evergreen.Version -gt [version]$Version)
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version)
     {
-        Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
 
         # download and process
-        $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1])"
+        $OutFile = "$($WorkingDirectory)\downloads\$($Evergreen.URI.Split("/")[-1])"
         try
         {
             # download
-            Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
-            Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+            Invoke-WebRequest -UseDefaultCredentials -Uri $Evergreen.URI -UseBasicParsing -OutFile $OutFile
 
             # install
             Write-Verbose "Installing downloaded Windows $($WindowsEdition) Admx installer"
-            $null = Start-Process -FilePath "MsiExec.exe" -WorkingDirectory "$($WorkingDirectory)\downloads" -ArgumentList "/qn /norestart /I`"$($outfile.split('\')[-1])`"" -PassThru -Wait
+            $null = Start-Process -FilePath "MsiExec.exe" -WorkingDirectory "$($WorkingDirectory)\downloads" -ArgumentList "/qn /norestart /I`"$($OutFile.split('\')[-1])`"" -PassThru -Wait
 
             # find installation path
             Write-Verbose "Grabbing installation path for Windows $($WindowsEdition) Admx installer"
@@ -1642,15 +1667,15 @@ function Get-WindowsAdmx
             Write-Verbose "Found '$($uninstall.DisplayName)'"
 
             # copy
-            $sourceadmx = "C:\Program Files (x86)\Microsoft Group Policy\$($installfolder.Name)\PolicyDefinitions"
-            $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
+            $SourceAdmx = "C:\Program Files (x86)\Microsoft Group Policy\$($installfolder.Name)\PolicyDefinitions"
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
 
             # uninstall
             Write-Verbose "Uninstalling Windows $($WindowsEdition) Admx installer"
             $null = Start-Process -FilePath "MsiExec.exe" -ArgumentList "/qn /norestart /X$($uninstall.PSChildName)" -PassThru -Wait
 
-            return $evergreen
+            return $Evergreen
         }
         catch
         {
@@ -1689,32 +1714,32 @@ function Get-OneDriveAdmx
     )
 
     if ($PreferLocalOneDrive) {
-        $evergreen = Get-OneDriveOnline -PreferLocalOneDrive $PreferLocalOneDrive
+        $Evergreen = Get-OneDriveOnline -PreferLocalOneDrive $PreferLocalOneDrive
     } else {
-        $evergreen = Get-OneDriveOnline
+        $Evergreen = Get-OneDriveOnline
     }
 
-    $productname = "Microsoft OneDrive"
-    $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
+    $ProductName = "Microsoft OneDrive"
+    $ProductFolder = ""; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
 
     # see if this is a newer version
-    if (-not $Version -or [version]$evergreen.Version -gt [version]$Version)
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version)
     {
-        Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
 
         # download and process
-        $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1])"
+        $OutFile = "$($WorkingDirectory)\downloads\$($Evergreen.URI.Split("/")[-1])"
         try
         {
             if (-not $PreferLocalOneDrive)
             {
                 # download
-                Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
-                Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
+                Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+                Invoke-WebRequest -UseDefaultCredentials -Uri $Evergreen.URI -UseBasicParsing -OutFile $OutFile
 
                 # install
                 Write-Verbose "Installing downloaded OneDrive installer"
-                $null = Start-Process -FilePath $outfile -ArgumentList "/allusers /silent" -PassThru
+                $null = Start-Process -FilePath $OutFile -ArgumentList "/allusers /silent" -PassThru
                 # wait for setup to complete
                 while (Get-Process -Name "OneDriveSetup") { Start-Sleep -Seconds 10 }
                 # onedrive starts automatically after setup. kill!
@@ -1743,47 +1768,47 @@ function Get-OneDriveAdmx
             }
             else
             {
-                $installfolder = $evergreen.URI
+                $installfolder = $Evergreen.URI
             }
             # copy
-            $sourceadmx = "$($installfolder)\adm"
-            $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            if (-not (Test-Path -Path "$($targetadmx)")) { $null = (New-Item -Path "$($targetadmx)" -ItemType Directory -Force) }
+            $SourceAdmx = "$($installfolder)\adm"
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            if (-not (Test-Path -Path "$($TargetAdmx)")) { $null = (New-Item -Path "$($TargetAdmx)" -ItemType Directory -Force) }
 
-            Write-Verbose "Copying Admx files from '$($sourceadmx)' to '$($targetadmx)'"
-            Copy-Item -Path "$($sourceadmx)\*.admx" -Destination "$($targetadmx)" -Force
+            Write-Verbose "Copying Admx files from '$($SourceAdmx)' to '$($TargetAdmx)'"
+            Copy-Item -Path "$($SourceAdmx)\*.admx" -Destination "$($TargetAdmx)" -Force
             foreach ($language in $Languages)
             {
-                if (-not (Test-Path -Path "$($sourceadmx)\$($language)") -and -not (Test-Path -Path "$($sourceadmx)\$($language.Substring(0,2))"))
+                if (-not (Test-Path -Path "$($SourceAdmx)\$($language)") -and -not (Test-Path -Path "$($SourceAdmx)\$($language.Substring(0,2))"))
                 {
-                    if ($language -notlike "en-us") { Write-Warning "Language '$($language)' not found for '$($productname)'. Processing 'en-US' instead." }
-                    if (-not (Test-Path -Path "$($targetadmx)\en-US")) { $null = (New-Item -Path "$($targetadmx)\en-US" -ItemType Directory -Force) }
-                    Copy-Item -Path "$($sourceadmx)\*.adml" -Destination "$($targetadmx)\en-US" -Force
+                    if ($language -notlike "en-us") { Write-Warning "Language '$($language)' not found for '$($ProductName)'. Processing 'en-US' instead." }
+                    if (-not (Test-Path -Path "$($TargetAdmx)\en-US")) { $null = (New-Item -Path "$($TargetAdmx)\en-US" -ItemType Directory -Force) }
+                    Copy-Item -Path "$($SourceAdmx)\*.adml" -Destination "$($TargetAdmx)\en-US" -Force
                 }
                 else
                 {
-                    $sourcelanguage = $language; if (-not (Test-Path -Path "$($sourceadmx)\$($language)")) { $sourcelanguage = $language.Substring(0, 2) }
-                    if (-not (Test-Path -Path "$($targetadmx)\$($language)")) { $null = (New-Item -Path "$($targetadmx)\$($language)" -ItemType Directory -Force) }
-                    Copy-Item -Path "$($sourceadmx)\$($sourcelanguage)\*.adml" -Destination "$($targetadmx)\$($language)" -Force
+                    $sourcelanguage = $language; if (-not (Test-Path -Path "$($SourceAdmx)\$($language)")) { $sourcelanguage = $language.Substring(0, 2) }
+                    if (-not (Test-Path -Path "$($TargetAdmx)\$($language)")) { $null = (New-Item -Path "$($TargetAdmx)\$($language)" -ItemType Directory -Force) }
+                    Copy-Item -Path "$($SourceAdmx)\$($sourcelanguage)\*.adml" -Destination "$($TargetAdmx)\$($language)" -Force
                 }
             }
 
             if ($PolicyStore)
             {
-                Write-Verbose "Copying Admx files from '$($sourceadmx)' to '$($PolicyStore)'"
-                Copy-Item -Path "$($sourceadmx)\*.admx" -Destination "$($PolicyStore)" -Force
+                Write-Verbose "Copying Admx files from '$($SourceAdmx)' to '$($PolicyStore)'"
+                Copy-Item -Path "$($SourceAdmx)\*.admx" -Destination "$($PolicyStore)" -Force
                 foreach ($language in $Languages)
                 {
-                    if (-not (Test-Path -Path "$($sourceadmx)\$($language)") -and -not (Test-Path -Path "$($sourceadmx)\$($language.Substring(0,2))"))
+                    if (-not (Test-Path -Path "$($SourceAdmx)\$($language)") -and -not (Test-Path -Path "$($SourceAdmx)\$($language.Substring(0,2))"))
                     {
                         if (-not (Test-Path -Path "$($PolicyStore)en-US")) { $null = (New-Item -Path "$($PolicyStore)en-US" -ItemType Directory -Force) }
-                        Copy-Item -Path "$($sourceadmx)\*.adml" -Destination "$($PolicyStore)en-US" -Force
+                        Copy-Item -Path "$($SourceAdmx)\*.adml" -Destination "$($PolicyStore)en-US" -Force
                     }
                     else
                     {
-                        $sourcelanguage = $language; if (-not (Test-Path -Path "$($sourceadmx)\$($language)")) { $sourcelanguage = $language.Substring(0, 2) }
+                        $sourcelanguage = $language; if (-not (Test-Path -Path "$($SourceAdmx)\$($language)")) { $sourcelanguage = $language.Substring(0, 2) }
                         if (-not (Test-Path -Path "$($PolicyStore)$($language)")) { $null = (New-Item -Path "$($PolicyStore)$($language)" -ItemType Directory -Force) }
-                        Copy-Item -Path "$($sourceadmx)\$($sourcelanguage)\*.adml" -Destination "$($PolicyStore)$($language)" -Force
+                        Copy-Item -Path "$($SourceAdmx)\$($sourcelanguage)\*.adml" -Destination "$($PolicyStore)$($language)" -Force
                     }
                 }
             }
@@ -1795,7 +1820,7 @@ function Get-OneDriveAdmx
                 $null = Start-Process -FilePath "$($installfolder)\OneDriveSetup.exe" -ArgumentList "/uninstall /allusers" -PassThru -Wait
             }
 
-            return $evergreen
+            return $Evergreen
         }
         catch
         {
@@ -1813,7 +1838,7 @@ function Get-MicrosoftEdgeAdmx
 {
     <#
     .SYNOPSIS
-    Process Microsoft Edge (Chromium) Admx files
+    Process Microsoft Edge Admx files
 
     .PARAMETER Version
     Current Version present
@@ -1828,42 +1853,41 @@ function Get-MicrosoftEdgeAdmx
         [string[]]$Languages = $null
     )
 
-    $evergreen = Get-MicrosoftEdgePolicyOnline
-    $productname = "Microsoft Edge (Chromium)"
-    $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
+    $Evergreen = Get-MicrosoftEdgePolicyOnline
+    $ProductName = "Microsoft Edge"
+    $ProductFolder = ""; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
 
     # see if this is a newer version
-    if (-not $Version -or [version]$evergreen.Version -gt [version]$Version)
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version)
     {
-        Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
 
         # download and process
-        $outfile = "$($WorkingDirectory)\downloads\MicrosoftEdgePolicyTemplates.cab"
-        $zipfile = "$($WorkingDirectory)\downloads\MicrosoftEdgePolicyTemplates.zip"
+        $OutFile = "$($WorkingDirectory)\downloads\$($ProductName).cab"
+        $ZipFile = "$($WorkingDirectory)\downloads\MicrosoftEdgePolicyTemplates.zip"
 
         try
         {
             # download
-            Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
-            Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+            Invoke-WebRequest -UseDefaultCredentials -Uri $Evergreen.URI -UseBasicParsing -OutFile $OutFile
 
             # extract
-            Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\microsoftedgepolicy'"
-            $null = (New-Item -Path "$($env:TEMP)\microsoftedgepolicy" -ItemType Directory -Force)
-            $null = (expand "$($outfile)" -F:* "$($env:TEMP)\microsoftedgepolicy" $zipfile)
-
-            Expand-Archive -Path $zipfile -DestinationPath "$($env:TEMP)\microsoftedgepolicy" -Force
+            Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\$($ProductName)'"
+            $null = (New-Item -Path "$($env:TEMP)\$($ProductName)" -ItemType Directory -Force)
+            $null = (expand -F:* "$($OutFile)" "$($env:TEMP)\$($ProductName)" $ZipFile)
+            Expand-Archive -Path $ZipFile -DestinationPath "$($env:TEMP)\$($ProductName)" -Force
 
             # copy
-            $sourceadmx = "$($env:TEMP)\microsoftedgepolicy\windows\admx"
-            $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
+            $SourceAdmx = "$($env:TEMP)\$($ProductName)\windows\admx"
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
 
             # cleanup
-            Remove-Item -Path $outfile -Force
-            Remove-Item -Path "$env:TEMP\microsoftedgepolicy" -Recurse -Force
+            Remove-Item -Path $OutFile -Force
+            Remove-Item -Path "$env:TEMP\$($ProductName)" -Recurse -Force
 
-            return $evergreen
+            return $Evergreen
         }
         catch
         {
@@ -1896,31 +1920,31 @@ function Get-GoogleChromeAdmx
         [string[]]$Languages = $null
     )
 
-    $evergreen = Get-GoogleChromeAdmxOnline
-    $productname = "Google Chrome"
-    $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
+    $Evergreen = Get-GoogleChromeAdmxOnline
+    $ProductName = "Google Chrome"
+    $ProductFolder = ""; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
 
     # see if this is a newer version
-    if (-not $Version -or [version]$evergreen.Version -gt [version]$Version)
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version)
     {
-        Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
 
         # download and process
-        $outfile = "$($WorkingDirectory)\downloads\googlechromeadmx.zip"
+        $OutFile = "$($WorkingDirectory)\downloads\googlechromeadmx.zip"
         try
         {
             # download
-            Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
-            Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+            Invoke-WebRequest -UseDefaultCredentials -Uri $Evergreen.URI -UseBasicParsing -OutFile $OutFile
 
             # extract
-            Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\chromeadmx'"
-            Expand-Archive -Path $outfile -DestinationPath "$($env:TEMP)\chromeadmx" -Force
+            Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\chromeadmx'"
+            Expand-Archive -Path $OutFile -DestinationPath "$($env:TEMP)\chromeadmx" -Force
 
             # copy
-            $sourceadmx = "$($env:TEMP)\chromeadmx\windows\admx"
-            $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
+            $SourceAdmx = "$($env:TEMP)\chromeadmx\windows\admx"
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\chromeadmx" -Recurse -Force
@@ -1929,23 +1953,23 @@ function Get-GoogleChromeAdmx
             $url = "https://dl.google.com/dl/update2/enterprise/googleupdateadmx.zip"
 
             # download
-            $outfile = "$($WorkingDirectory)\downloads\googlechromeupdateadmx.zip"
-            Write-Verbose "Downloading '$($url)' to '$($outfile)'"
-            Invoke-WebRequest -UseDefaultCredentials -Uri $url -UseBasicParsing -OutFile $outfile
+            $OutFile = "$($WorkingDirectory)\downloads\googlechromeupdateadmx.zip"
+            Write-Verbose "Downloading '$($url)' to '$($OutFile)'"
+            Invoke-WebRequest -UseDefaultCredentials -Uri $url -UseBasicParsing -OutFile $OutFile
 
             # extract
-            Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\chromeupdateadmx'"
-            Expand-Archive -Path $outfile -DestinationPath "$($env:TEMP)\chromeupdateadmx" -Force
+            Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\chromeupdateadmx'"
+            Expand-Archive -Path $OutFile -DestinationPath "$($env:TEMP)\chromeupdateadmx" -Force
 
             # copy
-            $sourceadmx = "$($env:TEMP)\chromeupdateadmx\GoogleUpdateAdmx"
-            $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Quiet -Languages $Languages
+            $SourceAdmx = "$($env:TEMP)\chromeupdateadmx\GoogleUpdateAdmx"
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Quiet -Languages $Languages
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\chromeupdateadmx" -Recurse -Force
 
-            return $evergreen
+            return $Evergreen
         }
         catch
         {
@@ -1978,36 +2002,36 @@ function Get-AdobeAcrobatAdmx
         [string[]]$Languages = $null
     )
 
-    $evergreen = Get-AdobeAcrobatAdmxOnline
-    $productname = "Adobe Acrobat"
-    $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
+    $Evergreen = Get-AdobeAcrobatAdmxOnline
+    $ProductName = "Adobe Acrobat"
+    $ProductFolder = ""; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
 
     # see if this is a newer version
-    if (-not $Version -or [version]$evergreen.Version -gt [version]$Version)
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version)
     {
-        Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
 
         # download and process
-        $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1])"
+        $OutFile = "$($WorkingDirectory)\downloads\$($Evergreen.URI.Split("/")[-1])"
         try
         {
             # download
-            Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
-            Invoke-WebRequest -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+            Invoke-WebRequest -Uri $Evergreen.URI -UseBasicParsing -OutFile $OutFile
 
             # extract
-            Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\AdobeAcrobat'"
-            Expand-Archive -Path $outfile -DestinationPath "$($env:TEMP)\AdobeAcrobat" -Force
+            Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\AdobeAcrobat'"
+            Expand-Archive -Path $OutFile -DestinationPath "$($env:TEMP)\AdobeAcrobat" -Force
 
             # copy
-            $sourceadmx = "$($env:TEMP)\AdobeAcrobat"
-            $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
+            $SourceAdmx = "$($env:TEMP)\AdobeAcrobat"
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\AdobeAcrobat" -Recurse -Force
 
-            return $evergreen
+            return $Evergreen
         }
         catch
         {
@@ -2040,36 +2064,36 @@ function Get-AdobeReaderAdmx
         [string[]]$Languages = $null
     )
 
-    $evergreen = Get-AdobeReaderAdmxOnline
-    $productname = "Adobe Reader"
-    $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
+    $Evergreen = Get-AdobeReaderAdmxOnline
+    $ProductName = "Adobe Reader"
+    $ProductFolder = ""; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
 
     # see if this is a newer version
-    if (-not $Version -or [version]$evergreen.Version -gt [version]$Version)
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version)
     {
-        Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
 
         # download and process
-        $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1])"
+        $OutFile = "$($WorkingDirectory)\downloads\$($Evergreen.URI.Split("/")[-1])"
         try
         {
             # download
-            Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
-            Invoke-WebRequest -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+            Invoke-WebRequest -Uri $Evergreen.URI -UseBasicParsing -OutFile $OutFile
 
             # extract
-            Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\AdobeReader'"
-            Expand-Archive -Path $outfile -DestinationPath "$($env:TEMP)\AdobeReader" -Force
+            Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\AdobeReader'"
+            Expand-Archive -Path $OutFile -DestinationPath "$($env:TEMP)\AdobeReader" -Force
 
             # copy
-            $sourceadmx = "$($env:TEMP)\AdobeReader"
-            $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
+            $SourceAdmx = "$($env:TEMP)\AdobeReader"
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\AdobeReader" -Recurse -Force
 
-            return $evergreen
+            return $Evergreen
         }
         catch
         {
@@ -2102,37 +2126,37 @@ function Get-CitrixWorkspaceAppAdmx
         [string[]]$Languages = $null
     )
 
-    $evergreen = Get-CitrixWorkspaceAppAdmxOnline
-    $productname = "Citrix Workspace App"
-    $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
+    $Evergreen = Get-CitrixWorkspaceAppAdmxOnline
+    $ProductName = "Citrix Workspace App"
+    $ProductFolder = ""; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
 
     # see if this is a newer version
-    if (-not $Version -or [version]$evergreen.Version -gt [version]$Version)
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version)
     {
-        Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
 
         # download and process
-        $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("?")[0].Split("/")[-1])"
+        $OutFile = "$($WorkingDirectory)\downloads\$($Evergreen.URI.Split("?")[0].Split("/")[-1])"
         try
         {
             # download
-            Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
-            Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+            Invoke-WebRequest -UseDefaultCredentials -Uri $Evergreen.URI -UseBasicParsing -OutFile $OutFile
 
             # extract
-            Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\citrixworkspaceapp'"
-            Expand-Archive -Path $outfile -DestinationPath "$($env:TEMP)\citrixworkspaceapp" -Force
+            Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\citrixworkspaceapp'"
+            Expand-Archive -Path $OutFile -DestinationPath "$($env:TEMP)\citrixworkspaceapp" -Force
 
             # copy
-            # $sourceadmx = "$($env:TEMP)\citrixworkspaceapp\$($evergreen.URI.Split("/")[-2].Split("?")[0].SubString(0,$evergreen.URI.Split("/")[-2].Split("?")[0].IndexOf(".")))"
-            $sourceadmx = (Get-ChildItem -Path "$($env:TEMP)\citrixworkspaceapp\$($evergreen.URI.Split("/")[-2].Split("?")[0].SubString(0,$evergreen.URI.Split("/")[-2].Split("?")[0].IndexOf(".")))" -Include "*.admx" -Recurse)[0].DirectoryName
-            $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
+            # $SourceAdmx = "$($env:TEMP)\citrixworkspaceapp\$($Evergreen.URI.Split("/")[-2].Split("?")[0].SubString(0,$Evergreen.URI.Split("/")[-2].Split("?")[0].IndexOf(".")))"
+            $SourceAdmx = (Get-ChildItem -Path "$($env:TEMP)\citrixworkspaceapp\$($Evergreen.URI.Split("/")[-2].Split("?")[0].SubString(0,$Evergreen.URI.Split("/")[-2].Split("?")[0].IndexOf(".")))" -Include "*.admx" -Recurse)[0].DirectoryName
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\citrixworkspaceapp" -Recurse -Force
 
-            return $evergreen
+            return $Evergreen
         }
         catch
         {
@@ -2165,36 +2189,36 @@ function Get-MozillaFirefoxAdmx
         [string[]]$Languages = $null
     )
 
-    $evergreen = Get-MozillaFirefoxAdmxOnline
-    $productname = "Mozilla Firefox"
-    $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
+    $Evergreen = Get-MozillaFirefoxAdmxOnline
+    $ProductName = "Mozilla Firefox"
+    $ProductFolder = ""; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
 
     # see if this is a newer version
-    if (-not $Version -or [version]$evergreen.Version -gt [version]$Version)
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version)
     {
-        Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
 
         # download and process
-        $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1])"
+        $OutFile = "$($WorkingDirectory)\downloads\$($Evergreen.URI.Split("/")[-1])"
         try
         {
             # download
-            Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
-            Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+            Invoke-WebRequest -UseDefaultCredentials -Uri $Evergreen.URI -UseBasicParsing -OutFile $OutFile
 
             # extract
-            Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\firefoxadmx'"
-            Expand-Archive -Path $outfile -DestinationPath "$($env:TEMP)\firefoxadmx" -Force
+            Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\firefoxadmx'"
+            Expand-Archive -Path $OutFile -DestinationPath "$($env:TEMP)\firefoxadmx" -Force
 
             # copy
-            $sourceadmx = "$($env:TEMP)\firefoxadmx\windows"
-            $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
+            $SourceAdmx = "$($env:TEMP)\firefoxadmx\windows"
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\firefoxadmx" -Recurse -Force
 
-            return $evergreen
+            return $Evergreen
         }
         catch
         {
@@ -2227,44 +2251,45 @@ function Get-ZoomDesktopClientAdmx
         [string[]]$Languages = $null
     )
 
-    $evergreen = Get-ZoomDesktopClientAdmxOnline
-    $productname = "Zoom Desktop Client"
-    $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
+    $Evergreen = Get-ZoomDesktopClientAdmxOnline
+    $ProductName = "Zoom Desktop Client"
+    $ProductFolder = ""; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
 
     # see if this is a newer version
-    if (-not $Version -or [version]$evergreen.Version -gt [version]$Version)
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version)
     {
-        Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
 
         # download and process
-        $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1])"
+        $OutFile = "$($WorkingDirectory)\downloads\$($Evergreen.URI.Split("/")[-1])"
         try
         {
             # download
-            Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
-            Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+            Invoke-WebRequest -UseDefaultCredentials -Uri $Evergreen.URI -UseBasicParsing -OutFile $OutFile
 
             # extract
-            Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\zoomclientadmx'"
-            Expand-Archive -Path $outfile -DestinationPath "$($env:TEMP)\zoomclientadmx" -Force
+            Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\$($ProductName)'"
+            Expand-Archive -Path $OutFile -DestinationPath "$($env:TEMP)\$($ProductName)" -Force
 
             # cleanup folder structure
-            $sourceadmx = Get-ChildItem -Path "$($env:TEMP)\zoomclientadmx\" -Exclude *.adm -Include *.admx -Recurse | Where-Object { -Not $_.PSIsContainer }
-            $sourceadml = Get-ChildItem -Path "$($env:TEMP)\zoomclientadmx\" -Exclude *.adm -Include *.adml -Recurse | Where-Object { -Not $_.PSIsContainer }
-            $null = (New-Item -Path "$($env:TEMP)\clean-zoomclientadmx\" -ItemType Directory -Force)
-            $null = (New-Item -Path "$($env:TEMP)\clean-zoomclientadmx\en-us" -ItemType Directory -Force)
-            Copy-Item -Path $sourceadmx -Destination "$($env:TEMP)\clean-zoomclientadmx\" -Force
-            Copy-Item -Path $sourceadml -Destination "$($env:TEMP)\clean-zoomclientadmx\en-us" -Force
-            Remove-Item -Path "$($env:TEMP)\zoomclientadmx" -Recurse -Force
-            Rename-Item -Path "$($env:TEMP)\clean-zoomclientadmx" -NewName "zoomclientadmx" -Force
+            $SourceAdmx = Get-ChildItem -Path "$($env:TEMP)\$($ProductName)\" -Exclude *.adm -Include *.admx -Recurse | Where-Object { -Not $_.PSIsContainer }
+            $SourceAdml = Get-ChildItem -Path "$($env:TEMP)\$($ProductName)\" -Exclude *.adm -Include *.adml -Recurse | Where-Object { -Not $_.PSIsContainer }
+            $null = (New-Item -Path "$($env:TEMP)\clean-$($ProductName)\" -ItemType Directory -Force)
+            $null = (New-Item -Path "$($env:TEMP)\clean-$($ProductName)\en-us" -ItemType Directory -Force)
+            Copy-Item -Path $SourceAdmx -Destination "$($env:TEMP)\clean-$($ProductName)\" -Force
+            Copy-Item -Path $SourceAdml -Destination "$($env:TEMP)\clean-$($ProductName)\en-us" -Force
+            Remove-Item -Path "$($env:TEMP)\$($ProductName)" -Recurse -Force
+            Rename-Item -Path "$($env:TEMP)\clean-$($ProductName)" -NewName "$($ProductName)" -Force
             # copy
-            $sourceadmx = "$($env:TEMP)\zoomclientadmx"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
+            $SourceAdmx = "$($env:TEMP)\$($ProductName)"
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
 
             # cleanup
-            Remove-Item -Path "$($env:TEMP)\zoomclientadmx" -Recurse -Force
+            Remove-Item -Path "$($env:TEMP)\$($ProductName)" -Recurse -Force
 
-            return $evergreen
+            return $Evergreen
         }
         catch
         {
@@ -2297,40 +2322,40 @@ function Get-BIS-FAdmx
         [string[]]$Languages = $null
     )
 
-    $evergreen = Get-BIS-FAdmxOnline
-    $productname = "BIS-F"
-    $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
+    $Evergreen = Get-BIS-FAdmxOnline
+    $ProductName = "BIS-F"
+    $ProductFolder = ""; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
 
     # see if this is a newer version
-    if (-not $Version -or [version]$evergreen.Version -gt [version]$Version)
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version)
     {
-        Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
 
         # download and process
-        $outfile = "$($WorkingDirectory)\downloads\bis-f.$($evergreen.Version).zip"
+        $OutFile = "$($WorkingDirectory)\downloads\bis-f.$($Evergreen.Version).zip"
         try
         {
             # download
-            Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
-            Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+            Invoke-WebRequest -UseDefaultCredentials -Uri $Evergreen.URI -UseBasicParsing -OutFile $OutFile
 
             # extract
-            Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\bisfadmx'"
-            Expand-Archive -Path $outfile -DestinationPath "$($env:TEMP)\bisfadmx" -Force
+            Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\bisfadmx'"
+            Expand-Archive -Path $OutFile -DestinationPath "$($env:TEMP)\bisfadmx" -Force
 
             # find extraction folder
             Write-Verbose "Finding extraction folder"
             $folder = (Get-ChildItem -Path "$($env:TEMP)\bisfadmx" | Sort-Object LastWriteTime -Descending)[0].Name
 
             # copy
-            $sourceadmx = "$($env:TEMP)\bisfadmx\$($folder)\admx"
-            $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName $productname -Languages $Languages
+            $SourceAdmx = "$($env:TEMP)\bisfadmx\$($folder)\admx"
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\bisfadmx" -Recurse -Force
 
-            return $evergreen
+            return $Evergreen
         }
         catch
         {
@@ -2363,27 +2388,27 @@ function Get-MDOPAdmx
         [string[]]$Languages = $null
     )
 
-    $evergreen = Get-MDOPAdmxOnline
-    $productname = "Microsoft Desktop Optimization Pack"
-    $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
+    $Evergreen = Get-MDOPAdmxOnline
+    $ProductName = "Microsoft Desktop Optimization Pack"
+    $ProductFolder = ""; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
 
     # see if this is a newer version
-    if (-not $Version -or [version]$evergreen.Version -gt [version]$Version)
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version)
     {
-        Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
 
         # download and process
-        $outfile = "$($WorkingDirectory)\downloads\$($evergreen.URI.Split("/")[-1])"
+        $OutFile = "$($WorkingDirectory)\downloads\$($Evergreen.URI.Split("/")[-1])"
         try
         {
             # download
-            Write-Verbose "Downloading '$($evergreen.URI)' to '$($outfile)'"
-            Invoke-WebRequest -UseDefaultCredentials -Uri $evergreen.URI -UseBasicParsing -OutFile $outfile
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+            Invoke-WebRequest -UseDefaultCredentials -Uri $Evergreen.URI -UseBasicParsing -OutFile $OutFile
 
             # extract
-            Write-Verbose "Extracting '$($outfile)' to '$($env:TEMP)\mdopadmx'"
+            Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\mdopadmx'"
             $null = (New-Item -Path "$($env:TEMP)\mdopadmx" -ItemType Directory -Force)
-            $null = (expand "$($outfile)" -F:* "$($env:TEMP)\mdopadmx")
+            $null = (expand "$($OutFile)" -F:* "$($env:TEMP)\mdopadmx")
 
             # find app-v folder
             Write-Verbose "Finding App-V folder"
@@ -2396,18 +2421,18 @@ function Get-MDOPAdmx
             $uevfolder = (Get-ChildItem -Path "$($env:TEMP)\mdopadmx" -Filter "UE-V*" | Sort-Object Name -Descending)[0].Name
 
             # copy
-            $sourceadmx = "$($env:TEMP)\mdopadmx\$($appvfolder)"
-            $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName "$($productname) - App-V" -Languages $Languages
-            $sourceadmx = "$($env:TEMP)\mdopadmx\$($mbamfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName "$($productname) - MBAM" -Languages $Languages
-            $sourceadmx = "$($env:TEMP)\mdopadmx\$($uevfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName "$($productname) - UE-V" -Languages $Languages
+            $SourceAdmx = "$($env:TEMP)\mdopadmx\$($appvfolder)"
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName "$($ProductName) - App-V" -Languages $Languages
+            $SourceAdmx = "$($env:TEMP)\mdopadmx\$($mbamfolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName "$($ProductName) - MBAM" -Languages $Languages
+            $SourceAdmx = "$($env:TEMP)\mdopadmx\$($uevfolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName "$($ProductName) - UE-V" -Languages $Languages
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\mdopadmx" -Recurse -Force
 
-            return $evergreen
+            return $Evergreen
         }
         catch
         {
@@ -2441,24 +2466,91 @@ function Get-CustomPolicyAdmx
         [string[]]$Languages = $null
     )
 
-    $evergreen = Get-CustomPolicyOnline -CustomPolicyStore $CustomPolicyStore
-    $productname = "Custom Policy Store"
-    $productfolder = ""; if ($UseProductFolders) { $productfolder = "\$($productname)" }
+    $Evergreen = Get-CustomPolicyOnline -CustomPolicyStore $CustomPolicyStore
+    $ProductName = "Custom Policy Store"
+    $ProductFolder = ""; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
 
     # see if this is a newer version
-    if (-not $Version -or [version]$evergreen.Version -gt [version]$Version)
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version)
     {
-        Write-Verbose "Found new version $($evergreen.Version) for '$($productname)'"
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
 
         # download and process
         try
         {
             # copy
-            $sourceadmx = "$($evergreen.URI)"
-            $targetadmx = "$($WorkingDirectory)\admx$($productfolder)"
-            Copy-Admx -SourceFolder $sourceadmx -TargetFolder $targetadmx -PolicyStore $PolicyStore -ProductName "$($productname)" -Languages $Languages
+            $SourceAdmx = "$($Evergreen.URI)"
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName "$($ProductName)" -Languages $Languages
 
-            return $evergreen
+            return $Evergreen
+        }
+        catch
+        {
+            Throw $_
+        }
+    }
+    else
+    {
+        # version already processed
+        return $null
+    }
+}
+
+function Get-AzureVirtualDesktopAdmx
+{
+    <#
+    .SYNOPSIS
+    Process Azure Virtual Desktop Admx files
+
+    .PARAMETER Version
+    Current Version present
+
+    .PARAMETER PolicyStore
+    Destination for the Admx files
+#>
+
+    param(
+        [string]$Version,
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
+    )
+
+    $Evergreen = Get-AzureVirtualDesktopAdmxOnline
+    $ProductName = "Azure Virtual Desktop"
+    $ProductFolder = ""; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
+
+    # see if this is a newer version
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version)
+    {
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
+
+        # download and process
+        $OutFile = "$($WorkingDirectory)\downloads\$($ProductName).cab"
+        $ZipFile = "$($WorkingDirectory)\downloads\AVDGPTemplate.zip"
+        try
+        {
+            # download
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+            Invoke-Download -URL $Evergreen.URI -Destination "$($WorkingDirectory)\downloads" -FileName "$($ProductName).cab"
+            #Invoke-WebRequest -UseDefaultCredentials -Uri $Evergreen.URI -UseBasicParsing -OutFile $OutFile
+
+            # extract
+            Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\$($ProductName)'"
+            $null = (New-Item -Path "$($env:TEMP)\$($ProductName)" -ItemType Directory -Force)
+            $null = (expand -F:* "$($OutFile)" "$($env:TEMP)\$($ProductName)" $ZipFile)
+            Expand-Archive -Path $ZipFile -DestinationPath "$($env:TEMP)\$($ProductName)" -Force
+
+            # copy
+            $SourceAdmx = "$($env:TEMP)\$($ProductName)"
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+
+            # cleanup
+            Remove-Item -Path $OutFile -Force
+            Remove-Item -Path "$($env:TEMP)\$($ProductName)" -Recurse -Force
+
+            return $Evergreen
         }
         catch
         {
@@ -2511,14 +2603,14 @@ else
     if ($admx) { if ($admxversions.Windows11) { $admxversions.Windows11 = $admx } else { $admxversions += @{ Windows11 = @{ Version = $admx.Version; URI = $admx.URI } } } }
 }
 
-# Microsoft Edge (Chromium)
+# Microsoft Edge
 if ($Include -notcontains 'Microsoft Edge')
 {
-    Write-Verbose "`nSkipping Microsoft Edge (Chromium)"
+    Write-Verbose "`nSkipping Microsoft Edge"
 }
 else
 {
-    Write-Verbose "`nProcessing Admx files for Microsoft Edge (Chromium)"
+    Write-Verbose "`nProcessing Admx files for Microsoft Edge"
     $admx = Get-MicrosoftEdgeAdmx -Version $admxversions.Edge.Version -PolicyStore $PolicyStore -Languages $Languages
     if ($admx) { if ($admxversions.Edge) { $admxversions.Edge = $admx } else { $admxversions += @{ Edge = @{ Version = $admx.Version; URI = $admx.URI } } } }
 }
@@ -2653,6 +2745,18 @@ else
     Write-Verbose "`nProcessing Admx files for Zoom Desktop Client"
     $admx = Get-ZoomDesktopClientAdmx -Version $admxversions.ZoomDesktopClient.Version -PolicyStore $PolicyStore -Languages $Languages
     if ($admx) { if ($admxversions.ZoomDesktopClient) { $admxversions.ZoomDesktopClient = $admx } else { $admxversions += @{ ZoomDesktopClient = @{ Version = $admx.Version; URI = $admx.URI } } } }
+}
+
+# Azure Virtual Desktop
+if ($Include -notcontains 'Azure Virtual Desktop')
+{
+    Write-Verbose "`nSkipping Azure Virtual Desktop"
+}
+else
+{
+    Write-Verbose "`nProcessing Admx files for Azure Virtual Desktop"
+    $admx = Get-AzureVirtualDesktopAdmx -Version $admxversions.AzureVirtualDesktop.Version -PolicyStore $PolicyStore -Languages $Languages
+    if ($admx) { if ($admxversions.AzureVirtualDesktop) { $admxversions.AzureVirtualDesktop = $admx } else { $admxversions += @{ AzureVirtualDesktop = @{ Version = $admx.Version; URI = $admx.URI } } } }
 }
 
 Write-Verbose "`nSaving Admx versions to '$($WorkingDirectory)\admxversions.xml'"
