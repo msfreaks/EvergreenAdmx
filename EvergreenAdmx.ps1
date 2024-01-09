@@ -1,5 +1,7 @@
 ﻿#Requires -RunAsAdministrator
 
+#region init
+
 <#PSScriptInfo
 
 .VERSION 2312.0
@@ -99,9 +101,6 @@ param(
     [Parameter(Mandatory = $False)]
     [switch] $PreferLocalOneDrive = $False
 )
-
-#region init
-
 $ProgressPreference = "SilentlyContinue"
 $ErrorActionPreference = "SilentlyContinue"
 
@@ -1071,12 +1070,14 @@ function Get-OneDriveOnline
     )
 
     # detect if OneDrive is installed
-    $localOneDrive = (Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | Where-Object {$_.DisplayName -like "*OneDrive*"}) | Sort-Object -Property Version -Descending | Select-Object -First 1
-    If (-Not $localOneDrive ) {
-        $localOneDrive = (Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | Where-Object {$_.DisplayName -like "*OneDrive*"}) | Sort-Object -Property Version -Descending | Select-Object -First 1
+    $localOneDrive = (Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | Where-Object { $_.DisplayName -like "*OneDrive*" }) | Sort-Object -Property Version -Descending | Select-Object -First 1
+    If (-Not $localOneDrive )
+    {
+        $localOneDrive = (Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | Where-Object { $_.DisplayName -like "*OneDrive*" }) | Sort-Object -Property Version -Descending | Select-Object -First 1
     }
-    If (-Not $localOneDrive ) {
-       $localOneDrive  = (Get-ItemProperty HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | Where-Object {$_.DisplayName -like "*OneDrive*"}) | Sort-Object -Property Version -Descending | Select-Object -First 1
+    If (-Not $localOneDrive )
+    {
+        $localOneDrive = (Get-ItemProperty HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | Where-Object { $_.DisplayName -like "*OneDrive*" }) | Sort-Object -Property Version -Descending | Select-Object -First 1
     }
 
 
@@ -1095,8 +1096,8 @@ function Get-OneDriveOnline
             $ring = "Insider"
             $type = "exe"
             $Evergreen = Invoke-RestMethod -Uri $url
-            $Evergreen =  $Evergreen | Where-Object { $_.Architecture -eq $architecture -and $_.Ring -eq $ring -and $_.Type -eq $type } | `
-            Sort-Object -Property @{ Expression = { [System.Version]$_.Version }; Descending = $true } | Select-Object -First 1
+            $Evergreen = $Evergreen | Where-Object { $_.Architecture -eq $architecture -and $_.Ring -eq $ring -and $_.Type -eq $type } | `
+                    Sort-Object -Property @{ Expression = { [System.Version]$_.Version }; Descending = $true } | Select-Object -First 1
 
             # grab download uri
             $URI = $Evergreen.URI
@@ -1181,93 +1182,22 @@ function Get-AdobeAcrobatAdmxOnline
 {
     <#
     .SYNOPSIS
-        Returns latest Version and Uri for the Adobe Acrobat Continuous track Admx files
+        Returns latest Version and Uri for the Adobe Acrobat Continuous track Admx files. Use this for Acrobat , 64-bit Reader, and the unified installer.
     #>
 
     try
     {
+        $URL = "https://ardownload2.adobe.com/pub/adobe/acrobat/win/AcrobatDC/misc/AcrobatADMTemplate.zip"
 
-        $url = "https://www.adobe.com/devnet-docs/acrobatetk/tools/DesktopDeployment/gpo.html#gpo-registry-template"
-        Get-Link -Uri $url -MatchProperty href -Pattern "\.zip$"
+        # grab uri
+        $URI = (Resolve-Uri -Uri $URL).URI
 
-
-        $file = "AcrobatADMTemplate.zip"
-        $url = "ftp://ftp.adobe.com/pub/adobe/acrobat/win/AcrobatDC/misc/"
-
-        # grab ftp response from $url
-        Write-Verbose "FTP $($url)"
-        $listRequest = [Net.WebRequest]::Create($url)
-        $listRequest.Method = [System.Net.WebRequestMethods+Ftp]::ListDirectoryDetails
-        $lines = New-Object System.Collections.ArrayList
-
-        # process response
-        $listResponse = $listRequest.GetResponse()
-        $listStream = $listResponse.GetResponseStream()
-        $listReader = New-Object System.IO.StreamReader($listStream)
-        while (!$listReader.EndOfStream)
-        {
-            $line = $listReader.ReadLine()
-            if ($line.Contains($file)) { $lines.Add($line) | Out-Null }
-        }
-        $listReader.Dispose()
-        $listStream.Dispose()
-        $listResponse.Dispose()
-
-        Write-Verbose "received $($line.Length) characters response"
-
-        # parse response to get Version
-        $tokens = $lines[0].Split(" ", 9, [StringSplitOptions]::RemoveEmptyEntries)
-        $Version = Get-Date -Date "$($tokens[6])/$($tokens[5])/$($tokens[7])" -Format "yy.M.d"
+        # grab version
+        $LastModifiedDate = (Resolve-Uri -Uri $URL).LastModified
+        [version]$Version = $LastModifiedDate.ToString("yyyy.MM.dd")
 
         # return evergreen object
-        return @{ Version = $Version; URI = "$($url)$($file)" }
-    }
-    catch
-    {
-        Throw $_
-    }
-}
-
-function Get-AdobeAcrobatAdmxOnline
-{
-    <#
-    .SYNOPSIS
-        Returns latest Version and Uri for the Adobe Acrobat Continuous track Admx files
-    #>
-
-    try
-    {
-
-        $file = "AcrobatADMTemplate.zip"
-        $url = "ftp://ftp.adobe.com/pub/adobe/acrobat/win/AcrobatDC/misc/"
-
-        # grab ftp response from $url
-        Write-Verbose "FTP $($url)"
-        $listRequest = [Net.WebRequest]::Create($url)
-        $listRequest.Method = [System.Net.WebRequestMethods+Ftp]::ListDirectoryDetails
-        $lines = New-Object System.Collections.ArrayList
-
-        # process response
-        $listResponse = $listRequest.GetResponse()
-        $listStream = $listResponse.GetResponseStream()
-        $listReader = New-Object System.IO.StreamReader($listStream)
-        while (!$listReader.EndOfStream)
-        {
-            $line = $listReader.ReadLine()
-            if ($line.Contains($file)) { $lines.Add($line) | Out-Null }
-        }
-        $listReader.Dispose()
-        $listStream.Dispose()
-        $listResponse.Dispose()
-
-        Write-Verbose "received $($line.Length) characters response"
-
-        # parse response to get Version
-        $tokens = $lines[0].Split(" ", 9, [StringSplitOptions]::RemoveEmptyEntries)
-        $Version = Get-Date -Date "$($tokens[6])/$($tokens[5])/$($tokens[7])" -Format "yy.M.d"
-
-        # return evergreen object
-        return @{ Version = $Version; URI = "$($url)$($file)" }
+        return @{ Version = $Version; URI = $URI }
     }
     catch
     {
@@ -1279,41 +1209,22 @@ function Get-AdobeReaderAdmxOnline
 {
     <#
     .SYNOPSIS
-        Returns latest Version and Uri for the Adobe Reader Continuous track Admx files
+        Returns latest Version and Uri for the Adobe Reader Continuous track (32-bit) Admx files
     #>
 
     try
     {
+        $URL = "https://ardownload2.adobe.com/pub/adobe/reader/win/Acrobat2020/misc/ReaderADMTemplate.zip"
 
-        $file = "ReaderADMTemplate.zip"
-        $url = "ftp://ftp.adobe.com/pub/adobe/reader/win/AcrobatDC/misc/"
+        # grab uri
+        $URI = (Resolve-Uri -Uri $URL).URI
 
-        # grab ftp response from $url
-        Write-Verbose "FTP $($url)"
-        $listRequest = [Net.WebRequest]::Create($url)
-        $listRequest.Method = [System.Net.WebRequestMethods+Ftp]::ListDirectoryDetails
-        $lines = New-Object System.Collections.ArrayList
-
-        # process response
-        $listResponse = $listRequest.GetResponse()
-        $listStream = $listResponse.GetResponseStream()
-        $listReader = New-Object System.IO.StreamReader($listStream)
-        while (!$listReader.EndOfStream)
-        {
-            $line = $listReader.ReadLine()
-            if ($line.Contains($file)) { $lines.Add($line) | Out-Null }
-        }
-        $listReader.Dispose()
-        $listStream.Dispose()
-        $listResponse.Dispose()
-
-        Write-Verbose "received $($line.Length) characters response"
-        # parse response to get Version
-        $tokens = $lines[0].Split(" ", 9, [StringSplitOptions]::RemoveEmptyEntries)
-        $Version = Get-Date -Date "$($tokens[6])/$($tokens[5])/$($tokens[7])" -Format "yy.M.d"
+        # grab version
+        $LastModifiedDate = (Resolve-Uri -Uri $URL).LastModified
+        [version]$Version = $LastModifiedDate.ToString("yyyy.MM.dd")
 
         # return evergreen object
-        return @{ Version = $Version; URI = "$($url)$($file)" }
+        return @{ Version = $Version; URI = $URI }
     }
     catch
     {
@@ -1501,7 +1412,7 @@ function Get-AzureVirtualDesktopAdmxOnline
         $URL = "https://aka.ms/avdgpo"
 
         # grab uri
-        $URI= (Resolve-Uri -Uri $url).URI
+        $URI = (Resolve-Uri -Uri $URL).URI
 
         # grab version
         $LastModifiedDate = (Resolve-Uri -Uri $URL).LastModified
@@ -1764,9 +1675,12 @@ function Get-OneDriveAdmx
         [string[]]$Languages = $null
     )
 
-    if ($PreferLocalOneDrive) {
+    if ($PreferLocalOneDrive)
+    {
         $Evergreen = Get-OneDriveOnline -PreferLocalOneDrive $PreferLocalOneDrive
-    } else {
+    }
+    else
+    {
         $Evergreen = Get-OneDriveOnline
     }
 
@@ -2071,16 +1985,16 @@ function Get-AdobeAcrobatAdmx
             Invoke-WebRequest -Uri $Evergreen.URI -UseBasicParsing -OutFile $OutFile
 
             # extract
-            Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\AdobeAcrobat'"
-            Expand-Archive -Path $OutFile -DestinationPath "$($env:TEMP)\AdobeAcrobat" -Force
+            Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\$($ProductName)'"
+            Expand-Archive -Path $OutFile -DestinationPath "$($env:TEMP)\$($ProductName)" -Force
 
             # copy
-            $SourceAdmx = "$($env:TEMP)\AdobeAcrobat"
+            $SourceAdmx = "$($env:TEMP)\$($ProductName)"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
             Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
 
             # cleanup
-            Remove-Item -Path "$($env:TEMP)\AdobeAcrobat" -Recurse -Force
+            Remove-Item -Path "$($env:TEMP)\$($ProductName)" -Recurse -Force
 
             return $Evergreen
         }
@@ -2287,14 +2201,14 @@ function Get-ZoomDesktopClientAdmx
 {
     <#
     .SYNOPSIS
-    Process Zoom Desktop Client Admx files
+        Process Zoom Desktop Client Admx files
 
     .PARAMETER Version
-    Current Version present
+        Current Version present
 
     .PARAMETER PolicyStore
-    Destination for the Admx files
-#>
+        Destination for the Admx files
+    #>
 
     param(
         [string]$Version,
@@ -2616,6 +2530,7 @@ function Get-AzureVirtualDesktopAdmx
 }
 #endregion
 
+#region execution
 # Custom Policy Store
 if ($Include -notcontains 'Custom Policy Store')
 {
@@ -2812,3 +2727,4 @@ else
 
 Write-Verbose "`nSaving Admx versions to '$($WorkingDirectory)\admxversions.xml'"
 $admxversions | Export-Clixml -Path "$($WorkingDirectory)\admxversions.xml" -Force
+#endregion

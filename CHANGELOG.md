@@ -7,7 +7,6 @@
 *  Add logging options (yep, since the beginning)
 *  Add notification options (yep, also since the beginning)
 *  Detect user domain automatically (Get code from PSADT)
-*  Adobe ADMX Templates have moved [#37](https://github.com/msfreaks/EvergreenAdmx/issues/37)
 *  Add support for Winget-Autoupdate-Intune ADMX (https://github.com/msfreaks/EvergreenAdmx/issues/35)
 *  Add parameter to create Central Policy Store location
 *  Add parameter to clean old Office ADMX from Central Policy Store location
@@ -15,6 +14,7 @@
 
 ## 2312
 
+* Adobe ADMX Templates have moved [#37](https://github.com/msfreaks/EvergreenAdmx/issues/37)
 * Added Admx for Microsoft Windows 11 (23H2) [#38](https://github.com/msfreaks/EvergreenAdmx/issues/38)
 * Added back WindowsVersion parameter as an alias for Windows11Version
 * Added Admx for Azure Virtual Desktop [#17](https://github.com/msfreaks/EvergreenAdmx/issues/17)
@@ -26,7 +26,7 @@
 * Fixed and improved Get-MicrosoftOfficeAdmxOnline version detection
 * Fixed and improved Get-MDOPAdmxOnline version detection
 * Improved Get-FSLogixOnline
-* Fixed and improved Get-OneDriveOnline, now use [EvergreenApi](https://stealthpuppy.com/evergreen/invoke/) method for version and url detection
+* Fixed and improved Get-OneDriveOnline, now use [EvergreenApi](https://stealthpuppy.com/evergreen/invoke) method for version and url detection
 * Microsoft OneDrive now install silently
 * Fixed typo
 * Updated help
