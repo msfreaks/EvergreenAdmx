@@ -12,15 +12,16 @@
 *  Add parameter to clean old Office ADMX from Central Policy Store location
 *  Add parameter to clean old Adobe Reader ADMX from Central Policy Store location
 
-## 2312
+## 2402
 
-* Adobe ADMX Templates have moved [#37](https://github.com/msfreaks/EvergreenAdmx/issues/37)
-* Added Admx for Microsoft Windows 11 (23H2) [#38](https://github.com/msfreaks/EvergreenAdmx/issues/38)
+* Improved Get-WindowsAdmx speed by switching to MSI extraction [#41](https://github.com/msfreaks/EvergreenAdmx/issues/41)
+* Improved Adobe admx downloads with https URLs [#37](https://github.com/msfreaks/EvergreenAdmx/issues/37)
+* Added admx for Microsoft Windows 11 (23H2) [#38](https://github.com/msfreaks/EvergreenAdmx/issues/38)
 * Added back WindowsVersion parameter as an alias for Windows11Version
-* Added Admx for Azure Virtual Desktop [#17](https://github.com/msfreaks/EvergreenAdmx/issues/17)
+* Added admx for Azure Virtual Desktop [#17](https://github.com/msfreaks/EvergreenAdmx/issues/17)
 * Added new functions [Get-Link](https://github.com/DanGough/Nevergreen/blob/main/Nevergreen/Private/Get-Link.ps1), [Get-Version](https://github.com/DanGough/Nevergreen/blob/main/Nevergreen/Private/Get-Version.ps1) and [Resolve-Uri](https://github.com/DanGough/Nevergreen/blob/main/Nevergreen/Private/Resolve-Uri.ps1). Thanks [Dan Gough](https://github.com/DanGough)!
 * Added new function [Invoke-Download](https://github.com/DanGough/PsDownload/blob/main/PsDownload/Public/Invoke-Download.ps1) to improve download speed and get last modified date. Thanks [Dan Gough](https://github.com/DanGough)!
-* Replace Get-RedirectUrl function by Resolve-Uri
+* Replaced Get-RedirectUrl function by Resolve-Uri Thanks [Dan Gough](https://github.com/DanGough)!
 * Fixed and improved Zoom Desktop Client version and url detection. Now works on PowerShell 5.1 as well! Thanks [Dan Gough](https://github.com/DanGough)!
 * Fixed Zoom Desktop Client admx copy to policy definitions
 * Fixed and improved Get-MicrosoftOfficeAdmxOnline version detection

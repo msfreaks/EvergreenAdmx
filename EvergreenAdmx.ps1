@@ -890,14 +890,23 @@ function Get-WindowsAdmxDownloadId
 {
     <#
     .SYNOPSIS
-        Returns download Id for Admx file based on Windows 10 version
+        Returns Widnows admx download Id
 
     .PARAMETER WindowsVersion
-        Official WindowsVersion format
+        Specifies Windows version (Example: 23H2)
+
+    .PARAMETER WindowsEdition
+        Specifies Windows edition (Example: 11)
+
     #>
 
     param (
+        [Parameter()]
+        [ValidateSet("1903", "1909", "2004", "20H2", "21H1", "21H2", "22H2", "23H2")]
+        [ValidateNotNullOrEmpty()]
         [string]$WindowsVersion,
+        [ValidateSet("10", "11")]
+        [ValidateNotNullOrEmpty()]
         [int]$WindowsEdition
     )
 
@@ -1183,12 +1192,36 @@ function Get-AdobeAcrobatAdmxOnline
     <#
     .SYNOPSIS
         Returns latest Version and Uri for the Adobe Acrobat Continuous track Admx files. Use this for Acrobat , 64-bit Reader, and the unified installer.
+
+    .PARAMETER Track
+        Specifies Adobe Acrobat track (Example: Continuous)
     #>
+
+    param (
+        [Parameter()]
+        [ValidateSet("Continuous", "Classic2020", "Classic2017")]
+        [ValidateNotNullOrEmpty()]
+        [string]$Track = "Continuous"
+    )
+
+    switch ($Track)
+    {
+        Continuous
+        {
+            $URL = "https://ardownload2.adobe.com/pub/adobe/acrobat/win/AcrobatDC/misc/AcrobatADMTemplate.zip"
+        }
+        Classic2020
+        {
+            $URL = "https://ardownload2.adobe.com/pub/adobe/acrobat/win/Acrobat2020/misc/AcrobatADMTemplate.zip"
+        }
+        Classic2017
+        {
+            $URL = "https://ardownload2.adobe.com/pub/adobe/acrobat/win/Acrobat2017/misc/AcrobatADMTemplate.zip"
+        }
+    }
 
     try
     {
-        $URL = "https://ardownload2.adobe.com/pub/adobe/acrobat/win/AcrobatDC/misc/AcrobatADMTemplate.zip"
-
         # grab uri
         $URI = (Resolve-Uri -Uri $URL).URI
 
@@ -1209,13 +1242,37 @@ function Get-AdobeReaderAdmxOnline
 {
     <#
     .SYNOPSIS
-        Returns latest Version and Uri for the Adobe Reader Continuous track (32-bit) Admx files
+        Returns latest Version and Uri for the Adobe Reader admx files
+
+    .PARAMETER Track
+        Specifies Adobe Reader track (Example: Continuous)
     #>
+
+    param (
+        [Parameter()]
+        [ValidateSet("Continuous", "Classic2020", "Classic2017")]
+        [ValidateNotNullOrEmpty()]
+        [string]$Track = "Continuous"
+    )
+
+    switch ($Track)
+    {
+        Continuous
+        {
+            $URL = "https://ardownload2.adobe.com/pub/adobe/reader/win/AcrobatDC/misc/ReaderADMTemplate.zip"
+        }
+        Classic2020
+        {
+            $URL = "https://ardownload2.adobe.com/pub/adobe/reader/win/Acrobat2020/misc/ReaderADMTemplate.zip"
+        }
+        Classic2017
+        {
+            $URL = "https://ardownload2.adobe.com/pub/adobe/reader/win/Acrobat2017/misc/ReaderADMTemplate.zip"
+        }
+    }
 
     try
     {
-        $URL = "https://ardownload2.adobe.com/pub/adobe/reader/win/Acrobat2020/misc/ReaderADMTemplate.zip"
-
         # grab uri
         $URI = (Resolve-Uri -Uri $URL).URI
 
@@ -1464,11 +1521,11 @@ function Get-FSLogixAdmx
             Invoke-WebRequest -UseDefaultCredentials -Uri $Evergreen.URI -UseBasicParsing -OutFile $OutFile
 
             # extract
-            Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\fslogix'"
-            Expand-Archive -Path $OutFile -DestinationPath "$($env:TEMP)\fslogix" -Force
+            Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\$($ProductName)'"
+            Expand-Archive -Path $OutFile -DestinationPath "$($env:TEMP)\$($ProductName)" -Force
 
             # copy
-            $SourceAdmx = "$($env:TEMP)\fslogix"
+            $SourceAdmx = "$($env:TEMP)\$($ProductName)"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
             if (-not (Test-Path -Path "$($TargetAdmx)\en-US")) { $null = (New-Item -Path "$($TargetAdmx)\en-US" -ItemType Directory -Force) }
 
@@ -1484,7 +1541,7 @@ function Get-FSLogixAdmx
             }
 
             # cleanup
-            Remove-Item -Path "$($env:TEMP)\fslogix" -Recurse -Force
+            Remove-Item -Path "$($env:TEMP)\$($ProductName)" -Recurse -Force
 
             return $Evergreen
         }
@@ -1600,6 +1657,7 @@ function Get-WindowsAdmx
     $Evergreen = Get-WindowsAdmxOnline -DownloadId $id
     $ProductName = "Microsoft Windows $($WindowsEdition) $($WindowsVersion)"
     $ProductFolder = ""; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
+    $TempFolder = "$($env:TEMP)\$($ProductName)"
 
     # see if this is a newer version
     if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version)
@@ -1616,26 +1674,20 @@ function Get-WindowsAdmx
 
             # install
             Write-Verbose "Installing downloaded Windows $($WindowsEdition) Admx installer"
-            $null = Start-Process -FilePath "MsiExec.exe" -WorkingDirectory "$($WorkingDirectory)\downloads" -ArgumentList "/qn /norestart /I`"$($OutFile.split('\')[-1])`"" -PassThru -Wait
+            $null = Start-Process -FilePath "MsiExec.exe" -WorkingDirectory "$($WorkingDirectory)\downloads" -ArgumentList "/qn /norestart /a `"$($OutFile.split('\')[-1])`" TargetDir=`"$($TempFolder)`"" -PassThru -Wait
 
             # find installation path
             Write-Verbose "Grabbing installation path for Windows $($WindowsEdition) Admx installer"
-            $installfolder = Get-ChildItem -Path "C:\Program Files (x86)\Microsoft Group Policy"
-            Write-Verbose "Found '$($installfolder.Name)'"
-
-            # find uninstall info
-            Write-Verbose "Grabbing uninstallation info from registry for Windows $($WindowsEdition) Admx installer"
-            $uninstall = Get-ItemProperty -Path "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" | Where-Object { $_.DisplayName -like "*(.admx)*" }
-            Write-Verbose "Found '$($uninstall.DisplayName)'"
+            $InstallFolder = Get-ChildItem -Path "$($TempFolder)\Microsoft Group Policy"
+            Write-Verbose "Found '$($InstallFolder.Name)'"
 
             # copy
-            $SourceAdmx = "C:\Program Files (x86)\Microsoft Group Policy\$($installfolder.Name)\PolicyDefinitions"
+            $SourceAdmx = "$($TempFolder)\Microsoft Group Policy\$($InstallFolder.Name)\PolicyDefinitions"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
             Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
 
-            # uninstall
-            Write-Verbose "Uninstalling Windows $($WindowsEdition) Admx installer"
-            $null = Start-Process -FilePath "MsiExec.exe" -ArgumentList "/qn /norestart /X$($uninstall.PSChildName)" -PassThru -Wait
+            # cleanup
+            Remove-Item -Path $TempFolder -Recurse -Force
 
             return $Evergreen
         }
