@@ -8,14 +8,14 @@ After deploying several Azure Virtual Desktop environments I decided I no longer
 
 This script solves both problems.
 *  Checks for newer versions of the Admx files that are present and processes the new version if found
-*  Optionally copies the new Admx files to the Policy Store or Definition folder, or a folder of your chosing
+*  Optionally copies the new Admx files to the Policy Store or Definition folder, or a folder of your choosing
 
 The name I chose for this script is an ode to the Evergreen module (https://github.com/aaronparker/Evergreen) by Aaron Parker (@stealthpuppy).
 
 ## How to use
 
 Quick start:
-*  Download the script to a location of your chosing (for example: C:\Scripts\EvergreenAdmx)
+*  Download the script to a location of your choosing (for example: C:\Scripts\EvergreenAdmx)
 *  Run or schedule the script
 
 You can also install the script from the PowerShell Gallery ([EvergreenAdmx][poshgallery-evergreenadmx]):
@@ -26,7 +26,7 @@ Install-Script -Name EvergreenAdmx
 I have scheduled the script to run daily:
 
 ```powershell
-EvergreenAdmx.ps1 -Windows11Version "22H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions"
+EvergreenAdmx.ps1 -Windows11Version "23H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions"
 ```
 
 The above execution will keep the central Policy Store up-to-date on a daily basis.
@@ -67,9 +67,12 @@ DESCRIPTION
 
 PARAMETERS
     -Windows10Version <String>
-        The Windows 10 version to get the Admx files for. This value will be ignored if 'Windows 10' is
-        not specified with -Include parameter.
-        If omitted the newest version supported by this script will be used, if 'Windows 10' is included.
+       The Windows 10 version to get the Admx files for. This value will be ignored if 'Windows 10' is
+       not specified with -Include parameter.
+       If the -Include parameter contains 'Windows 10', the latest Windows 10 version will be used.
+       Defaults to "Windows11Version" if omitted.
+
+       Note: Windows 11 23H2 policy definitions now supports Windows 10.
 
         Required?                    false
         Position?                    1
@@ -78,13 +81,13 @@ PARAMETERS
         Accept wildcard characters?  false
 
     -Windows11Version <String>
-        The Windows 11 version to get the Admx files for. This value will be ignored if 'Windows 11' is
-        not specified with -Include parameter.
-        If omitted the newest version supported by this script will be used, if 'Windows 11' is included.
+       The Windows 11 version to get the Admx files for. This value will be ignored if 'Windows 10' is
+       not specified with -Include parameter.
+       If omitted, defaults to latest version available.
 
         Required?                    false
         Position?                    1
-        Default value                22H2
+        Default value                23H2
         Accept pipeline input?       false
         Accept wildcard characters?  false
 
@@ -168,7 +171,7 @@ PARAMETERS
 
     -------------------------- EXAMPLE 1 --------------------------
 
-    PS C:\>.\EvergreenAdmx.ps1 -Windows10Version "22H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
+    PS C:\>.\EvergreenAdmx.ps1 -Windows11Version "23H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
 
     Will process the default set of products, storing results in product folders, for both English United States as Dutch languages, and copies the files to the Policy store.
 
@@ -191,7 +194,7 @@ Now supports
 *  Microsoft Office
 *  Microsoft OneDrive (installed or Evergreen)
 *  Microsoft Windows 10 (1903/1909/2004/20H2/21H1/21H2/22H2)
-*  Microsoft Windows 11 (21H2/22H2)
+*  Microsoft Windows 11 (21H2/22H2/23H2)
 *  Mozilla Firefox
 *  Zoom Desktop Client
 
