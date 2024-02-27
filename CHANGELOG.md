@@ -7,13 +7,16 @@
 *  Add logging options (yep, since the beginning)
 *  Add notification options (yep, also since the beginning)
 *  Detect user domain automatically (Get code from PSADT)
-*  Add support for Winget-Autoupdate-Intune ADMX (https://github.com/msfreaks/EvergreenAdmx/issues/35)
+*  Add support for Winget-Autoupdate-Intune ADMX [#35](https://github.com/msfreaks/EvergreenAdmx/issues/35)
 *  Add parameter to create Central Policy Store location
 *  Add parameter to clean old Office ADMX from Central Policy Store location
 *  Add parameter to clean old Adobe Reader ADMX from Central Policy Store location
 
 ## 2402
 
+* Fixed Get-WindowsAdmxOnline version return
+* Improved function Get-WindowsAdmxOnline, added default parameters
+* Improved function Get-WindowsAdmxDownloadId, added default parameters
 * Improved Get-WindowsAdmx speed by switching to MSI extraction [#41](https://github.com/msfreaks/EvergreenAdmx/issues/41)
 * Improved Adobe admx downloads with https URLs [#37](https://github.com/msfreaks/EvergreenAdmx/issues/37)
 * Added admx for Microsoft Windows 11 (23H2) [#38](https://github.com/msfreaks/EvergreenAdmx/issues/38)

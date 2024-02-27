@@ -1,7 +1,6 @@
 ﻿#Requires -RunAsAdministrator
 
 #region init
-
 <#PSScriptInfo
 
 .VERSION 2312.0
@@ -79,6 +78,7 @@
     https://msfreaks.wordpress.com
 
 #>
+
 [CmdletBinding(DefaultParameterSetName = 'Windows11Version')]
 param(
     [Parameter(Mandatory = $False, ParameterSetName = "Windows10Version", Position = 0)][ValidateSet("1903", "1909", "2004", "20H2", "21H1", "21H2", "22H2")]
@@ -138,9 +138,8 @@ Write-Verbose "Languages:`t`t`t`t'$($Languages)'"
 Write-Verbose "Use product folders:`t'$($UseProductFolders)'"
 Write-Verbose "Admx path:`t`t`t`t'$($WorkingDirectory)\admx'"
 Write-Verbose "Download path:`t`t`t'$($WorkingDirectory)\downloads'"
-Write-Verbose "Included:`t`t`t`t'$($Include -join ',')'"
+Write-Verbose "Included:`t`t`t`t'$($Include -join ', ')'"
 Write-Verbose "PreferLocalOneDrive:`t'$($PreferLocalOneDrive)'"
-
 #endregion
 
 #region functions
@@ -886,45 +885,6 @@ function Invoke-Download
     }
 }
 
-function Get-WindowsAdmxDownloadId
-{
-    <#
-    .SYNOPSIS
-        Returns Widnows admx download Id
-
-    .PARAMETER WindowsVersion
-        Specifies Windows version (Example: 23H2)
-
-    .PARAMETER WindowsEdition
-        Specifies Windows edition (Example: 11)
-
-    #>
-
-    param (
-        [Parameter()]
-        [ValidateSet("1903", "1909", "2004", "20H2", "21H1", "21H2", "22H2", "23H2")]
-        [ValidateNotNullOrEmpty()]
-        [string]$WindowsVersion,
-        [ValidateSet("10", "11")]
-        [ValidateNotNullOrEmpty()]
-        [int]$WindowsEdition
-    )
-
-    switch ($WindowsEdition)
-    {
-        10
-        {
-            return (@( @{ "1903" = "58495" }, @{ "1909" = "100591" }, @{ "2004" = "101445" }, @{ "20H2" = "102157" }, @{ "21H1" = "103124" }, @{ "21H2" = "104042" }, @{ "22H2" = "104677" } ).$WindowsVersion)
-            break
-        }
-        11
-        {
-            return (@( @{ "21H2" = "103507" }, @{ "22H2" = "104593" }, @{ "23H2" = "105667" } ).$WindowsVersion)
-            break
-        }
-    }
-}
-
 function Copy-Admx
 {
     param (
@@ -1001,31 +961,70 @@ function Get-MicrosoftOfficeAdmxOnline
     #>
 
     $id = "49030"
-    $url = "https://www.microsoft.com/en-us/download/details.aspx?id=$($id)"
-    $urldownload = "https://www.microsoft.com/en-us/download/confirmation.aspx?id=$($id)"
+    $urlVersion = "https://www.microsoft.com/en-us/download/details.aspx?id=$($id)"
+    $urlDownload = "https://www.microsoft.com/en-us/download/confirmation.aspx?id=$($id)"
 
     try
     {
 
         # load page for version scrape
-        $web = (Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $url).RawContent
+        $web = (Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urlVersion -MaximumRedirection 0 -UserAgent 'Googlebot/2.1 (+http://www.google.com/bot.html)').RawContent
         # grab version
         $regEx = '(version\":")((?:\d+\.)+(?:\d+))"'
         $version = ($web | Select-String -Pattern $regEx).Matches.Groups[2].Value
 
         # load page for uri scrape
-        $web = Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urldownload -MaximumRedirection 0
+        $web = Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urlDownload -MaximumRedirection 0 -UserAgent 'Googlebot/2.1 (+http://www.google.com/bot.html)'
         # grab x64 version
         $hrefx64 = $web.Links | Where-Object { $_.outerHTML -like "*click here to download manually*" -and $_.href -like "*.exe" -and $_.href -like "*x64*" } | Select-Object -First 1
         # grab x86 version
         $hrefx86 = $web.Links | Where-Object { $_.outerHTML -like "*click here to download manually*" -and $_.href -like "*.exe" -and $_.href -like "*x86*" } | Select-Object -First 1
 
         # return evergreen object
-        return @( @{ Version = $Version; URI = $hrefx64.href; Architecture = "x64" }, @{ Version = $Version; URI = $hrefx86.href; Architecture = "x86" })
+        return @( @{ Version = $version; URI = $hrefx64.href; Architecture = "x64" }, @{ Version = $version; URI = $hrefx86.href; Architecture = "x86" })
     }
     catch
     {
         Throw $_
+    }
+}
+
+function Get-WindowsAdmxDownloadId
+{
+    <#
+    .SYNOPSIS
+        Returns Windows admx download Id
+
+    .PARAMETER WindowsEdition
+        Specifies Windows edition (Example: 11)
+
+    .PARAMETER WindowsVersion
+        Specifies Windows version (Example: 23H2)
+    #>
+
+    param (
+        [Parameter(Position = 0, ValueFromPipeline = $true)]
+        [ValidateSet("10", "11")]
+        [ValidateNotNullOrEmpty()]
+        [int]$WindowsEdition = "11",
+        [Parameter(Position = 1, ValueFromPipeline = $true)]
+        [ValidateSet("1903", "1909", "2004", "20H2", "21H1", "21H2", "22H2", "23H2")]
+        [ValidateNotNullOrEmpty()]
+        [string]$WindowsVersion = "23H2"
+    )
+
+    switch ($WindowsEdition)
+    {
+        10
+        {
+            return (@( @{ "1903" = "58495" }, @{ "1909" = "100591" }, @{ "2004" = "101445" }, @{ "20H2" = "102157" }, @{ "21H1" = "103124" }, @{ "21H2" = "104042" }, @{ "22H2" = "104677" } ).$WindowsVersion)
+            break
+        }
+        11
+        {
+            return (@( @{ "21H2" = "103507" }, @{ "22H2" = "104593" }, @{ "23H2" = "105667" } ).$WindowsVersion)
+            break
+        }
     }
 }
 
@@ -1039,26 +1038,30 @@ function Get-WindowsAdmxOnline
         Id returned from Get-WindowsAdmxDownloadId
     #>
 
+    [CmdletBinding()]
     param(
-        [string]$DownloadId
+        [int]$DownloadId = (Get-WindowsAdmxDownloadId)
     )
 
-    $urlversion = "https://www.microsoft.com/en-us/download/details.aspx?id=$($DownloadId)"
-    $urldownload = "https://www.microsoft.com/en-us/download/confirmation.aspx?id=$($DownloadId)"
+    $urlVersion = "https://www.microsoft.com/en-us/download/details.aspx?id=$($DownloadId)"
+    $urlDownload = "https://www.microsoft.com/en-us/download/confirmation.aspx?id=$($DownloadId)"
+
     try
     {
 
         # load page for version scrape
-        $web = Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urlversion
-        $str = ($web.ToString() -split "[`r`n]" | Select-String "Version:").ToString()
+        $web = Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urlVersion -UserAgent 'Googlebot/2.1 (+http://www.google.com/bot.html)'
+
         # grab version
-        $Version = "$($DownloadId).$(($str | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString())"
+        $regEx = '(version\":")((?:\d+\.)+(?:\d+))"'
+        $version = ($web | Select-String -Pattern $regEx).Matches.Groups[2].Value
+
         # load page for uri scrape
-        $web = Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urldownload -MaximumRedirection 0
+        $web = Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urlDownload -MaximumRedirection 0 -UserAgent 'Googlebot/2.1 (+http://www.google.com/bot.html)'
         $href = $web.Links | Where-Object { $_.outerHTML -like "*click here to download manually*" -and $_.href -like "*.msi" } | Select-Object -First 1
 
         # return evergreen object
-        return @{ Version = $Version; URI = $href.href }
+        return @{ Version = $version; URI = $href.href }
     }
     catch
     {
