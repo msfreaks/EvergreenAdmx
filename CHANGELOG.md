@@ -12,6 +12,11 @@
 *  Add parameter to clean old Office ADMX from Central Policy Store location
 *  Add parameter to clean old Adobe Reader ADMX from Central Policy Store location
 
+## 2411
+
+* Changed Get-WindowsAdmxOnline version return
+* Added Admx for Microsoft Windows 11 (24H2)
+
 ## 2402
 
 * Fixed Get-WindowsAdmxOnline version return

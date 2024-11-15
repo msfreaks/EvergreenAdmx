@@ -3,7 +3,7 @@
 #region init
 <#PSScriptInfo
 
-.VERSION 2312.0
+.VERSION 2411.0
 
 .GUID 999952b7-1337-4018-a1b9-499fad48e734
 
@@ -67,10 +67,10 @@
 
 .PARAMETER PreferLocalOneDrive
     Microsoft OneDrive Admx files are only available after installing OneDrive.
-    If this script is running on a machine that has OneDrive installed, this switch will prevent automaticic uninstallation of OneDrive.
+    If this script is running on a machine that has OneDrive installed, this switch will prevent automatic uninstallation of OneDrive.
 
 .EXAMPLE
-    .\EvergreenAdmx.ps1 -Windows11Version "23H2" -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
+    .\EvergreenAdmx.ps1 -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
     Get policy default set of products, storing results in product folders, for both en-us and nl-NL languages, and copies the files to the Policy store.
 
 .LINK
@@ -83,9 +83,9 @@
 param(
     [Parameter(Mandatory = $False, ParameterSetName = "Windows10Version", Position = 0)][ValidateSet("1903", "1909", "2004", "20H2", "21H1", "21H2", "22H2")]
     [System.String] $Windows10Version = "22H2",
-    [Parameter(Mandatory = $False, ParameterSetName = "Windows11Version", Position = 0)][ValidateSet("21H2", "22H2", "23H2")]
+    [Parameter(Mandatory = $False, ParameterSetName = "Windows11Version", Position = 0)][ValidateSet("21H2", "22H2", "23H2", "24H2")]
     [Alias("WindowsVersion")]
-    [System.String] $Windows11Version = "23H2",
+    [System.String] $Windows11Version = "24H2",
     [Parameter(Mandatory = $False)]
     [System.String] $WorkingDirectory = $null,
     [Parameter(Mandatory = $False)]
@@ -1008,9 +1008,9 @@ function Get-WindowsAdmxDownloadId
         [ValidateNotNullOrEmpty()]
         [int]$WindowsEdition = "11",
         [Parameter(Position = 1, ValueFromPipeline = $true)]
-        [ValidateSet("1903", "1909", "2004", "20H2", "21H1", "21H2", "22H2", "23H2")]
+        [ValidateSet("1903", "1909", "2004", "20H2", "21H1", "21H2", "22H2", "23H2", "24H2")]
         [ValidateNotNullOrEmpty()]
-        [string]$WindowsVersion = "23H2"
+        [string]$WindowsVersion = "24H2"
     )
 
     switch ($WindowsEdition)
@@ -1022,7 +1022,7 @@ function Get-WindowsAdmxDownloadId
         }
         11
         {
-            return (@( @{ "21H2" = "103507" }, @{ "22H2" = "104593" }, @{ "23H2" = "105667" } ).$WindowsVersion)
+            return (@( @{ "21H2" = "103507" }, @{ "22H2" = "104593" }, @{ "23H2" = "105667" }, @{ "24H2" = "106254" } ).$WindowsVersion)
             break
         }
     }
@@ -1054,7 +1054,7 @@ function Get-WindowsAdmxOnline
 
         # grab version
         $regEx = '(version\":")((?:\d+\.)+(?:\d+))"'
-        $version = ($web | Select-String -Pattern $regEx).Matches.Groups[2].Value
+        $version = ('{0}.{1}' -f $DownloadId, ($web | Select-String -Pattern $regEx).Matches.Groups[2].Value)
 
         # load page for uri scrape
         $web = Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urlDownload -MaximumRedirection 0 -UserAgent 'Googlebot/2.1 (+http://www.google.com/bot.html)'
