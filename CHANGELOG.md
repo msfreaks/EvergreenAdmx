@@ -12,12 +12,16 @@
 *  Add parameter to clean old Office ADMX from Central Policy Store location
 *  Add parameter to clean old Adobe Reader ADMX from Central Policy Store location
 
-## 2411
+## 2411.1
+
+* Added admx for Microsoft Winget [#40](https://github.com/msfreaks/EvergreenAdmx/issues/40)
+
+## 2411.0
 
 * Changed Get-WindowsAdmxOnline version return
-* Added Admx for Microsoft Windows 11 (24H2)
+* Added Admx for Microsoft Windows 11 (24H2) [#45](https://github.com/msfreaks/EvergreenAdmx/issues/45)
 
-## 2402
+## 2402.1
 
 * Fixed Get-WindowsAdmxOnline version return
 * Improved function Get-WindowsAdmxOnline, added default parameters
