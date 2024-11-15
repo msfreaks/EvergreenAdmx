@@ -3,7 +3,7 @@
 #region init
 <#PSScriptInfo
 
-.VERSION 2411.0
+.VERSION 2411.1
 
 .GUID 999952b7-1337-4018-a1b9-499fad48e734
 
@@ -96,7 +96,7 @@ param(
     [switch] $UseProductFolders,
     [Parameter(Mandatory = $False)]
     [System.String] $CustomPolicyStore = $null,
-    [Parameter(Mandatory = $False)][ValidateSet("Custom Policy Store", "Windows 10", "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office", "FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client", "Azure Virtual Desktop")]
+    [Parameter(Mandatory = $False)][ValidateSet("Custom Policy Store", "Windows 10", "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office", "FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client", "Azure Virtual Desktop", "Microsoft Winget")]
     [System.String[]] $Include = @("Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office"),
     [Parameter(Mandatory = $False)]
     [switch] $PreferLocalOneDrive = $False
@@ -1487,6 +1487,35 @@ function Get-AzureVirtualDesktopAdmxOnline
     }
 }
 
+function Get-WingetAdmxOnline
+{
+    <#
+    .SYNOPSIS
+        Returns latest Version and Uri for Winget-cli ADMX files
+    #>
+
+    try
+    {
+
+        # define github repo
+        $repo = "microsoft/winget-cli"
+        # grab latest release properties
+        $latest = ((Invoke-WebRequest -UseDefaultCredentials -Uri "https://api.github.com/repos/$($repo)/releases" -UseBasicParsing | ConvertFrom-Json) | Where-Object { $_.name -notlike '*-preview' -and $_.draft -eq $false -and $_.assets.browser_download_url -match 'DesktopAppInstallerPolicies.zip' })[0]
+
+        # grab version
+        $Version = ($latest.tag_name | Select-String -Pattern "(\d+(\.\d+){1,4})" -AllMatches | ForEach-Object { $_.Matches } | ForEach-Object { $_.Value }).ToString()
+        # grab uri
+        $URI = $latest.assets.browser_download_url | Where-Object { $_ -like '*/DesktopAppInstallerPolicies.zip'}
+
+        # return evergreen object
+        return @{ Version = $Version; URI = $URI }
+    }
+    catch
+    {
+        Throw $_
+    }
+}
+
 function Get-FSLogixAdmx
 {
     <#
@@ -2583,6 +2612,69 @@ function Get-AzureVirtualDesktopAdmx
         return $null
     }
 }
+
+function Get-WingetAdmx
+{
+    <#
+    .SYNOPSIS
+        Process Winget-cli Admx files
+
+    .PARAMETER Version
+        Current Version present
+
+    .PARAMETER PolicyStore
+        Destination for the Admx files
+    #>
+
+    param(
+        [string]$Version,
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
+    )
+
+    $Evergreen = Get-WingetAdmxOnline
+    $ProductName = "Microsoft winget-cli"
+    $ProductFolder = ""; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
+
+    # see if this is a newer version
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version)
+    {
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
+
+        # download and process
+        $OutFile = "$($WorkingDirectory)\downloads\$($Evergreen.URI.Split("/")[-1])"
+        try
+        {
+            # download
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+            Invoke-WebRequest -UseDefaultCredentials -Uri $Evergreen.URI -UseBasicParsing -OutFile $OutFile
+
+            # extract
+            Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\wingetadmx'"
+            Expand-Archive -Path $OutFile -DestinationPath "$($env:TEMP)\wingetadmx" -Force
+
+            # copy
+            $SourceAdmx = "$($env:TEMP)\wingetadmx\admx"
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+
+            # cleanup
+            Remove-Item -Path "$($env:TEMP)\wingetadmx" -Recurse -Force
+
+            return $Evergreen
+        }
+        catch
+        {
+            Throw $_
+        }
+    }
+    else
+    {
+        # version already processed
+        return $null
+    }
+}
+
 #endregion
 
 #region execution
@@ -2778,6 +2870,18 @@ else
     Write-Verbose "`nProcessing Admx files for Azure Virtual Desktop"
     $admx = Get-AzureVirtualDesktopAdmx -Version $admxversions.AzureVirtualDesktop.Version -PolicyStore $PolicyStore -Languages $Languages
     if ($admx) { if ($admxversions.AzureVirtualDesktop) { $admxversions.AzureVirtualDesktop = $admx } else { $admxversions += @{ AzureVirtualDesktop = @{ Version = $admx.Version; URI = $admx.URI } } } }
+}
+
+# Microsoft winget-cli
+if ($Include -notcontains 'Microsoft Winget')
+{
+    Write-Verbose "`nSkipping Microsoft Winget"
+}
+else
+{
+    Write-Verbose "`nProcessing Admx files for Microsoft Winget"
+    $admx = Get-WingetAdmx -Version $admxversions.Winget.Version -PolicyStore $PolicyStore -Languages $Languages
+    if ($admx) { if ($admxversions.Winget) { $admxversions.Winget = $admx } else { $admxversions += @{ Winget = @{ Version = $admx.Version; URI = $admx.URI } } } }
 }
 
 Write-Verbose "`nSaving Admx versions to '$($WorkingDirectory)\admxversions.xml'"
