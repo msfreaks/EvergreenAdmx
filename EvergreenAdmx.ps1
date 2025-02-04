@@ -962,26 +962,26 @@ function Get-MicrosoftOfficeAdmxOnline
 
     $id = "49030"
     $urlVersion = "https://www.microsoft.com/en-us/download/details.aspx?id=$($id)"
-    $urlDownload = "https://www.microsoft.com/en-us/download/confirmation.aspx?id=$($id)"
+    $JSONBlobPattern = "(?<scriptStart><script>[\w.]+__DLCDetails__=).*?(?<JSObject-scriptStart></script>)"
 
     try
     {
 
         # load page for version scrape
-        $web = (Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urlVersion -MaximumRedirection 0 -UserAgent 'Googlebot/2.1 (+http://www.google.com/bot.html)').RawContent
+        $web = Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urlVersion -MaximumRedirection 0 -UserAgent 'Googlebot/2.1 (+http://www.google.com/bot.html)'
         # grab version
         $regEx = '(version\":")((?:\d+\.)+(?:\d+))"'
-        $version = ($web | Select-String -Pattern $regEx).Matches.Groups[2].Value
+        $version = ($web.RawContent | Select-String -Pattern $regEx).Matches.Groups[2].Value
 
-        # load page for uri scrape
-        $web = Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urlDownload -MaximumRedirection 0 -UserAgent 'Googlebot/2.1 (+http://www.google.com/bot.html)'
+        # carve JSON from script tag
+        $web = $web.Content | Select-String -Pattern $JSONBlobPattern | Select-Object -ExpandProperty Matches | ForEach-Object { $_.Groups["JSObject"].Value } | Select-Object -First 1 | ConvertFrom-JSON
         # grab x64 version
-        $hrefx64 = $web.Links | Where-Object { $_.outerHTML -like "*click here to download manually*" -and $_.href -like "*.exe" -and $_.href -like "*x64*" } | Select-Object -First 1
+        $hrefx64 = $web.dlcDetailsView.downloadFile | Where-Object { $_.url -like "*x64*" } | Select-Object -First 1
         # grab x86 version
-        $hrefx86 = $web.Links | Where-Object { $_.outerHTML -like "*click here to download manually*" -and $_.href -like "*.exe" -and $_.href -like "*x86*" } | Select-Object -First 1
+        $hrefx86 = $web.dlcDetailsView.downloadFile | Where-Object { $_.url -like "*x86*" } | Select-Object -First 1
 
         # return evergreen object
-        return @( @{ Version = $version; URI = $hrefx64.href; Architecture = "x64" }, @{ Version = $version; URI = $hrefx86.href; Architecture = "x86" })
+        return @( @{ Version = $version; URI = $hrefx64.url; Architecture = "x64" }, @{ Version = $version; URI = $hrefx86.url; Architecture = "x86" })
     }
     catch
     {
@@ -1044,7 +1044,7 @@ function Get-WindowsAdmxOnline
     )
 
     $urlVersion = "https://www.microsoft.com/en-us/download/details.aspx?id=$($DownloadId)"
-    $urlDownload = "https://www.microsoft.com/en-us/download/confirmation.aspx?id=$($DownloadId)"
+    $JSONBlobPattern = "(?<scriptStart><script>[\w.]+__DLCDetails__=).*?(?<JSObject-scriptStart></script>)"
 
     try
     {
@@ -1056,12 +1056,12 @@ function Get-WindowsAdmxOnline
         $regEx = '(version\":")((?:\d+\.)+(?:\d+))"'
         $version = ('{0}.{1}' -f $DownloadId, ($web | Select-String -Pattern $regEx).Matches.Groups[2].Value)
 
-        # load page for uri scrape
-        $web = Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urlDownload -MaximumRedirection 0 -UserAgent 'Googlebot/2.1 (+http://www.google.com/bot.html)'
-        $href = $web.Links | Where-Object { $_.outerHTML -like "*click here to download manually*" -and $_.href -like "*.msi" } | Select-Object -First 1
+        # carve JSON from script tag
+        $web = $web.Content | Select-String -Pattern $JSONBlobPattern | Select-Object -ExpandProperty Matches | ForEach-Object { $_.Groups["JSObject"].Value } | Select-Object -First 1 | ConvertFrom-JSON
+        $href = $web.dlcDetailsView.downloadFile | Where-Object { $_.url -like "*.msi" } | Select-Object -First 1
 
         # return evergreen object
-        return @{ Version = $version; URI = $href.href }
+        return @{ Version = $version; URI = $href.url }
     }
     catch
     {
@@ -1389,7 +1389,7 @@ function Get-MDOPAdmxOnline
 
     $id = "55531"
     $urlversion = "https://www.microsoft.com/en-us/download/details.aspx?id=$($id)"
-    $urldownload = "https://www.microsoft.com/en-us/download/confirmation.aspx?id=$($id)"
+    $JSONBlobPattern = "(?<scriptStart><script>[\w.]+__DLCDetails__=).*?(?<JSObject-scriptStart></script>)"
     try
     {
         # load page for version scrape
@@ -1398,13 +1398,13 @@ function Get-MDOPAdmxOnline
         $regEx = '(version\":")((?:\d+\.)+(?:\d+))"'
         $version = ($web | Select-String -Pattern $regEx).Matches.Groups[2].Value
 
-        # load page for uri scrape
-        $web = Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urldownload -MaximumRedirection 0
+        # carve JSON from script tag
+        $web = $web.Content | Select-String -Pattern $JSONBlobPattern | Select-Object -ExpandProperty Matches | ForEach-Object { $_.Groups["JSObject"].Value } | Select-Object -First 1 | ConvertFrom-JSON
         # grab download url
-        $href = $web.Links | Where-Object { $_.outerHTML -like "*click here to download manually*" }
+        $href = $web.dlcDetailsView.downloadFile
 
         # return evergreen object
-        return @{ Version = $Version; URI = $href.href }
+        return @{ Version = $Version; URI = $href.url }
     }
     catch
     {
