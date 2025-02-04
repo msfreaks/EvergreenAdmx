@@ -1104,7 +1104,7 @@ function Get-OneDriveOnline
         try
         {
             $url = "https://evergreen-api.stealthpuppy.com/app/MicrosoftOneDrive"
-            $architecture = "AMD64"
+            $architecture = "x64"
             $ring = "Insider"
             $type = "exe"
             $Evergreen = Invoke-RestMethod -Uri $url
