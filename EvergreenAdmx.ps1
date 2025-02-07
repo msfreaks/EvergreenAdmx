@@ -2738,6 +2738,15 @@ function Get-BraveAdmx {
             Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\braveadmx'"
             Expand-Archive -Path $OutFile -DestinationPath "$($env:TEMP)\braveadmx" -Force
 
+            # fix policyNamespaces to support Intune ingest
+            Write-Verbose "Fixing policyNamespaces in brave.admx"
+            [xml]$xml = (Get-Content -Path "$($env:TEMP)\braveadmx\windows\admx\brave.admx") -replace 'Brave:Cat_Brave', 'brave:Cat_Brave' | Where-Object { $_ -notmatch "^\s*<using" }
+            $newCategory = $xml.CreateElement("category")
+            $newCategory.SetAttribute("displayName", '$(string.brave)')
+            $newCategory.SetAttribute("name", "Cat_Brave")
+            $xml.policyDefinitions.categories.AppendChild($newCategory)
+            $xml.Save("$($env:TEMP)\braveadmx\windows\admx\brave.admx")
+
             # copy
             $SourceAdmx = "$($env:TEMP)\braveadmx\windows\admx"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
