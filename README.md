@@ -56,7 +56,17 @@ You can import the sample xml file in Task Scheduler provided with this script.
 
 `Breaking change starting from 2503.1`
 
-Valid entries are "Custom Policy Store", "Windows 10", "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom", "Zoom VDI", "Microsoft AVD", "Microsoft Winget", "Brave Browser".
+Added script parameter **WindowsVersion** that supports value **10**, **11**, **2022** and **2025**
+Replaced script parameter **Windows10Version** and **Windows11Version** by **WindowsFeatureVersion**
+Renamed product **Microsoft Office** to **Microsoft 365 Apps**
+Renamed product **Azure Virtual Desktop** to **Microsoft AVD**
+Renamed product **FSLogix** to **Microsoft FSlogix**
+Renamed product **Zoom Desktop Client** to **Zoom**
+Added admx for Windows Server 2025
+Added admx for Windows Server 2022
+Added admx for Zoom VDI
+
+Valid entries are "Custom Policy Store", "Windows 10", "Windows 11", "Windows 2022", "Windows 2025", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom", "Zoom VDI", "Microsoft AVD", "Microsoft Winget", "Brave Browser".
 
 `Breaking change starting from 2402.1`
 
@@ -88,8 +98,8 @@ SYNOPSIS
 
 
 SYNTAX
-    N:\Intune\Scripts\EvergreenAdmx\EvergreenAdmx.ps1 [[-WindowsVersion] <String>] [-Windows10FeatureVersion <String>] [-Windows11FeatureVersion <String>] [-WorkingDirectory <String>] [-PolicyStore <String>] [-Languages <String[]>]
-    [-UseProductFolders] [-AddAdmxPath <String>] [-Include <String[]>] [-PreferLocalOneDrive] [<CommonParameters>]
+    N:\Intune\Scripts\EvergreenAdmx\EvergreenAdmx.ps1 [[-WindowsVersion] <String>] [-WindowsFeatureVersion <String>] [-WorkingDirectory <String>] [-PolicyStore <String>] [-Languages <String[]>] [-UseProductFolders] [-CustomPolicyStore <String>] [-Include <String[]>] [-PreferLocalOneDrive]
+    [<CommonParameters>]
 
 
 DESCRIPTION
@@ -99,7 +109,7 @@ DESCRIPTION
 
 PARAMETERS
     -WindowsVersion <String>
-        Specifies Windows major version. Supports 10, 11 2022 or 2025.
+        Specifies Windows major version. Supports 10, 11, 2022 or 2025.
         Default is 11.
 
         Required?                    false
@@ -109,28 +119,23 @@ PARAMETERS
         Aliases
         Accept wildcard characters?  false
 
-    -Windows10FeatureVersion <String>
-        Specifies Windows 10 feature version to get the Admx files for. This parameter is used when 'Windows 10' is included.
-        Valid values are: 1903, 1909, 2004, 20H2, 21H1, 21H2, 22H2.
-        Defaults to 22H2.
+    -WindowsFeatureVersion <String>
+        Specifies Windows 10 or 11 feature version to get the Admx files for.
+        Valid values are: 1903, 1909, 2004, 20H2, 21H1, 21H2, 22H2 for Windows 10.
+        Valid values are: 21H2, 22H2, 23H2, 24H2 for Windows 11.
+        Defaults to 24H2.
 
         Note: Windows 11 23H2 policy definitions now supports Windows 10.
 
         Required?                    false
         Position?                    named
-        Default value                22H2
-        Accept pipeline input?       false
-        Aliases
-        Accept wildcard characters?  false
-
-    -Windows11FeatureVersion <String>
-        Specifies Windows 11 feature version to get the Admx files for. This parameter is used when 'Windows 11' is included.
-        Valid values are: 21H2, 22H2, 23H2, 24H2.
-        Defaults to 24H2.
-
-        Required?                    false
-        Position?                    named
-        Default value                24H2
+        Default value                $(
+                switch ($WindowsVersion) {
+                    '10' { '22H2' }
+                    '11' { '24H2' }
+                    default { '24H2' }
+                }
+            )
         Accept pipeline input?       false
         Aliases
         Accept wildcard characters?  false
@@ -179,7 +184,7 @@ PARAMETERS
         Aliases
         Accept wildcard characters?  false
 
-    -AddAdmxPath <String>
+    -CustomPolicyStore <String>
         Specifies a location for custom policy files. Can be UNC format or local folder.
         Find .admx files in this location, and at least one language folder holding the .adml file(s).
         Versioning will be done based on the newest file found recursively in this location (any .admx or .adml).
@@ -194,13 +199,21 @@ PARAMETERS
 
     -Include <String[]>
         Array containing Admx products to include when checking for updates.
-        Valid values are: "Windows 10", "Windows 11", "Windows 2022", "Windows 2025", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft
-        Desktop Optimization Pack", "Mozilla Firefox", "Zoom", "Zoom VDI", "Microsoft AVD", "Microsoft Winget", "Brave Browser".
+        Valid values are: "Windows 10", "Windows 11", "Windows 2022", "Windows 2025", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization
+        Pack", "Mozilla Firefox", "Zoom", "Zoom VDI", "Microsoft AVD", "Microsoft Winget", "Brave Browser".
         Defaults to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps".
 
         Required?                    false
         Position?                    named
-        Default value                @('Windows 11', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps')
+        Default value                $(
+                switch ($WindowsVersion) {
+                    '10' { @('Windows 10', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps') }
+                    '11' { @('Windows 11', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps') }
+                    '2022' { @('Windows 2022', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps') }
+                    '2025' { @('Windows 2025', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps') }
+                    default { @('Windows 11', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps') }
+                }
+            )
         Accept pipeline input?       false
         Aliases
         Accept wildcard characters?  false
@@ -237,18 +250,18 @@ OUTPUTS
 
     -------------------------- EXAMPLE 2 --------------------------
 
-    PS > .\EvergreenAdmx.ps1 -WorkingDirectory "C:\Temp\EvergreenAdmx" -Include @('Windows 11', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft FSLogix')
+    PS > .\EvergreenAdmx.ps1 -WindowsVersion 2025
 
-    Downloads the latest admx files for the specified products to C:\Temp\EvergreenAdmx folder.
+    Downloads the latest admx files for Windows 2025, Microsoft Edge, Microsoft OneDrive, and Microsoft 365 Apps to the current folder.
 
 
 
 
     -------------------------- EXAMPLE 3 --------------------------
 
-    PS > .\EvergreenAdmx.ps1 -WindowsVersion 2025 -Include "Windows 2025"
+    PS > .\EvergreenAdmx.ps1 -WorkingDirectory "C:\Temp\EvergreenAdmx" -Include @('Windows 11', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft FSLogix')
 
-    Downloads the latest admx files for Windows 2025 to the current folder.
+    Downloads the latest admx files for the specified products to C:\Temp\EvergreenAdmx folder.
 
 
 
@@ -257,7 +270,7 @@ OUTPUTS
 
     PS > .\EvergreenAdmx.ps1 -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
 
-    Downloads the default set of admx files, stores them in product folders for both English and Dutch languages, and copies them to the specified Policy store.
+    Downloads the default set of products policy definitions files, stores them in product folders for both English and Dutch languages, and copies them to the specified Policy store.
 ```
 
 ## Admx files

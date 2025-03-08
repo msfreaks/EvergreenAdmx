@@ -17,13 +17,13 @@
 
 ## 2503.1
 
-- Added new parameter **WindowsVersion** that supports value **10**, **11**, **2022** and **2025** (`breaking change`)
-- Removed parameter **Windows10Version** (`breaking change`)
-- Removed parameter **Windows11Version** (`breaking change`)
+- Added script parameter **WindowsVersion** that supports value **10**, **11**, **2022** and **2025** (`breaking change`)
+- Replaced script parameter **Windows10Version** and **Windows11Version** by **WindowsFeatureVersion** (`breaking change`)
 - Renamed product **Microsoft Office** to **Microsoft 365 Apps** (`breaking change`)
 - Renamed product **Azure Virtual Desktop** to **Microsoft AVD** (`breaking change`)
 - Renamed product **FSLogix** to **Microsoft FSlogix** (`breaking change`)
 - Renamed product **Zoom Desktop Client** to **Zoom** (`breaking change`)
+- Improved script parameters validation
 - Improved verbose logging
 - Fixed issues with PreferLocalOneDrive parameter
 - Added admx for Windows Server 2025

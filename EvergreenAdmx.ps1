@@ -23,17 +23,13 @@
     Specifies Windows major version. Supports 10, 11, 2022 or 2025.
     Default is 11.
 
-.PARAMETER Windows10FeatureVersion
-    Specifies Windows 10 feature version to get the Admx files for. This parameter is used when 'Windows 10' is included.
-    Valid values are: 1903, 1909, 2004, 20H2, 21H1, 21H2, 22H2.
-    Defaults to 22H2.
+.PARAMETER WindowsFeatureVersion
+    Specifies Windows 10 or 11 feature version to get the Admx files for.
+    Valid values are: 1903, 1909, 2004, 20H2, 21H1, 21H2, 22H2 for Windows 10.
+    Valid values are: 21H2, 22H2, 23H2, 24H2 for Windows 11.
+    Defaults to 24H2.
 
     Note: Windows 11 23H2 policy definitions now supports Windows 10.
-
-.PARAMETER Windows11FeatureVersion
-    Specifies Windows 11 feature version to get the Admx files for. This parameter is used when 'Windows 11' is included.
-    Valid values are: 21H2, 22H2, 23H2, 24H2.
-    Defaults to 24H2.
 
 .PARAMETER WorkingDirectory
     Specifies a Working Directory for the script.
@@ -51,7 +47,7 @@
 .PARAMETER UseProductFolders
     Admx files are copied to their respective product folders in a subfolder of 'Admx' in the WorkingDirectory.
 
-.PARAMETER AddAdmxPath
+.PARAMETER CustomPolicyStore
     Specifies a location for custom policy files. Can be UNC format or local folder.
     Find .admx files in this location, and at least one language folder holding the .adml file(s).
     Versioning will be done based on the newest file found recursively in this location (any .admx or .adml).
@@ -72,23 +68,26 @@
     Downloads the latest admx files for Windows 11, Microsoft Edge, Microsoft OneDrive, and Microsoft 365 Apps to the current folder.
 
 .EXAMPLE
+    .\EvergreenAdmx.ps1 -WindowsVersion 2025
+
+    Downloads the latest admx files for Windows 2025, Microsoft Edge, Microsoft OneDrive, and Microsoft 365 Apps to the current folder.
+
+.EXAMPLE
     .\EvergreenAdmx.ps1 -WorkingDirectory "C:\Temp\EvergreenAdmx" -Include @('Windows 11', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft FSLogix')
 
     Downloads the latest admx files for the specified products to C:\Temp\EvergreenAdmx folder.
 
 .EXAMPLE
-    .\EvergreenAdmx.ps1 -WindowsVersion 2025 -Include "Windows 2025"
-
-    Downloads the latest admx files for Windows 2025 to the current folder.
-
-.EXAMPLE
     .\EvergreenAdmx.ps1 -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
 
-    Downloads the default set of admx files, stores them in product folders for both English and Dutch languages, and copies them to the specified Policy store.
+    Downloads the default set of products policy definitions files, stores them in product folders for both English and Dutch languages, and copies them to the specified Policy store.
 
 .LINK
     https://github.com/msfreaks/EvergreenAdmx
+
+.LINK
     https://msfreaks.wordpress.com
+
 #>
 
 [CmdletBinding()]
@@ -96,11 +95,15 @@ param(
     [Parameter(Mandatory = $False, Position = 0)]
     [ValidateSet('10', '11', '2022', '2025')]
     [System.String] $WindowsVersion = '11',
-    [Parameter(Mandatory = $False)][ValidateSet('1903', '1909', '2004', '20H2', '21H1', '21H2', '22H2')]
-    [System.String] $Windows10FeatureVersion = '22H2',
-    [Parameter(Mandatory = $False)][ValidateSet('21H2', '22H2', '23H2', '24H2')]
     [Alias('WindowsFeatureEdition')]
-    [System.String] $Windows11FeatureVersion = '24H2',
+    [ValidateSet('1903', '1909', '2004', '20H2', '21H1', '21H2', '22H2', '23H2', '24H2')]
+    [System.String] $WindowsFeatureVersion = $(
+        switch ($WindowsVersion) {
+            '10' { '22H2' }
+            '11' { '24H2' }
+            default { '24H2' }
+        }
+    ),
     [Parameter(Mandatory = $False)]
     [System.String] $WorkingDirectory,
     [Parameter(Mandatory = $False)]
@@ -111,45 +114,33 @@ param(
     [switch] $UseProductFolders,
     [Parameter(Mandatory = $False)]
     [Alias('CustomPolicyStore')]
-    [System.String] $AddAdmxPath = $null,
+    [System.String] $CustomPolicyStore = $null,
     [Parameter(Mandatory = $False)]
     [ValidateSet('Custom Policy Store', 'Windows 10', 'Windows 11', 'Windows 2022', 'Windows 2025', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft FSLogix', 'Adobe Acrobat', 'Adobe Reader', 'BIS-F', 'Citrix Workspace App', 'Google Chrome', 'Microsoft Desktop Optimization Pack', 'Mozilla Firefox', 'Zoom', 'Zoom VDI', 'Microsoft AVD', 'Microsoft Winget', 'Brave Browser')]
-    [System.String[]] $Include = @('Windows 11', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps'),
+    [System.String[]] $Include = $(
+        switch ($WindowsVersion) {
+            '10' { @('Windows 10', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps') }
+            '11' { @('Windows 11', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps') }
+            '2022' { @('Windows 2022', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps') }
+            '2025' { @('Windows 2025', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps') }
+            default { @('Windows 11', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps') }
+        }
+    ),
     [Parameter(Mandatory = $False)]
-    [switch] $PreferLocalOneDrive = $False
+    [switch] $PreferLocalOneDrive
 )
 
 # Validate feature version based on Windows version
-if ($WindowsVersion -eq '10' -and $PSBoundParameters.ContainsKey('Windows11FeatureVersion')) {
-    Write-Warning 'Windows11FeatureVersion parameter is ignored when WindowsVersion is set to 10'
-} elseif ($WindowsVersion -eq '11' -and $PSBoundParameters.ContainsKey('Windows10FeatureVersion')) {
-    Write-Warning 'Windows10FeatureVersion parameter is ignored when WindowsVersion is set to 11'
-} elseif ($WindowsVersion -eq '2022' -and ($PSBoundParameters.ContainsKey('Windows10FeatureVersion') -or $PSBoundParameters.ContainsKey('Windows11FeatureVersion'))) {
+if ($WindowsVersion -eq '2022' -and ($PSBoundParameters.ContainsKey('WindowsFeatureVersion'))) {
     Write-Warning 'Windows feature version parameters are ignored when WindowsVersion is set to 2022'
-} elseif ($WindowsVersion -eq '2025' -and ($PSBoundParameters.ContainsKey('Windows10FeatureVersion') -or $PSBoundParameters.ContainsKey('Windows11FeatureVersion'))) {
+} elseif ($WindowsVersion -eq '2025' -and ($PSBoundParameters.ContainsKey('WindowsFeatureVersion'))) {
     Write-Warning 'Windows feature version parameters are ignored when WindowsVersion is set to 2025'
-}
-
-# Set the appropriate feature version variable based on Windows version
-$WindowsFeatureVersion = switch ($WindowsVersion) {
-    '10' { $Windows10FeatureVersion }
-    '11' { $Windows11FeatureVersion }
-    default { $null }
 }
 
 $ProgressPreference = 'SilentlyContinue'
 #$ErrorActionPreference = 'SilentlyContinue'
 
 $AdmxVersions = $null
-If ($WindowsVersion -eq '10' -and $Include -notcontains 'Windows 10') {
-    $Include += 'Windows 10'
-} elseif ($WindowsVersion -eq '11' -and $Include -notcontains 'Windows 11') {
-    $Include += 'Windows 11'
-} elseif ($WindowsVersion -eq '2022' -and $Include -notcontains 'Windows 2022') {
-    $Include += 'Windows 2022'
-} elseif ($WindowsVersion -eq '2025' -and $Include -notcontains 'Windows 2025') {
-    $Include += 'Windows 2025'
-}
 if (-not $WorkingDirectory) { $WorkingDirectory = $PWD }
 if (Test-Path -Path "$($WorkingDirectory)\AdmxVersions.xml") { $AdmxVersions = Import-Clixml -Path "$($WorkingDirectory)\AdmxVersions.xml" }
 if (-not (Test-Path -Path "$($WorkingDirectory)\admx")) { $null = New-Item -Path "$($WorkingDirectory)\admx" -ItemType Directory -Force }
@@ -157,26 +148,24 @@ if (-not (Test-Path -Path "$($WorkingDirectory)\downloads")) { $null = New-Item 
 if ($PolicyStore -and -not $PolicyStore.EndsWith('\')) { $PolicyStore += '\' }
 elseif ($null -eq $PolicyStore) { $PolicyStore = $PWD }
 if ($Languages -notmatch '([A-Za-z]{2})-([A-Za-z]{2})$') { Write-Warning "Language not in expected format: $($Languages -notmatch '([A-Za-z]{2})-([A-Za-z]{2})$')" }
-if ($AddAdmxPath -and -not (Test-Path -Path "$($AddAdmxPath)")) { throw "'$($AddAdmxPath)' is not a valid path." }
-if ($AddAdmxPath -and -not $AddAdmxPath.EndsWith('\')) { $AddAdmxPath += '\' }
-if ($AddAdmxPath -and (Get-ChildItem -Path $AddAdmxPath -Directory) -notmatch '([A-Za-z]{2})-([A-Za-z]{2})$') { throw "'$($AddAdmxPath)' does not contain at least one subfolder matching the language format (e.g 'en-US')." }
+if ($CustomPolicyStore -and -not (Test-Path -Path "$($CustomPolicyStore)")) { throw "'$($CustomPolicyStore)' is not a valid path." }
+if ($CustomPolicyStore -and -not $CustomPolicyStore.EndsWith('\')) { $CustomPolicyStore += '\' }
+if ($CustomPolicyStore -and (Get-ChildItem -Path $CustomPolicyStore -Directory) -notmatch '([A-Za-z]{2})-([A-Za-z]{2})$') { throw "'$($CustomPolicyStore)' does not contain at least one subfolder matching the language format (e.g 'en-US')." }
 If ($PreferLocalOneDrive -and $Include -notcontains 'Microsoft OneDrive') {
     $Include += 'Microsoft OneDrive'
 }
 
 # Parameter debugging
 Write-Verbose "Windows Version:`t'$($WindowsVersion)'"
-If ($WindowsVersion -eq '10') {
-    Write-Verbose "Windows Feature Version:`t'$($Windows10FeatureVersion)'"
-} ElseIf ($WindowsVersion -eq '11') {
-    Write-Verbose "Windows Feature Version:`t'$($Windows11FeatureVersion)'"
+If ($WindowsVersion -eq '10' -or $WindowsVersion -eq '11') {
+    Write-Verbose "Windows Feature Version:`t'$($WindowsFeatureVersion)'"
 }
 Write-Verbose "WorkingDirectory:`t'$($WorkingDirectory)'"
 If ($PolicyStore) {
     Write-Verbose "PolicyStore:`t'$($PolicyStore)'"
 }
-If ($AddAdmxPath) {
-    Write-Verbose "Add admx Path:`t`'$($AddAdmxPath)'"
+If ($CustomPolicyStore) {
+    Write-Verbose "Add admx Path:`t`'$($CustomPolicyStore)'"
 }
 Write-Verbose "Languages:`t`'$($Languages)'"
 Write-Verbose "Use product folders:`t'$($UseProductFolders)'"
@@ -1105,14 +1094,14 @@ function Get-CustomPolicyOnline {
     #>
 
     param(
-        [string] $AddAdmxPath
+        [string] $CustomPolicyStore
     )
 
-    $newestFileDate = Get-Date -Date ((Get-ChildItem -Path $AddAdmxPath -Include '*.admx', '*.adml' -Recurse | Sort-Object LastWriteTime -Descending) | Select-Object -First 1).LastWriteTime
+    $newestFileDate = Get-Date -Date ((Get-ChildItem -Path $CustomPolicyStore -Include '*.admx', '*.adml' -Recurse | Sort-Object LastWriteTime -Descending) | Select-Object -First 1).LastWriteTime
 
     $version = Get-Date -Date $newestFileDate -Format 'yyMM.dd.HHmmss'
 
-    return @{ Version = $version; URI = $AddAdmxPath }
+    return @{ Version = $version; URI = $CustomPolicyStore }
 }
 
 function Get-EvergreenAdmxAVD {
@@ -1324,22 +1313,22 @@ function Invoke-EvergreenAdmxEdge {
         $ZipFile = "$($WorkingDirectory)\downloads\MicrosoftEdgePolicyTemplates.zip"
 
         try {
-            # download
+            # Download
             Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
             Invoke-WebRequest -UseDefaultCredentials -Uri $Evergreen.URI -UseBasicParsing -OutFile $OutFile
 
-            # extract
+            # Extract
             Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\$($ProductName)'"
             $null = (New-Item -Path "$($env:TEMP)\$($ProductName)" -ItemType Directory -Force)
             $null = (expand -F:* "$($OutFile)" "$($env:TEMP)\$($ProductName)" $ZipFile)
             Expand-Archive -Path $ZipFile -DestinationPath "$($env:TEMP)\$($ProductName)" -Force
 
-            # copy
+            # Copy
             $SourceAdmx = "$($env:TEMP)\$($ProductName)\windows\admx"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
             Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
 
-            # cleanup
+            # Cleanup
             Remove-Item -Path $OutFile -Force
             Remove-Item -Path "$env:TEMP\$($ProductName)" -Recurse -Force
 
@@ -2173,11 +2162,11 @@ function Invoke-EvergreenAdmxCustomPolicy {
     param(
         [string]$Version,
         [string]$PolicyStore = $null,
-        [string]$AddAdmxPath,
+        [string]$CustomPolicyStore,
         [string[]]$Languages = $null
     )
 
-    $Evergreen = Get-CustomPolicyOnline -CustomPolicyStore $AddAdmxPath
+    $Evergreen = Get-CustomPolicyOnline -CustomPolicyStore $CustomPolicyStore
     $ProductName = 'Custom Policy Store'
     $ProductFolder = ''; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
 
@@ -2443,7 +2432,7 @@ if ($Include -notcontains 'Custom Policy Store') {
     Write-Verbose "`nProcessing Admx files for Custom Policy Store"
     $currentversion = $null
     if ($AdmxVersions.PSObject.properties -match 'CustomPolicyStore') { $currentversion = $AdmxVersions.CustomPolicyStore.Version }
-    $admx = Invoke-EvergreenAdmxCustomPolicy -Version $currentversion -PolicyStore $PolicyStore -CustomPolicyStore $AddAdmxPath -Languages $Languages
+    $admx = Invoke-EvergreenAdmxCustomPolicy -Version $currentversion -PolicyStore $PolicyStore -CustomPolicyStore $CustomPolicyStore -Languages $Languages
     Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'CustomPolicyStore' -AdmxData $admx
 }
 
@@ -2451,8 +2440,8 @@ if ($Include -notcontains 'Custom Policy Store') {
 if ($Include -notcontains 'Windows 10') {
     Write-Verbose "`nSkipping Windows 10"
 } else {
-    Write-Verbose "`nProcessing Admx files for Windows 10 $($Windows10FeatureVersion)"
-    $admx = Invoke-EvergreenAdmxWindows -Version $AdmxVersions.Windows.Version -PolicyStore $PolicyStore -WindowsFeatureVersion $Windows10FeatureVersion -WindowsVersion 10 -Languages $Languages
+    Write-Verbose "`nProcessing Admx files for Windows 10 $($WindowsFeatureVersion)"
+    $admx = Invoke-EvergreenAdmxWindows -Version $AdmxVersions.Windows.Version -PolicyStore $PolicyStore -WindowsFeatureVersion $WindowsFeatureVersion -WindowsVersion 10 -Languages $Languages
     Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'Windows10' -AdmxData $admx
 }
 
@@ -2460,8 +2449,8 @@ if ($Include -notcontains 'Windows 10') {
 if ($Include -notcontains 'Windows 11') {
     Write-Verbose "`nSkipping Windows 11"
 } else {
-    Write-Verbose "`nProcessing Admx files for Windows 11 $($Windows11FeatureVersion)"
-    $admx = Invoke-EvergreenAdmxWindows -Version $AdmxVersions.Windows.Version -PolicyStore $PolicyStore -WindowsFeatureVersion $Windows11FeatureVersion -WindowsVersion 11 -Languages $Languages
+    Write-Verbose "`nProcessing Admx files for Windows 11 $($WindowsFeatureVersion)"
+    $admx = Invoke-EvergreenAdmxWindows -Version $AdmxVersions.Windows.Version -PolicyStore $PolicyStore -WindowsFeatureVersion $WindowsFeatureVersion -WindowsVersion 11 -Languages $Languages
     if ($null -ne $admx) {
         Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'Windows11' -AdmxData $admx
     } else {
