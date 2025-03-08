@@ -9,7 +9,6 @@
 
 .LICENSEURI https://github.com/msfreaks/EvergreenAdmx/blob/main/LICENSE
 
-.PROJECTURI https://github.com/msfreaks/EvergreenAdmx
 #>
 
 <#
@@ -21,7 +20,8 @@
     Optionally copies the latest Admx files to a folder of your choosing, for example a Policy Store.
 
 .PARAMETER WindowsVersion
-    Specifies Windows major version. Supports 10, 11 or 2025. Default is 11.
+    Specifies Windows major version. Supports 10, 11 or 2025.
+    Default is 11.
 
 .PARAMETER Windows10FeatureVersion
     Specifies Windows 10 feature version to get the Admx files for. This parameter is used when 'Windows 10' is included.
@@ -39,7 +39,7 @@
     Specifies a Working Directory for the script.
     Admx files will be stored in a subdirectory called "admx".
     Downloaded files will be stored in a subdirectory called "downloads".
-    If omitted the script will treat the script's folder as the working directory.
+    Defaults to current script location.
 
 .PARAMETER PolicyStore
     Specifies a Policy Store location to copy the Admx files to after processing.
