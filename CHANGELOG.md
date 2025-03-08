@@ -17,7 +17,7 @@
 
 ## 2503.1
 
-- Added parameter **WindowsVersion** (`breaking change`)
+- Added new parameter **WindowsVersion** that supports value **10**, **11**, **2022** and **2025** (`breaking change`)
 - Removed parameter **Windows10Version** (`breaking change`)
 - Removed parameter **Windows11Version** (`breaking change`)
 - Renamed product **Microsoft Office** to **Microsoft 365 Apps** (`breaking change`)
@@ -27,14 +27,16 @@
 - Improved verbose logging
 - Fixed issues with PreferLocalOneDrive parameter
 - Added admx for Windows Server 2025
+- Added admx for Windows Server 2022
 - Added admx for Zoom VDI
 - Renamed functions to get url and latest version of policy definitions files from Get-$ProductAdmxOnline to Get-EvergreenAdmx%Product%
 - Renamed functions to download policy definitions files from Get-$ProductAdmx to Invoke-EvergreenAdmx%Product%
 - Added new Update-AdmxVersion function
 - Added admx for Brave Browser [#48](https://github.com/msfreaks/EvergreenAdmx/issues/48) Thanks [Tom Plant](https://github.com/pl4nty)!
-- Fix scrapping for OneDrive [#55](https://github.com/msfreaks/EvergreenAdmx/pull/55) Thanks [Tom Plant](https://github.com/pl4nty)!
-- Fix Windows 11, OneDrive and Office policies downloads [#51](https://github.com/msfreaks/EvergreenAdmx/issues/51) Thanks [Tom Plant](https://github.com/pl4nty)!
-- Improved code formatting
+- Fixed scrapping for OneDrive [#55](https://github.com/msfreaks/EvergreenAdmx/pull/55) Thanks [Tom Plant](https://github.com/pl4nty)!
+- Fix Windows 11, OneDrive and 365 apps admx downloads [#51](https://github.com/msfreaks/EvergreenAdmx/issues/51) Thanks [Tom Plant](https://github.com/pl4nty)!
+- Fixed errors reported by PSScriptAnalyzer rules
+- Improved code formatting based on powershell and markdown best practices
 
 ## 2411.1
 

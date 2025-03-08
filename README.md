@@ -99,7 +99,7 @@ DESCRIPTION
 
 PARAMETERS
     -WindowsVersion <String>
-        Specifies Windows major version. Supports 10, 11 or 2025.
+        Specifies Windows major version. Supports 10, 11 2022 or 2025.
         Default is 11.
 
         Required?                    false
@@ -194,7 +194,7 @@ PARAMETERS
 
     -Include <String[]>
         Array containing Admx products to include when checking for updates.
-        Valid values are: "Windows 10", "Windows 11", "Windows 2025", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft
+        Valid values are: "Windows 10", "Windows 11", "Windows 2022", "Windows 2025", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft
         Desktop Optimization Pack", "Mozilla Firefox", "Zoom", "Zoom VDI", "Microsoft AVD", "Microsoft Winget", "Brave Browser".
         Defaults to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps".
 
@@ -281,6 +281,7 @@ Now supports
 - Microsoft OneDrive (local installation or Evergreen)
 - Microsoft Windows 10 (1903/1909/2004/20H2/21H1/21H2/22H2)
 - Microsoft Windows 11 (21H2/22H2/23H2/24H2)
+- Microsoft Windows Server 2022 (Aug 2021)
 - Microsoft Windows Server 2025 (Nov 2024)
 - Microsoft Winget
 - Mozilla Firefox

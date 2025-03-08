@@ -20,7 +20,7 @@
     Optionally copies the latest Admx files to a folder of your choosing, for example a Policy Store.
 
 .PARAMETER WindowsVersion
-    Specifies Windows major version. Supports 10, 11 or 2025.
+    Specifies Windows major version. Supports 10, 11, 2022 or 2025.
     Default is 11.
 
 .PARAMETER Windows10FeatureVersion
@@ -59,7 +59,7 @@
 
 .PARAMETER Include
     Array containing Admx products to include when checking for updates.
-    Valid values are: "Windows 10", "Windows 11", "Windows 2025", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom", "Zoom VDI", "Microsoft AVD", "Microsoft Winget", "Brave Browser".
+    Valid values are: "Windows 10", "Windows 11", "Windows 2022", "Windows 2025", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom", "Zoom VDI", "Microsoft AVD", "Microsoft Winget", "Brave Browser".
     Defaults to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps".
 
 .PARAMETER PreferLocalOneDrive
@@ -94,7 +94,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $False, Position = 0)]
-    [ValidateSet('10', '11', '2025')]
+    [ValidateSet('10', '11', '2022', '2025')]
     [System.String] $WindowsVersion = '11',
     [Parameter(Mandatory = $False)][ValidateSet('1903', '1909', '2004', '20H2', '21H1', '21H2', '22H2')]
     [System.String] $Windows10FeatureVersion = '22H2',
@@ -113,7 +113,7 @@ param(
     [Alias('CustomPolicyStore')]
     [System.String] $AddAdmxPath = $null,
     [Parameter(Mandatory = $False)]
-    [ValidateSet('Custom Policy Store', 'Windows 10', 'Windows 11', 'Windows 2025', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft FSLogix', 'Adobe Acrobat', 'Adobe Reader', 'BIS-F', 'Citrix Workspace App', 'Google Chrome', 'Microsoft Desktop Optimization Pack', 'Mozilla Firefox', 'Zoom', 'Zoom VDI', 'Microsoft AVD', 'Microsoft Winget', 'Brave Browser')]
+    [ValidateSet('Custom Policy Store', 'Windows 10', 'Windows 11', 'Windows 2022', 'Windows 2025', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft FSLogix', 'Adobe Acrobat', 'Adobe Reader', 'BIS-F', 'Citrix Workspace App', 'Google Chrome', 'Microsoft Desktop Optimization Pack', 'Mozilla Firefox', 'Zoom', 'Zoom VDI', 'Microsoft AVD', 'Microsoft Winget', 'Brave Browser')]
     [System.String[]] $Include = @('Windows 11', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps'),
     [Parameter(Mandatory = $False)]
     [switch] $PreferLocalOneDrive = $False
@@ -124,6 +124,8 @@ if ($WindowsVersion -eq '10' -and $PSBoundParameters.ContainsKey('Windows11Featu
     Write-Warning 'Windows11FeatureVersion parameter is ignored when WindowsVersion is set to 10'
 } elseif ($WindowsVersion -eq '11' -and $PSBoundParameters.ContainsKey('Windows10FeatureVersion')) {
     Write-Warning 'Windows10FeatureVersion parameter is ignored when WindowsVersion is set to 11'
+} elseif ($WindowsVersion -eq '2022' -and ($PSBoundParameters.ContainsKey('Windows10FeatureVersion') -or $PSBoundParameters.ContainsKey('Windows11FeatureVersion'))) {
+    Write-Warning 'Windows feature version parameters are ignored when WindowsVersion is set to 2022'
 } elseif ($WindowsVersion -eq '2025' -and ($PSBoundParameters.ContainsKey('Windows10FeatureVersion') -or $PSBoundParameters.ContainsKey('Windows11FeatureVersion'))) {
     Write-Warning 'Windows feature version parameters are ignored when WindowsVersion is set to 2025'
 }
@@ -143,6 +145,8 @@ If ($WindowsVersion -eq '10' -and $Include -notcontains 'Windows 10') {
     $Include += 'Windows 10'
 } elseif ($WindowsVersion -eq '11' -and $Include -notcontains 'Windows 11') {
     $Include += 'Windows 11'
+} elseif ($WindowsVersion -eq '2022' -and $Include -notcontains 'Windows 2022') {
+    $Include += 'Windows 2022'
 } elseif ($WindowsVersion -eq '2025' -and $Include -notcontains 'Windows 2025') {
     $Include += 'Windows 2025'
 }
@@ -638,7 +642,7 @@ function Get-WindowsDownloadId {
         Returns Windows admx download Id
 
     .PARAMETER WindowsVersion
-        Specifies Windows major version. Supports 10, 11 or 2025. Default is 11.
+        Specifies Windows major version. Supports 10, 11, 2022 or 2025. Default is 11.
 
     .PARAMETER WindowsFeatureVersion
         Specifies Windows client feature edition. Default is 24H2.
@@ -649,7 +653,7 @@ function Get-WindowsDownloadId {
 
     param (
         [Parameter(Position = 0, ValueFromPipeline = $true)]
-        [ValidateSet('10', '11', '2025')]
+        [ValidateSet('10', '11', '2022', '2025')]
         [ValidateNotNullOrEmpty()]
         [int]$WindowsVersion = '11',
         [Parameter(Position = 1, ValueFromPipeline = $true)]
@@ -658,10 +662,10 @@ function Get-WindowsDownloadId {
                     return $true
                 } elseif ($WindowsVersion -eq '11' -and $_ -in @('21H2', '22H2', '23H2', '24H2')) {
                     return $true
-                } elseif ($WindowsVersion -eq '2025') {
+                } elseif ($WindowsVersion -eq '2022' -or $WindowsVersion -eq '2025') {
                     return $true
                 } else {
-                    throw "Invalid Windows Feature Version '$_' for Windows $WindowsVersion. Windows 10 supports: 1903, 1909, 2004, 20H2, 21H1, 21H2, 22H2. Windows 11 supports: 21H2, 22H2, 23H2, 24H2. Windows 2025 has no feature editions."
+                    throw "Invalid Windows Feature Version '$_' for Windows $WindowsVersion. Windows 10 supports: 1903, 1909, 2004, 20H2, 21H1, 21H2, 22H2. Windows 11 supports: 21H2, 22H2, 23H2, 24H2. Windows 2022 and 2025 has no Windows Feature Versions."
                 }
             })]
         [ValidateNotNullOrEmpty()]
@@ -677,6 +681,10 @@ function Get-WindowsDownloadId {
             return (@( @{ '21H2' = '103507' }, @{ '22H2' = '104593' }, @{ '23H2' = '105667' }, @{ '24H2' = '106254' } ).$WindowsFeatureVersion)
             break
         }
+        2022 {
+            return @( '104003' )
+            break
+        }
         2025 {
             return @( '106295' )
             break
@@ -687,7 +695,7 @@ function Get-WindowsDownloadId {
 function Get-EvergreenAdmxWindows {
     <#
     .SYNOPSIS
-        Returns url and latest version for Windows 10, Windows 11 or Windows Server 2025 policy definitions files.
+        Returns url and latest version for Windows 10, Windows 11 or Windows Server 2022 or 2025 policy definitions files.
 
     .PARAMETER DownloadId
         Id returned from Get-WindowsDownloadId. Default is the latest version for the current Windows major version.
@@ -1236,12 +1244,12 @@ function Invoke-EvergreenAdmxWindows {
         [string[]]$Languages = $null
     )
 
-    if ($WindowsVersion -eq '2025') {
-        $id = Get-WindowsDownloadId -WindowsVersion $WindowsVersion
-        $ProductName = "Microsoft Windows $($WindowsVersion)"
-    } elseif ($WindowsVersion -eq 11 -or $WindowsVersion -eq 10) {
+    If ($WindowsVersion -eq 11 -or $WindowsVersion -eq 10) {
         $id = Get-WindowsDownloadId -WindowsVersion $WindowsVersion -WindowsFeatureVersion $WindowsFeatureVersion
         $ProductName = "Microsoft Windows $($WindowsVersion) $($WindowsFeatureVersion)"
+    } elseif ($WindowsVersion -eq '2022' -or $WindowsVersion -eq '2025') {
+        $id = Get-WindowsDownloadId -WindowsVersion $WindowsVersion
+        $ProductName = "Microsoft Windows Server $($WindowsVersion)"
     }
     $Evergreen = Get-EvergreenAdmxWindows -DownloadId $id
     $ProductFolder = ''; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
@@ -2458,6 +2466,19 @@ if ($Include -notcontains 'Windows 11') {
         Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'Windows11' -AdmxData $admx
     } else {
         Write-Warning 'Failed to retrieve Windows 11 ADMX files. Skipping update.'
+    }
+}
+
+# Windows 2022
+if ($Include -notcontains 'Windows 2022') {
+    Write-Verbose "`nSkipping Windows Server 2022"
+} else {
+    Write-Verbose "`nProcessing Admx files for Windows Server 2022"
+    $admx = Invoke-EvergreenAdmxWindows -Version $AdmxVersions.Windows.Version -PolicyStore $PolicyStore -WindowsVersion 2022 -Languages $Languages
+    if ($null -ne $admx) {
+        Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'Windows2022' -AdmxData $admx
+    } else {
+        Write-Warning 'Failed to retrieve Windows Server 2022 ADMX files. Skipping update.'
     }
 }
 
