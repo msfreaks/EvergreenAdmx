@@ -7,63 +7,85 @@
 After deploying several Azure Virtual Desktop environments I decided I no longer wanted to manually download the Admx files I needed, and I wanted a way to keep them up-to-date.
 
 This script solves both problems.
-*  Checks for newer versions of the Admx files that are present and processes the new version if found
-*  Optionally copies the new Admx files to the Policy Store or Definition folder, or a folder of your choosing
+
+- Checks for newer versions of the Admx files that are present and processes the new version if found
+- Optionally copies the new Admx files to the Policy Store or Definition folder, or a folder of your choosing
 
 The name I chose for this script is an ode to the [Evergreen module](https://github.com/aaronparker/Evergreen) by Aaron Parker [@stealthpuppy](https://twitter.com/stealthpuppy).
 
 ## How to use
 
 Quick start:
-*  Download the script to a location of your choosing (for example: C:\Scripts\EvergreenAdmx)
-*  Run or schedule the script
+
+- Download the script to a location of your choosing (for example: C:\Scripts\EvergreenAdmx)
+- Run or schedule the script
 
 You can also install the script from the PowerShell Gallery [EvergreenAdmx][poshgallery-evergreenadmx] :
+
 ```powershell
 Install-Script -Name EvergreenAdmx
 ```
 
-I have scheduled the script to run daily:
+### Examples
+
+Download policy definitions files to Test directory
 
 ```powershell
-EvergreenAdmx.ps1 -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions"
+.\EvergreenAdmx.ps1 -WorkingDirectory .\Test
 ```
 
-The above execution will keep the central Policy Store up-to-date on a daily basis.
+Update local group policies policy store on your DC
 
-A sample .xml file that you can import in Task Scheduler is provided with this script.
+```powershell
+.\EvergreenAdmx.ps1 -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions"
+```
+
+Update local group policies
+
+```powershell
+.\EvergreenAdmx.ps1 -PolicyStore "C:\Windows\PolicyDefinitions"
+```
+
+
+```powershell
+    [array]$IncludeProducts = @("Windows 2025", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix")
+    .\EvergreenAdmx.ps1 -WorkingDirectory .\Test -Include $IncludeProducts -UseProductFolders
+```
+
+If you wish to run a scheduled task on a daily basis.
+You can import the sample xml file in Task Scheduler provided with this script.
+
+`Breaking change starting from 2503.1`
+
+Valid entries are "Custom Policy Store", "Windows 10", "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client", "Azure Virtual Desktop", "Microsoft Winget", "Brave Browser".
 
 `Breaking change starting from 2402.1`
 
-The -WindowsVersion parameter was added back and is now an alias of -Windows11Version
-
-Valid entries are "Custom Policy Store", "Windows 10", "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office", "FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client", "Azure Virtual Desktop".
+Valid entries are "Custom Policy Store", "Windows 10", "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client", "Azure Virtual Desktop", "Microsoft Winget".
 
 `Breaking change starting from 2301.1`
 
-Valid entries are "Custom Policy Store", "Windows 10", "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office", "FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client".
+Valid entries are "Custom Policy Store", "Windows 10", "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client".
 
 `Breaking change starting from 2112.1`
 
 Windows 11 was added to the script, and that means the -WindowsVersion parameter was substituted with -Windows10Version and -Windows11Version.
 These MUST be used and for the same Windows version as any 'Include' options you provide.
 
-From this version the 'Includes' will default to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office".
+From this version the 'Includes' will default to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps".
 
 `Breaking change starting from 2101.2`
 
 This script no longer processes all the products by default. There's no need to comment out any products you don't need anymore.
 
 In 2101.2 the parameter 'Include' was introduced which is an array you can use to specify all products that need to be processed. This parameter is required for the script to be able to run.
-Valid entries are "Custom Policy Store", "Windows 10" or "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office", "FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client", "Azure Virtual Desktop", "Microsoft Winget".
+Valid entries are "Custom Policy Store", "Windows 10" or "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client", "Azure Virtual Desktop".
 
-By default, if you don't use this parameter, only "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office" is processed.
+By default, if you don't use this parameter, only "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps" is processed.
 
-```
+```powershell
 SYNTAX
-    C:\gits\github\EvergreenAdmx\EvergreenAdmx.ps1 [[-Windows10Version] <String>] [[-Windows11Version]
-    <String>] [[-WorkingDirectory] <String>] [[-PolicyStore] <String>] [[-Languages] <String[]>]
-    [-UseProductFolders] [[-CustomPolicyStore] <String>] [[-Include] <String[]>] [-PreferLocalOneDrive]
+    .\EvergreenAdmx.ps1 [[-WindowsVersion] <String>] [[-Windows11FeatureVersion] <String>] [[-Windows10FeatureVersion] <String>] [[-WorkingDirectory] <String>] [[-PolicyStore] <String>] [[-Languages] <String[]>] [-UseProductFolders] [[-AddAdmxPath] <String>] [[-Include] <String[]>] [-PreferLocalOneDrive]
     [<CommonParameters>]
 
 DESCRIPTION
@@ -98,8 +120,8 @@ PARAMETERS
 
     -WorkingDirectory <String>
         Optionally provide a Working Directory for the script.
-        The script will store Admx files in a subdirectory called "admx".
-        The script will store downloaded files in a subdirectory called "downloads".
+        The script will store admx files in a subdirectory called 'Admx'.
+        The script will store downloaded files in a subdirectory called 'downloads'.
         If omitted the script will treat the script's folder as the working directory.
 
         Required?                    false
@@ -150,11 +172,11 @@ PARAMETERS
 
     -Include <String[]>
         Array containing Admx products to include when checking for updates.
-        Defaults to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office" if omitted.
+        Defaults to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps" if omitted.
 
         Required?                    false
         Position?                    6
-        Default value                @("Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office")
+        Default value                @("Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps")
         Accept pipeline input?       false
         Accept wildcard characters?  false
 
@@ -179,7 +201,6 @@ PARAMETERS
     PS C:\>.\EvergreenAdmx.ps1 -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
 
     Will process the default set of products, storing results in product folders, for both English United States as Dutch languages, and copies the files to the Policy store.
-
 ```
 
 ## Admx files
@@ -187,23 +208,27 @@ PARAMETERS
 Also see [Change Log][change-log] for a list of supported products.
 
 Now supports
-*  Adobe Acrobat (Continuous Track)
-*  Adobe Reader (Continuous Track)
-*  Azure Virtual Desktop
-*  Base Image Script Framework (BIS-F)
-*  Citrix Workspace App
-*  Custom Policy Store
-*  FSLogix
-*  Google Chrome
-*  Microsoft Desktop Optimization Pack
-*  Microsoft Edge (Chromium)
-*  Microsoft Office
-*  Microsoft OneDrive (local installation or Evergreen)
-*  Microsoft Windows 10 (1903/1909/2004/20H2/21H1/21H2/22H2)
-*  Microsoft Windows 11 (21H2/22H2/23H2/24H2)
-*  Microsoft Winget
-*  Mozilla Firefox
-*  Zoom Desktop Client
+
+- Adobe Acrobat (Continuous Track)
+- Adobe Reader (Continuous Track)
+- Base Image Script Framework (BIS-F)
+- Brave Browser
+- Citrix Workspace App
+- Custom Policy Store
+- Google Chrome
+- Microsoft AVD
+- Microsoft Desktop Optimization Pack
+- Microsoft Edge (Chromium)
+- Microsoft FSLogix
+- Microsoft 365 Apps
+- Microsoft OneDrive (local installation or Evergreen)
+- Microsoft Windows 10 (1903/1909/2004/20H2/21H1/21H2/22H2)
+- Microsoft Windows 11 (21H2/22H2/23H2/24H2)
+- Microsoft Windows Server 2025 (Nov 2024)
+- Microsoft Winget
+- Mozilla Firefox
+- Zoom
+- Zoom VDI
 
 ## Notes
 
