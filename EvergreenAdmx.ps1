@@ -113,9 +113,9 @@ param(
     [Parameter(Mandatory = $False)]
     [switch] $UseProductFolders,
     [Parameter(Mandatory = $False)]
-    [Alias('CustomPolicyStore')]
     [System.String] $CustomPolicyStore = $null,
     [Parameter(Mandatory = $False)]
+    [switch] $PreferLocalOneDrive,
     [ValidateSet('Custom Policy Store', 'Windows 10', 'Windows 11', 'Windows 2022', 'Windows 2025', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft FSLogix', 'Adobe Acrobat', 'Adobe Reader', 'BIS-F', 'Citrix Workspace App', 'Google Chrome', 'Microsoft Desktop Optimization Pack', 'Mozilla Firefox', 'Zoom', 'Zoom VDI', 'Microsoft AVD', 'Microsoft Winget', 'Brave Browser')]
     [System.String[]] $Include = $(
         switch ($WindowsVersion) {
@@ -125,9 +125,7 @@ param(
             '2025' { @('Windows 2025', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps') }
             default { @('Windows 11', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps') }
         }
-    ),
-    [Parameter(Mandatory = $False)]
-    [switch] $PreferLocalOneDrive
+    )
 )
 
 # Validate feature version based on Windows version
@@ -743,7 +741,7 @@ function Get-EvergreenAdmxOneDrive {
         $architecture = 'x64'
         $ring = 'Insider'
         $type = 'exe'
-        $Evergreen = Invoke-RestMethod -Uri $url
+        $Evergreen = Invoke-RestMethod -Uri $url -UserAgent 'Googlebot/2.1 (+http://www.google.com/bot.html)'
         $Evergreen = $Evergreen | Where-Object { $_.Architecture -eq $architecture -and $_.Ring -eq $ring -and $_.Type -eq $type } | `
                 Sort-Object -Property @{ Expression = { [System.Version]$_.Version }; Descending = $true } | Select-Object -First 1
 
@@ -764,6 +762,8 @@ function Get-EvergreenAdmxOneDrive {
             $isOneDriveInstalled = $true
             $OneDriveInstalledVersion = $Systemx86Install.DisplayVersion
             $global:oneDriveADMXFolder = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive').CurrentVersionPath
+        } else {
+            $isOneDriveInstalled = $false
         }
 
         if ($PreferLocalOneDrive) {
@@ -835,7 +835,7 @@ function Get-EvergreenAdmxChrome {
         $channel = 'Stable'
         $architecture = 'x64'
         $type = 'msi'
-        $Evergreen = Invoke-RestMethod -Uri $url
+        $Evergreen = Invoke-RestMethod -Uri $url -UserAgent 'Googlebot/2.1 (+http://www.google.com/bot.html)'
         $Evergreen = $Evergreen | Where-Object { $_.Channel -eq $channel -and $_.Architecture -eq $architecture -and $_.Type -eq $type } | `
                 Sort-Object -Property @{ Expression = { [System.Version]$_.Version }; Descending = $true } | Select-Object -First 1
 
@@ -1393,7 +1393,6 @@ function Invoke-EvergreenAdmxOneDrive {
                 $null = Start-Process -FilePath $OutFile -ArgumentList '/allusers /silent' -PassThru
                 # Wait for setup to complete
                 while (Get-Process -Name 'OneDriveSetup' -ErrorAction SilentlyContinue) { Start-Sleep -Seconds 10 }
-                # OneDrive starts automatically after setup. kill!
                 # Check if OneDrive is running and close it if it is
                 Write-Verbose 'Checking if OneDrive is running and stopping it if necessary'
                 $process = Get-Process -Name 'OneDrive' -ErrorAction SilentlyContinue
@@ -1428,26 +1427,11 @@ function Invoke-EvergreenAdmxOneDrive {
                 $installfolder = $oneDriveADMXFolder
             }
 
-            # copy
+            # Copy
             $SourceAdmx = "$($installfolder)\adm"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
             if (-not (Test-Path -Path "$($TargetAdmx)")) { $null = (New-Item -Path "$($TargetAdmx)" -ItemType Directory -Force) }
-
-            Write-Verbose "Copying Admx files from '$($SourceAdmx)' to '$($TargetAdmx)'"
-            Copy-Item -Path "$($SourceAdmx)\*.admx" -Destination "$($TargetAdmx)" -Force
-            foreach ($language in $Languages) {
-                if (-not (Test-Path -Path "$($SourceAdmx)\$($language)") -and -not (Test-Path -Path "$($SourceAdmx)\$($language.Substring(0,2))")) {
-                    if ($language -notlike 'en-us') { Write-Warning "Language '$($language)' not found for '$($ProductName)'. Processing 'en-US' instead." }
-                    if (-not (Test-Path -Path "$($TargetAdmx)\en-US")) { $null = (New-Item -Path "$($TargetAdmx)\en-US" -ItemType Directory -Force) }
-                    Copy-Item -Path "$($SourceAdmx)\*.adml" -Destination "$($TargetAdmx)\en-US" -Force
-                } else {
-                    $sourcelanguage = $language; if (-not (Test-Path -Path "$($SourceAdmx)\$($language)")) { $sourcelanguage = $language.Substring(0, 2) }
-                    if (-not (Test-Path -Path "$($TargetAdmx)\$($language)")) { $null = (New-Item -Path "$($TargetAdmx)\$($language)" -ItemType Directory -Force) }
-                    Copy-Item -Path "$($SourceAdmx)\$($sourcelanguage)\*.adml" -Destination "$($TargetAdmx)\$($language)" -Force
-                }
-            }
-
-            if ($PolicyStore) {
+            if ($PolicyStore -and (Test-Path -Path "$($SourceAdmx)\*.admx")) {
                 Write-Verbose "Copying Admx files from '$($SourceAdmx)' to '$($PolicyStore)'"
                 Copy-Item -Path "$($SourceAdmx)\*.admx" -Destination "$($PolicyStore)" -Force
                 foreach ($language in $Languages) {
@@ -1460,11 +1444,27 @@ function Invoke-EvergreenAdmxOneDrive {
                         Copy-Item -Path "$($SourceAdmx)\$($sourcelanguage)\*.adml" -Destination "$($PolicyStore)$($language)" -Force
                     }
                 }
+            } elseIf (Test-Path -Path "$($SourceAdmx)\*.admx") {
+                Write-Verbose "Copying Admx files from '$($SourceAdmx)' to '$($TargetAdmx)'"
+                Copy-Item -Path "$($SourceAdmx)\*.admx" -Destination "$($TargetAdmx)" -Force
+                foreach ($language in $Languages) {
+                    if (-not (Test-Path -Path "$($SourceAdmx)\$($language)") -and -not (Test-Path -Path "$($SourceAdmx)\$($language.Substring(0,2))")) {
+                        if ($language -notlike 'en-us') { Write-Warning "Language '$($language)' not found for '$($ProductName)'. Processing 'en-US' instead." }
+                        if (-not (Test-Path -Path "$($TargetAdmx)\en-US")) { $null = (New-Item -Path "$($TargetAdmx)\en-US" -ItemType Directory -Force) }
+                        Copy-Item -Path "$($SourceAdmx)\*.adml" -Destination "$($TargetAdmx)\en-US" -Force
+                    } else {
+                        $sourcelanguage = $language; if (-not (Test-Path -Path "$($SourceAdmx)\$($language)")) { $sourcelanguage = $language.Substring(0, 2) }
+                        if (-not (Test-Path -Path "$($TargetAdmx)\$($language)")) { $null = (New-Item -Path "$($TargetAdmx)\$($language)" -ItemType Directory -Force) }
+                        Copy-Item -Path "$($SourceAdmx)\$($sourcelanguage)\*.adml" -Destination "$($TargetAdmx)\$($language)" -Force
+                    }
+                }
+            } else {
+                Write-Warning "No ADMX files found for '$($ProductName)'"
             }
 
             if (-not $PreferLocalOneDrive) {
-                # uninstall
-                Write-Verbose 'Uninstalling OneDrive installer'
+                # Uninstall
+                Write-Verbose 'Uninstalling Microsoft OneDrive installer'
                 $null = Start-Process -FilePath "$($installfolder)\OneDriveSetup.exe" -ArgumentList '/uninstall /allusers' -PassThru -Wait
             }
 
@@ -1473,10 +1473,11 @@ function Invoke-EvergreenAdmxOneDrive {
             Throw $_
         }
     } else {
-        # version already processed
+        # Version already processed
         return $null
     }
 }
+
 function Invoke-EvergreenAdmx365Apps {
     <#
     .SYNOPSIS
@@ -1503,27 +1504,27 @@ function Invoke-EvergreenAdmx365Apps {
     $ProductName = "Microsoft 365 Apps $($Architecture)"
     $ProductFolder = ''; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
 
-    # see if this is a newer version
+    # See if this is a newer version
     if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version) {
         Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
 
-        # download and process
+        # Download and process
         $OutFile = "$($WorkingDirectory)\downloads\$($Evergreen.URI.Split('/')[-1])"
         try {
-            # download
+            # Download
             Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
             Invoke-WebRequest -UseDefaultCredentials -Uri $Evergreen.URI -UseBasicParsing -OutFile $OutFile
 
-            # extract
+            # Extract
             Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\office'"
             $null = Start-Process -FilePath $OutFile -ArgumentList "/quiet /norestart /extract:`"$($env:TEMP)\office`"" -PassThru -Wait
 
-            # copy
+            # Copy
             $SourceAdmx = "$($env:TEMP)\office\admx"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
             Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
 
-            # cleanup
+            # Cleanup
             Remove-Item -Path "$($env:TEMP)\office" -Recurse -Force
 
             return $Evergreen
@@ -1531,7 +1532,7 @@ function Invoke-EvergreenAdmx365Apps {
             Throw $_
         }
     } else {
-        # version already processed
+        # Version already processed
         return $null
     }
 }
@@ -1595,12 +1596,12 @@ function Invoke-EvergreenAdmxFSLogix {
             Throw $_
         }
     } else {
-        # version already processed
+        # Version already processed
         return $null
     }
 }
 
-function Invoke-EvergreenAdmxChrome {
+Function Invoke-EvergreenAdmxChrome {
     <#
     .SYNOPSIS
         Download Google Chrome policy definition files.
@@ -2498,7 +2499,11 @@ if ($Include -notcontains 'Microsoft OneDrive') {
     Write-Verbose "`nSkipping Microsoft OneDrive"
 } else {
     Write-Verbose "`nProcessing Admx files for Microsoft OneDrive"
-    $admx = Invoke-EvergreenAdmxOneDrive -Version $AdmxVersions.OneDrive.Version -PolicyStore $PolicyStore -PreferLocalOneDrive -Languages $Languages
+    If ($PreferLocalOneDrive) {
+        $admx = Invoke-EvergreenAdmxOneDrive -Version $AdmxVersions.OneDrive.Version -PolicyStore $PolicyStore -PreferLocalOneDrive -Languages $Languages
+    } else {
+        $admx = Invoke-EvergreenAdmxOneDrive -Version $AdmxVersions.OneDrive.Version -PolicyStore $PolicyStore -Languages $Languages
+    }
     Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'OneDrive' -AdmxData $admx
 }
 
@@ -2630,9 +2635,4 @@ if ($Include -notcontains 'Brave Browser') {
 
 Write-Verbose "`nSaving Admx versions to '$($WorkingDirectory)\AdmxVersions.xml'"
 $AdmxVersions | Export-Clixml -Path "$($WorkingDirectory)\AdmxVersions.xml" -Force
-#endregion
-#endregion
-#endregion
-#endregion
-#endregion
 #endregion
