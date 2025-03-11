@@ -3,6 +3,10 @@
 #region init
 <#PSScriptInfo
 
+.VERSION 2503.1
+
+.GUID 999952b7-1337-4018-a1b9-499fad48e734
+
 .AUTHOR Arjan Mensch & Jonathan Pitre
 
 .TAGS GroupPolicy GPO Admx Evergreen Automation
