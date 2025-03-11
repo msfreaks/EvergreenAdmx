@@ -7,64 +7,100 @@
 After deploying several Azure Virtual Desktop environments I decided I no longer wanted to manually download the Admx files I needed, and I wanted a way to keep them up-to-date.
 
 This script solves both problems.
-*  Checks for newer versions of the Admx files that are present and processes the new version if found
-*  Optionally copies the new Admx files to the Policy Store or Definition folder, or a folder of your choosing
 
-The name I chose for this script is an ode to the [Evergreen module](https://github.com/aaronparker/Evergreen) by Aaron Parker [@stealthpuppy](https://twitter.com/stealthpuppy).
+- Automatically checks for newer versions of ADMX files and processes them when found
+- Optionally copies the new ADMX files to your Policy Store or a custom location
+
+Named as an homage to the [Evergreen module](https://github.com/aaronparker/Evergreen) by Aaron Parker [@stealthpuppy](https://twitter.com/stealthpuppy).
 
 ## How to use
 
 Quick start:
-*  Download the script to a location of your choosing (for example: C:\Scripts\EvergreenAdmx)
-*  Run or schedule the script
+
+- Download the script to a location of your choosing (for example: C:\Scripts\EvergreenAdmx)
+- Run or schedule the script
 
 You can also install the script from the PowerShell Gallery [EvergreenAdmx][poshgallery-evergreenadmx] :
+
 ```powershell
 Install-Script -Name EvergreenAdmx
 ```
 
-I have scheduled the script to run daily:
+### Examples
+
+Download policy definitions files to Test directory
 
 ```powershell
-EvergreenAdmx.ps1 -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions"
+.\EvergreenAdmx.ps1 -WorkingDirectory .\Test
 ```
 
-The above execution will keep the central Policy Store up-to-date on a daily basis.
+Update local group policies policy store on your DC
 
-A sample .xml file that you can import in Task Scheduler is provided with this script.
+```powershell
+.\EvergreenAdmx.ps1 -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions"
+```
+
+Update local group policies
+
+```powershell
+.\EvergreenAdmx.ps1 -PolicyStore "C:\Windows\PolicyDefinitions"
+```
+
+
+```powershell
+.\EvergreenAdmx.ps1 -WorkingDirectory .\Test -Include @('Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft FSLogix') -UseProductFolders
+```
+
+If you wish to run a scheduled task on a daily basis.
+You can import the sample xml file in Task Scheduler provided with this script.
+
+`Breaking change starting from 2503.1`
+
+Added script parameter **WindowsVersion** that supports value **10**, **11**, **2022** and **2025**
+Replaced script parameter **Windows10Version** and **Windows11Version** by **WindowsFeatureVersion**
+Renamed product **Microsoft Office** to **Microsoft 365 Apps**
+Renamed product **Azure Virtual Desktop** to **Microsoft AVD**
+Renamed product **FSLogix** to **Microsoft FSlogix**
+Renamed product **Zoom Desktop Client** to **Zoom**
+Added admx for Windows Server 2025
+Added admx for Windows Server 2022
+Added admx for Zoom VDI
+
+Valid entries are "Custom Policy Store", "Windows 10", "Windows 11", "Windows 2022", "Windows 2025", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom", "Zoom VDI", "Microsoft AVD", "Microsoft Winget", "Brave Browser".
 
 `Breaking change starting from 2402.1`
 
-The -WindowsVersion parameter was added back and is now an alias of -Windows11Version
-
-Valid entries are "Custom Policy Store", "Windows 10", "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office", "FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client", "Azure Virtual Desktop".
+Valid entries are "Custom Policy Store", "Windows 10", "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client", "Azure Virtual Desktop", "Microsoft Winget".
 
 `Breaking change starting from 2301.1`
 
-Valid entries are "Custom Policy Store", "Windows 10", "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office", "FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client".
+Valid entries are "Custom Policy Store", "Windows 10", "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client".
 
 `Breaking change starting from 2112.1`
 
 Windows 11 was added to the script, and that means the -WindowsVersion parameter was substituted with -Windows10Version and -Windows11Version.
 These MUST be used and for the same Windows version as any 'Include' options you provide.
 
-From this version the 'Includes' will default to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office".
+From this version the 'Includes' will default to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps".
 
 `Breaking change starting from 2101.2`
 
 This script no longer processes all the products by default. There's no need to comment out any products you don't need anymore.
 
 In 2101.2 the parameter 'Include' was introduced which is an array you can use to specify all products that need to be processed. This parameter is required for the script to be able to run.
-Valid entries are "Custom Policy Store", "Windows 10" or "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office", "FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client", "Azure Virtual Desktop", "Microsoft Winget".
+Valid entries are "Custom Policy Store", "Windows 10" or "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization Pack", "Mozilla Firefox", "Zoom Desktop Client", "Azure Virtual Desktop".
 
-By default, if you don't use this parameter, only "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office" is processed.
+By default, if you don't use this parameter, only "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps" is processed.
 
-```
+```powershell
+SYNOPSIS
+    Script to automatically download latest Admx files for several products.
+
+
 SYNTAX
-    C:\gits\github\EvergreenAdmx\EvergreenAdmx.ps1 [[-Windows10Version] <String>] [[-Windows11Version]
-    <String>] [[-WorkingDirectory] <String>] [[-PolicyStore] <String>] [[-Languages] <String[]>]
-    [-UseProductFolders] [[-CustomPolicyStore] <String>] [[-Include] <String[]>] [-PreferLocalOneDrive]
+    N:\Intune\Scripts\EvergreenAdmx\EvergreenAdmx.ps1 [[-WindowsVersion] <String>] [-WindowsFeatureVersion <String>] [-WorkingDirectory <String>] [-PolicyStore <String>] [-Languages <String[]>] [-UseProductFolders] [-CustomPolicyStore <String>] [-Include <String[]>] [-PreferLocalOneDrive]
     [<CommonParameters>]
+
 
 DESCRIPTION
     Script to automatically download latest Admx files for several products.
@@ -72,90 +108,114 @@ DESCRIPTION
 
 
 PARAMETERS
-    -Windows10Version <String>
-       The Windows 10 version to get the Admx files for. This value will be ignored if 'Windows 10' is
-       not specified with -Include parameter.
-       If the -Include parameter contains 'Windows 10', the latest Windows 10 version will be used.
-       Defaults to "Windows11Version" if omitted.
-
-       Note: Windows 11 23H2 policy definitions now supports Windows 10.
+    -WindowsVersion <String>
+        Specifies Windows major version. Supports 10, 11, 2022 or 2025.
+        Default is 11.
 
         Required?                    false
         Position?                    1
-        Default value                22H2
+        Default value                11
         Accept pipeline input?       false
+        Aliases
         Accept wildcard characters?  false
 
-    -Windows11Version <String> || -WindowsVersion <String>
-       The Windows 11 version to get the Admx files for.
-       If omitted, defaults to latest version available.
+    -WindowsFeatureVersion <String>
+        Specifies Windows 10 or 11 feature version to get the Admx files for.
+        Valid values are: 1903, 1909, 2004, 20H2, 21H1, 21H2, 22H2 for Windows 10.
+        Valid values are: 21H2, 22H2, 23H2, 24H2 for Windows 11.
+        Defaults to 24H2.
+
+        Note: Windows 11 23H2 policy definitions now supports Windows 10.
 
         Required?                    false
-        Position?                    1
-        Default value                24H2
+        Position?                    named
+        Default value                $(
+                switch ($WindowsVersion) {
+                    '10' { '22H2' }
+                    '11' { '24H2' }
+                    default { '24H2' }
+                }
+            )
         Accept pipeline input?       false
+        Aliases
         Accept wildcard characters?  false
 
     -WorkingDirectory <String>
-        Optionally provide a Working Directory for the script.
-        The script will store Admx files in a subdirectory called "admx".
-        The script will store downloaded files in a subdirectory called "downloads".
-        If omitted the script will treat the script's folder as the working directory.
+        Specifies a Working Directory for the script.
+        Admx files will be stored in a subdirectory called "admx".
+        Downloaded files will be stored in a subdirectory called "downloads".
+        Defaults to current script location.
 
         Required?                    false
-        Position?                    2
+        Position?                    named
         Default value
         Accept pipeline input?       false
+        Aliases
         Accept wildcard characters?  false
 
     -PolicyStore <String>
-        Optionally provide a Policy Store location to copy the Admx files to after processing.
+        Specifies a Policy Store location to copy the Admx files to after processing.
 
         Required?                    false
-        Position?                    3
+        Position?                    named
         Default value
         Accept pipeline input?       false
+        Aliases
         Accept wildcard characters?  false
 
     -Languages <String[]>
-        Optionally provide an array of languages to process. Entries must be in 'xy-XY' format.
-        If omitted the script will process 'en-US'.
+        Specifies an array of languages to process. Entries must be in 'xy-XY' format.
+        Defaults to 'en-US'.
 
         Required?                    false
-        Position?                    4
-        Default value                @("en-US")
+        Position?                    named
+        Default value                @('en-US')
         Accept pipeline input?       false
+        Aliases
         Accept wildcard characters?  false
 
     -UseProductFolders [<SwitchParameter>]
-        When specified the extracted Admx files are copied to their respective product folders in a subfolder of 'Admx' in the WorkingDirectory.
+        Admx files are copied to their respective product folders in a subfolder of 'Admx' in the WorkingDirectory.
 
         Required?                    false
         Position?                    named
         Default value                False
         Accept pipeline input?       false
+        Aliases
         Accept wildcard characters?  false
 
     -CustomPolicyStore <String>
-        When specified processes a location for custom policy files. Can be UNC format or local folder.
-        The script will expect to find .admx files in this location, and at least one language folder holding the .adml file(s).
+        Specifies a location for custom policy files. Can be UNC format or local folder.
+        Find .admx files in this location, and at least one language folder holding the .adml file(s).
         Versioning will be done based on the newest file found recursively in this location (any .admx or .adml).
         Note that if any file has changed the script will process all files found in location.
 
         Required?                    false
-        Position?                    5
+        Position?                    named
         Default value
         Accept pipeline input?       false
+        Aliases
         Accept wildcard characters?  false
 
     -Include <String[]>
         Array containing Admx products to include when checking for updates.
-        Defaults to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office" if omitted.
+        Valid values are: "Windows 10", "Windows 11", "Windows 2022", "Windows 2025", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "BIS-F", "Citrix Workspace App", "Google Chrome", "Microsoft Desktop Optimization
+        Pack", "Mozilla Firefox", "Zoom", "Zoom VDI", "Microsoft AVD", "Microsoft Winget", "Brave Browser".
+        Defaults to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps".
 
         Required?                    false
-        Position?                    6
-        Default value                @("Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft Office")
+        Position?                    named
+        Default value                $(
+                switch ($WindowsVersion) {
+                    '10' { @('Windows 10', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps') }
+                    '11' { @('Windows 11', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps') }
+                    '2022' { @('Windows 2022', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps') }
+                    '2025' { @('Windows 2025', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps') }
+                    default { @('Windows 11', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps') }
+                }
+            )
         Accept pipeline input?       false
+        Aliases
         Accept wildcard characters?  false
 
     -PreferLocalOneDrive [<SwitchParameter>]
@@ -164,22 +224,53 @@ PARAMETERS
 
         Required?                    false
         Position?                    named
-        Default value                false
+        Default value                False
         Accept pipeline input?       false
+        Aliases
         Accept wildcard characters?  false
 
     <CommonParameters>
         This cmdlet supports the common parameters: Verbose, Debug,
         ErrorAction, ErrorVariable, WarningAction, WarningVariable,
         OutBuffer, PipelineVariable, and OutVariable. For more information, see
-        about_CommonParameters (https:/go.microsoft.com/fwlink/?LinkID=113216).
+        about_CommonParameters (https://go.microsoft.com/fwlink/?LinkID=113216).
+
+INPUTS
+
+OUTPUTS
 
     -------------------------- EXAMPLE 1 --------------------------
 
-    PS C:\>.\EvergreenAdmx.ps1 -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
+    PS > .\EvergreenAdmx.ps1
 
-    Will process the default set of products, storing results in product folders, for both English United States as Dutch languages, and copies the files to the Policy store.
+    Downloads the latest admx files for Windows 11, Microsoft Edge, Microsoft OneDrive, and Microsoft 365 Apps to the current folder.
 
+
+
+
+    -------------------------- EXAMPLE 2 --------------------------
+
+    PS > .\EvergreenAdmx.ps1 -WindowsVersion 2025
+
+    Downloads the latest admx files for Windows 2025, Microsoft Edge, Microsoft OneDrive, and Microsoft 365 Apps to the current folder.
+
+
+
+
+    -------------------------- EXAMPLE 3 --------------------------
+
+    PS > .\EvergreenAdmx.ps1 -WorkingDirectory "C:\Temp\EvergreenAdmx" -Include @('Windows 11', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft FSLogix')
+
+    Downloads the latest admx files for the specified products to C:\Temp\EvergreenAdmx folder.
+
+
+
+
+    -------------------------- EXAMPLE 4 --------------------------
+
+    PS > .\EvergreenAdmx.ps1 -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
+
+    Downloads the default set of products policy definitions files, stores them in product folders for both English and Dutch languages, and copies them to the specified Policy store.
 ```
 
 ## Admx files
@@ -187,23 +278,28 @@ PARAMETERS
 Also see [Change Log][change-log] for a list of supported products.
 
 Now supports
-*  Adobe Acrobat (Continuous Track)
-*  Adobe Reader (Continuous Track)
-*  Azure Virtual Desktop
-*  Base Image Script Framework (BIS-F)
-*  Citrix Workspace App
-*  Custom Policy Store
-*  FSLogix
-*  Google Chrome
-*  Microsoft Desktop Optimization Pack
-*  Microsoft Edge (Chromium)
-*  Microsoft Office
-*  Microsoft OneDrive (local installation or Evergreen)
-*  Microsoft Windows 10 (1903/1909/2004/20H2/21H1/21H2/22H2)
-*  Microsoft Windows 11 (21H2/22H2/23H2/24H2)
-*  Microsoft Winget
-*  Mozilla Firefox
-*  Zoom Desktop Client
+
+- Adobe Acrobat (Continuous Track)
+- Adobe Reader (Continuous Track)
+- Base Image Script Framework (BIS-F)
+- Brave Browser
+- Citrix Workspace App
+- Custom Policy Store
+- Google Chrome
+- Microsoft AVD
+- Microsoft Desktop Optimization Pack
+- Microsoft Edge (Chromium)
+- Microsoft FSLogix
+- Microsoft 365 Apps
+- Microsoft OneDrive (local installation or Evergreen)
+- Microsoft Windows 10 (1903/1909/2004/20H2/21H1/21H2/22H2)
+- Microsoft Windows 11 (21H2/22H2/23H2/24H2)
+- Microsoft Windows Server 2022 (Aug 2021)
+- Microsoft Windows Server 2025 (Nov 2024)
+- Microsoft Winget
+- Mozilla Firefox
+- Zoom
+- Zoom VDI
 
 ## Notes
 
