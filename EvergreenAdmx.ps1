@@ -2611,7 +2611,7 @@ if ($Include -notcontains 'Zoom VDI') {
 } else {
     Write-Verbose "`nProcessing Admx files for Zoom VDI"
     $pkey = 'Zoom VDI'
-    $admx = Invoke-EvergreenAdmxZoomVDI -Version $AdmxVersions.[$pkey].Version -PolicyStore $PolicyStore -Languages $Languages
+    $admx = Invoke-EvergreenAdmxZoomVDI -Version $AdmxVersions[$pkey].Version -PolicyStore $PolicyStore -Languages $Languages
     Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey $pkey -AdmxData $admx
 }
 
