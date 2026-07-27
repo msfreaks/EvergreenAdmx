@@ -1,6 +1,7 @@
 # 🌲 EvergreenAdmx
 
 [![Release][github-release-badge]][github-release]
+[![PowerShell Gallery][psgallery-downloads-badge]][poshgallery-evergreenadmx]
 [![Codacy][code-quality-badge]][code-quality]
 [![Twitter][twitter-follow-badge]][twitter-follow]
 
@@ -276,8 +277,12 @@ Earlier breaking changes (product renames, `-WindowsVersion` /
 Thank you [Jonathan Pitre][jonathan-pitre] for keeping me sharp, providing
 fixes and improvements!
 
+Thank you [Dan Gough][dan-gough] for the `Get-Link`, `Get-Version`, and
+`Resolve-Uri` helper functions from [Nevergreen][nevergreen].
+
 [github-release-badge]: https://img.shields.io/github/v/release/msfreaks/EvergreenAdmx.svg?style=flat-square
 [github-release]: https://github.com/msfreaks/EvergreenAdmx/releases/latest
+[psgallery-downloads-badge]: https://img.shields.io/powershellgallery/dt/EvergreenAdmx.svg?style=flat-square
 [code-quality-badge]: https://app.codacy.com/project/badge/Grade/c0efab02b66442399bb16b0493cdfbef?style=flat-square
 [code-quality]: https://www.codacy.com/gh/msfreaks/EvergreenAdmx/dashboard?utm_source=github.com&utm_medium=referral&utm_content=msfreaks/EvergreenAdmx&utm_campaign=Badge_Grade
 [twitter-follow-badge]: https://img.shields.io/twitter/follow/menschab?style=flat-square
@@ -286,9 +291,11 @@ fixes and improvements!
 [twitter-follow-jonathan]: https://x.com/JonathanPitre?ref_src=twsrc%5Etfw
 [change-log]: https://github.com/msfreaks/EvergreenAdmx/blob/main/CHANGELOG.md
 [poshgallery-evergreenadmx]: https://www.powershellgallery.com/packages/EvergreenAdmx/
-[evergreen-module]: https://github.com/aaronparker/Evergreen
+[evergreen-module]: https://github.com/EUCPilots/evergreen-module
 [stealthpuppy]: https://x.com/stealthpuppy
 [jonathan-pitre]: https://github.com/JonathanPitre
+[dan-gough]: https://github.com/DanGough
+[nevergreen]: https://github.com/DanGough/Nevergreen
 [windows-10-esu]: https://learn.microsoft.com/en-us/windows/whats-new/extended-security-updates
 [ref-1password]: https://support.1password.com/mobile-device-management/?windows=
 [ref-adobe-acrobat]: https://ardownload2.adobe.com/pub/adobe/acrobat/win/AcrobatDC/misc/AcrobatADMTemplate.zip
