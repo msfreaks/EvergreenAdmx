@@ -281,11 +281,13 @@ fixes and improvements!
 [code-quality-badge]: https://app.codacy.com/project/badge/Grade/c0efab02b66442399bb16b0493cdfbef?style=flat-square
 [code-quality]: https://www.codacy.com/gh/msfreaks/EvergreenAdmx/dashboard?utm_source=github.com&utm_medium=referral&utm_content=msfreaks/EvergreenAdmx&utm_campaign=Badge_Grade
 [twitter-follow-badge]: https://img.shields.io/twitter/follow/menschab?style=flat-square
-[twitter-follow]: https://twitter.com/menschab?ref_src=twsrc%5Etfw
+[twitter-follow]: https://x.com/menschab?ref_src=twsrc%5Etfw
+[twitter-follow-jonathan-badge]: https://img.shields.io/twitter/follow/JonathanPitre?style=flat-square
+[twitter-follow-jonathan]: https://x.com/JonathanPitre?ref_src=twsrc%5Etfw
 [change-log]: https://github.com/msfreaks/EvergreenAdmx/blob/main/CHANGELOG.md
 [poshgallery-evergreenadmx]: https://www.powershellgallery.com/packages/EvergreenAdmx/
 [evergreen-module]: https://github.com/aaronparker/Evergreen
-[stealthpuppy]: https://twitter.com/stealthpuppy
+[stealthpuppy]: https://x.com/stealthpuppy
 [jonathan-pitre]: https://github.com/JonathanPitre
 [windows-10-esu]: https://learn.microsoft.com/en-us/windows/whats-new/extended-security-updates
 [ref-1password]: https://support.1password.com/mobile-device-management/?windows=
