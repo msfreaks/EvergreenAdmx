@@ -40,8 +40,8 @@ script exits after registration and does not download Admx files in that run.
 
 ### 💡 Examples
 
-Run with defaults (Windows 11 `25H2` plus Edge, OneDrive, 365 Apps,
-Clipchamp, Notepad, and Winget) into the current folder:
+Run with defaults (Windows 11 25H2 plus Edge, OneDrive, 365 Apps,
+Clipchamp, Notepad, Winget, and Windows Terminal) into the current folder:
 
 ```powershell
 .\EvergreenAdmx.ps1
@@ -126,7 +126,8 @@ for.
 
 Ignored when `-WindowsVersion` is `2022` or `2025`.
 
-Note: Windows 11 `23H2` policy definitions also support Windows 10.
+Note: Current Windows 11 ADMX templates (`23H2` / `24H2` / `25H2`) can also
+manage Windows 10 clients; some settings apply only to newer OS versions.
 
 Why Windows 10 `21H2` and `22H2` are still offered:
 

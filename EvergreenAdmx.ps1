@@ -33,7 +33,7 @@
     Valid values are: 23H2, 24H2, 25H2 for Windows 11.
     Defaults to 25H2.
 
-    Note: Windows 11 23H2 policy definitions now supports Windows 10.
+    Note: Current Windows 11 ADMX templates (23H2 / 24H2 / 25H2) can also manage Windows 10 clients; some settings apply only to newer OS versions.
 
 .PARAMETER WorkingDirectory
     Specifies a Working Directory for the script.

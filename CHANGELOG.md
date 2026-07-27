@@ -8,6 +8,7 @@
 - Add parameter to create Central Policy Store location
 - Add parameter to clean old Office ADMX from Central Policy Store location
 - Add parameter to clean old Adobe Reader ADMX from Central Policy Store location
+- Add ADMX versioning automatically, very useful for Intune
 
 ## 2607.1
 
