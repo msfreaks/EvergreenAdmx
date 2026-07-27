@@ -831,7 +831,7 @@ function Get-WindowsDownloadId {
             break
         }
         2025 {
-            return @( '106295' )
+            return @( '108430' )
             break
         }
     }
@@ -4169,8 +4169,9 @@ if ($Include -notcontains 'Windows 10') {
     Write-Verbose "`nSkipping Windows 10"
 } else {
     Write-Verbose "`nProcessing Admx files for Windows 10 $($WindowsFeatureVersion)"
-    $admx = Invoke-EvergreenAdmxWindows -Version $AdmxVersions.Windows.Version -PolicyStore $PolicyStore -WindowsFeatureVersion $WindowsFeatureVersion -WindowsVersion 10 -Languages $Languages
-    Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'Windows10' -AdmxData $admx
+    $pkey = 'Windows10'
+    $admx = Invoke-EvergreenAdmxWindows -Version $AdmxVersions[$pkey].Version -PolicyStore $PolicyStore -WindowsFeatureVersion $WindowsFeatureVersion -WindowsVersion 10 -Languages $Languages
+    Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey $pkey -AdmxData $admx
 }
 
 # Windows 11
@@ -4178,9 +4179,10 @@ if ($Include -notcontains 'Windows 11') {
     Write-Verbose "`nSkipping Windows 11"
 } else {
     Write-Verbose "`nProcessing Admx files for Windows 11 $($WindowsFeatureVersion)"
-    $admx = Invoke-EvergreenAdmxWindows -Version $AdmxVersions.Windows.Version -PolicyStore $PolicyStore -WindowsFeatureVersion $WindowsFeatureVersion -WindowsVersion 11 -Languages $Languages
+    $pkey = 'Windows11'
+    $admx = Invoke-EvergreenAdmxWindows -Version $AdmxVersions[$pkey].Version -PolicyStore $PolicyStore -WindowsFeatureVersion $WindowsFeatureVersion -WindowsVersion 11 -Languages $Languages
     if ($null -ne $admx) {
-        Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'Windows11' -AdmxData $admx
+        Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey $pkey -AdmxData $admx
     } else {
         Write-Warning 'Failed to retrieve Windows 11 ADMX files. Skipping update.'
     }
@@ -4191,9 +4193,10 @@ if ($Include -notcontains 'Windows 2022') {
     Write-Verbose "`nSkipping Windows Server 2022"
 } else {
     Write-Verbose "`nProcessing Admx files for Windows Server 2022"
-    $admx = Invoke-EvergreenAdmxWindows -Version $AdmxVersions.Windows.Version -PolicyStore $PolicyStore -WindowsVersion 2022 -Languages $Languages
+    $pkey = 'Windows2022'
+    $admx = Invoke-EvergreenAdmxWindows -Version $AdmxVersions[$pkey].Version -PolicyStore $PolicyStore -WindowsVersion 2022 -Languages $Languages
     if ($null -ne $admx) {
-        Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'Windows2022' -AdmxData $admx
+        Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey $pkey -AdmxData $admx
     } else {
         Write-Warning 'Failed to retrieve Windows Server 2022 ADMX files. Skipping update.'
     }
@@ -4204,9 +4207,10 @@ if ($Include -notcontains 'Windows 2025') {
     Write-Verbose "`nSkipping Windows Server 2025"
 } else {
     Write-Verbose "`nProcessing Admx files for Windows Server 2025"
-    $admx = Invoke-EvergreenAdmxWindows -Version $AdmxVersions.Windows.Version -PolicyStore $PolicyStore -WindowsVersion 2025 -Languages $Languages
+    $pkey = 'Windows2025'
+    $admx = Invoke-EvergreenAdmxWindows -Version $AdmxVersions[$pkey].Version -PolicyStore $PolicyStore -WindowsVersion 2025 -Languages $Languages
     if ($null -ne $admx) {
-        Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'Windows2025' -AdmxData $admx
+        Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey $pkey -AdmxData $admx
     } else {
         Write-Warning 'Failed to retrieve Windows Server 2025 ADMX files. Skipping update.'
     }
@@ -4320,8 +4324,9 @@ if ($Include -notcontains 'Zoom VDI') {
     Write-Verbose "`nSkipping Zoom VDI"
 } else {
     Write-Verbose "`nProcessing Admx files for Zoom VDI"
-    $admx = Invoke-EvergreenAdmxZoomVDI -Version $AdmxVersions.ZoomVDI.Version -PolicyStore $PolicyStore -Languages $Languages
-    Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'Zoom VDI' -AdmxData $admx
+    $pkey = 'Zoom VDI'
+    $admx = Invoke-EvergreenAdmxZoomVDI -Version $AdmxVersions.[$pkey].Version -PolicyStore $PolicyStore -Languages $Languages
+    Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey $pkey -AdmxData $admx
 }
 
 # Microsoft AVD
