@@ -5,15 +5,47 @@
 - Add logging options (yep, since the beginning)
 - Add notification options (yep, also since the beginning)
 - Detect user domain automatically (Get code from PSADT)
-- Add support for Winget-Autoupdate-Intune ADMX
 - Add parameter to create Central Policy Store location
 - Add parameter to clean old Office ADMX from Central Policy Store location
 - Add parameter to clean old Adobe Reader ADMX from Central Policy Store location
-- Add SSL admx
-- Add Dell Command Update admx
-- Add Winget-Auto-Update admx
-- Add Winget-Auto-Update-Intune admx
-- Add Slack admx [#57](https://github.com/msfreaks/EvergreenAdmx/issues/57)
+
+## 2607.1
+
+- Replaced `Invoke-WebRequest -OutFile` downloads with HttpClient-based `Invoke-FileDownload` (TLS 1.3 preferred, TLS 1.2 fallback) for faster, streamed downloads on PowerShell 5.1 [#39](https://github.com/msfreaks/EvergreenAdmx/issues/39)
+- Added Microsoft PowerToys ADMX [#75](https://github.com/msfreaks/EvergreenAdmx/issues/75)
+- Added Windows Terminal ADMX [#76](https://github.com/msfreaks/EvergreenAdmx/issues/76)
+- Added Mozilla Thunderbird ADMX [#77](https://github.com/msfreaks/EvergreenAdmx/issues/77)
+- Added Dropbox ADMX [#79](https://github.com/msfreaks/EvergreenAdmx/issues/79)
+- Added Foxit PDF (Reader + Editor) ADMX [#80](https://github.com/msfreaks/EvergreenAdmx/issues/80)
+- Added LibreOffice / Collabora Office ADMX [#81](https://github.com/msfreaks/EvergreenAdmx/issues/81)
+- Added HP Anyware (PCoIP) ADMX via Standard Agent extract (requires winget + 7-Zip) [#83](https://github.com/msfreaks/EvergreenAdmx/issues/83)
+- Tracked Omnissa Horizon GPO Bundle (Customer Connect login wall) [#78](https://github.com/msfreaks/EvergreenAdmx/issues/78)
+- Tracked Cisco Secure Client (no official ADMX published) [#82](https://github.com/msfreaks/EvergreenAdmx/issues/82)
+- Tracked Lenovo Commercial Vantage / Dock Manager ADMX (no stable public URL yet) [#84](https://github.com/msfreaks/EvergreenAdmx/issues/84)
+- Added Windows 11 **25H2** ADMX support (download id `108542`, V3.0); default Windows 11 feature version is now `25H2` [#70](https://github.com/msfreaks/EvergreenAdmx/issues/70)
+- Fixed first-run crash when `AdmxVersions.xml` is missing by initializing `$AdmxVersions = @{}` [#70](https://github.com/msfreaks/EvergreenAdmx/issues/70)
+- Fixed OneDrive install detection `if`/`elseif` chain [#71](https://github.com/msfreaks/EvergreenAdmx/issues/71) / [#72](https://github.com/msfreaks/EvergreenAdmx/pull/72)
+- Relaxed language format validation to allow `es` and `es-419` [#52](https://github.com/msfreaks/EvergreenAdmx/issues/52)
+- Added Microsoft Notepad ADMX [#61](https://github.com/msfreaks/EvergreenAdmx/issues/61)
+- Added Microsoft Clipchamp ADMX [#60](https://github.com/msfreaks/EvergreenAdmx/issues/60)
+- Added Microsoft Visual Studio ADMX [#32](https://github.com/msfreaks/EvergreenAdmx/issues/32)
+- Added Microsoft VS Code ADMX via zip extract (no install) [#33](https://github.com/msfreaks/EvergreenAdmx/issues/33)
+- Added Slack ADMX [#57](https://github.com/msfreaks/EvergreenAdmx/issues/57)
+- Added TeamViewer ADMX [#69](https://github.com/msfreaks/EvergreenAdmx/issues/69)
+- Added community Adobe DC ADMX (separate from official Adobe Acrobat) [#68](https://github.com/msfreaks/EvergreenAdmx/issues/68)
+- Added Security-ADMX [#62](https://github.com/msfreaks/EvergreenAdmx/issues/62)
+- Added Dell Command Update ADMX [#50](https://github.com/msfreaks/EvergreenAdmx/issues/50)
+- Added Winget-AutoUpdate ADMX [#49](https://github.com/msfreaks/EvergreenAdmx/issues/49)
+- Added Winget-AutoUpdate-Intune ADMX [#35](https://github.com/msfreaks/EvergreenAdmx/issues/35)
+- Added PSAppDeployToolkit ADMX [#53](https://github.com/msfreaks/EvergreenAdmx/issues/53)
+- Added Devolutions Remote Desktop Manager ADMX via Bin zip extract (no install) [#34](https://github.com/msfreaks/EvergreenAdmx/issues/34)
+- Added 1Password ADMX [#74](https://github.com/msfreaks/EvergreenAdmx/issues/74)
+- Expanded default `-Include` set to also download Microsoft Clipchamp, Microsoft Notepad, Microsoft Winget, and Windows Terminal
+- Changed Dell Command Update ADMX source from the stale GitHub repo to the latest `Dell.CommandUpdate.Universal` installer via `winget download`, extracting ADMX from the EXE `Templates` folder (7-Zip preferred; Dell `/passthrough` extract fallback)
+- Removed Adobe Acrobat/Reader Classic 2017 and Classic 2020 tracks (EOL); Continuous track only (`breaking change`)
+- Removed Microsoft Desktop Optimization Pack ADMX support (extended support ended April 14, 2026) (`breaking change`)
+- Removed end-of-life Windows 10 feature versions `1903`–`21H1`; Windows 10 now supports `21H2` and `22H2` only (`breaking change`)
+- Removed end-of-life Windows 11 feature versions `21H2` and `22H2`; Windows 11 now supports `23H2`, `24H2`, and `25H2` only (`breaking change`)
 
 ## 2503.1
 
