@@ -95,12 +95,15 @@ Keep a locally installed OneDrive build when processing OneDrive ADMX:
 
 ## ⚙️ Parameters
 
-### 🪟 WindowsVersion
+Pass parameters with a leading `-` (PowerShell syntax), for example
+`-WorkingDirectory` or `-Include`.
+
+### 🪟 -WindowsVersion
 
 Specifies Windows major version. Supports `10`, `11`, `2022`, or `2025`.
 Default is `11`.
 
-### 🔢 WindowsFeatureVersion
+### 🔢 -WindowsFeatureVersion
 
 Specifies the Windows 10 or Windows 11 feature version to get the Admx files
 for.
@@ -108,7 +111,7 @@ for.
 - Windows 10: `21H2`, `22H2` (default `22H2`)
 - Windows 11: `23H2`, `24H2`, `25H2` (default `25H2`)
 
-Ignored when `WindowsVersion` is `2022` or `2025`.
+Ignored when `-WindowsVersion` is `2022` or `2025`.
 
 Note: Windows 11 `23H2` policy definitions also support Windows 10.
 
@@ -125,7 +128,7 @@ Why Windows 10 `21H2` and `22H2` are still offered:
 Older Windows 10 feature versions (`1903`–`21H1`) and Windows 11 `21H2` /
 `22H2` were removed because they are fully out of support.
 
-### 📁 WorkingDirectory
+### 📁 -WorkingDirectory
 
 Specifies a working directory for the script.
 
@@ -134,22 +137,22 @@ Specifies a working directory for the script.
 
 Defaults to the current script location.
 
-### 🏪 PolicyStore
+### 🏪 -PolicyStore
 
 Specifies a Policy Store location to copy the Admx files to after processing.
 
-### 🌐 Languages
+### 🌐 -Languages
 
 Specifies an array of languages to process. Entries must be in `xy-XY` format
 (also accepts short forms such as `es` and region tags such as `es-419`).
 Defaults to `en-US`.
 
-### 📂 UseProductFolders
+### 📂 -UseProductFolders
 
 When set, Admx files are copied to their respective product folders under
 `admx` in the WorkingDirectory.
 
-### 📦 CustomPolicyStore
+### 📦 -CustomPolicyStore
 
 Specifies a location for custom policy files (UNC or local folder).
 
@@ -160,7 +163,7 @@ Specifies a location for custom policy files (UNC or local folder).
 - If any file has changed, the script processes all files found in the
   location
 
-### ✅ Include
+### ✅ -Include
 
 Specifies which Admx products to download and process. Use exact product
 names from the list below.
@@ -217,7 +220,7 @@ Below are all valid values you can use with `-Include`. Each links to the respec
 - [`TeamViewer`][ref-teamviewer]
 - [`Windows 10`][ref-win10-22h2]
   ([`21H2`][ref-win10-21h2] / [`22H2`][ref-win10-22h2]; see
-  WindowsFeatureVersion above for why these remain)
+  -WindowsFeatureVersion above for why these remain)
 - [`Windows 11`][ref-win11-25h2]
   ([`23H2`][ref-win11-23h2] / [`24H2`][ref-win11-24h2] /
   [`25H2`][ref-win11-25h2])
@@ -229,7 +232,7 @@ Below are all valid values you can use with `-Include`. Each links to the respec
 - [`Zoom`][ref-zoom]
 - [`Zoom VDI`][ref-zoom-vdi]
 
-### 💾 PreferLocalOneDrive
+### 💾 -PreferLocalOneDrive
 
 Microsoft OneDrive Admx files are only available after installing OneDrive.
 If this script is running on a machine that has OneDrive installed locally,
@@ -249,8 +252,8 @@ See the [Change Log][change-log] for the full history. Highlights in
 - Removed end-of-life Windows 11 feature versions `21H2` and `22H2`;
   Windows 11 now supports `23H2`, `24H2`, and `25H2` only
 
-Earlier breaking changes (product renames, `WindowsVersion` /
-`WindowsFeatureVersion`, and the `Include` parameter) are documented in the
+Earlier breaking changes (product renames, `-WindowsVersion` /
+`-WindowsFeatureVersion`, and the `-Include` parameter) are documented in the
 [Change Log][change-log].
 
 ## 📝 Notes
