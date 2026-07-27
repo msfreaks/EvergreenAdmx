@@ -191,12 +191,19 @@ Write-Verbose "Included:`t`'$($Include -join ', ')'"
 Write-Verbose "PreferLocalOneDrive:`t'$($PreferLocalOneDrive)'"
 Write-Verbose "CreateScheduledTask:`t'$($CreateScheduledTask)'"
 
-if ($CreateScheduledTask) {
-    $ScriptPath = $PSCommandPath
-    if (-not $ScriptPath) { $ScriptPath = $MyInvocation.MyCommand.Path }
-    if (-not $ScriptPath -or -not (Test-Path -LiteralPath $ScriptPath)) {
-        throw 'Unable to resolve the path to EvergreenAdmx.ps1 for scheduled task registration.'
-    }
+    function New-EvergreenAdmxTaskArgumentList {
+    <#
+    .SYNOPSIS
+        Builds powershell.exe arguments for the EvergreenAdmx scheduled task action.
+    #>
+    [CmdletBinding()]
+    [OutputType([System.Collections.Generic.List[System.String]])]
+    param (
+        [Parameter(Mandatory = $true)]
+        [System.String] $ScriptPath,
+        [Parameter(Mandatory = $true)]
+        [System.Collections.IDictionary] $BoundParameters
+    )
 
     $ArgumentList = [System.Collections.Generic.List[System.String]]::new()
     $ArgumentList.Add('-NoProfile')
@@ -205,9 +212,9 @@ if ($CreateScheduledTask) {
     $ArgumentList.Add('-File')
     $ArgumentList.Add("`"$ScriptPath`"")
 
-    foreach ($Key in $PSBoundParameters.Keys) {
+    foreach ($Key in $BoundParameters.Keys) {
         if ($Key -eq 'CreateScheduledTask') { continue }
-        $Value = $PSBoundParameters[$Key]
+        $Value = $BoundParameters[$Key]
         if ($Value -is [System.Management.Automation.SwitchParameter]) {
             if ($Value.IsPresent) { $ArgumentList.Add("-$Key") }
             continue
@@ -224,6 +231,17 @@ if ($CreateScheduledTask) {
         $ArgumentList.Add("`"$($Value -replace '"', '`"')`"")
     }
 
+    return $ArgumentList
+}
+
+if ($CreateScheduledTask) {
+    $ScriptPath = $PSCommandPath
+    if (-not $ScriptPath) { $ScriptPath = $MyInvocation.MyCommand.Path }
+    if (-not $ScriptPath -or -not (Test-Path -LiteralPath $ScriptPath)) {
+        throw 'Unable to resolve the path to EvergreenAdmx.ps1 for scheduled task registration.'
+    }
+
+    $ArgumentList = New-EvergreenAdmxTaskArgumentList -ScriptPath $ScriptPath -BoundParameters $PSBoundParameters
     $TaskAction = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument ($ArgumentList -join ' ')
     $TaskTrigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At 1am
     $TaskPrincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
