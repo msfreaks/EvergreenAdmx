@@ -66,6 +66,11 @@
     Microsoft OneDrive Admx files are only available after installing OneDrive.
     If this script is running on a machine that has OneDrive installed locally, use this switch to prevent automatically uninstalling OneDrive.
 
+.PARAMETER CreateScheduledTask
+    Creates or updates a weekly Windows Scheduled Task named EvergreenAdmx that runs this script
+    as SYSTEM with highest privileges (Sunday at 01:00). Bound parameters are forwarded to the
+    task action except CreateScheduledTask. The script exits after registering the task and does not download Admx files in that run.
+
 .EXAMPLE
     .\EvergreenAdmx.ps1
 
@@ -85,6 +90,11 @@
     .\EvergreenAdmx.ps1 -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders
 
     Downloads the default set of products policy definitions files, stores them in product folders for both English and Dutch languages, and copies them to the specified Policy store.
+
+.EXAMPLE
+    .\EvergreenAdmx.ps1 -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" -Languages @("en-US", "nl-NL") -UseProductFolders -CreateScheduledTask
+
+    Creates or updates a weekly SYSTEM scheduled task named EvergreenAdmx that runs this script with the bound parameters (Sunday at 01:00), then exits.
 
 .LINK
     https://github.com/msfreaks/EvergreenAdmx
@@ -120,6 +130,8 @@ param(
     [System.String] $CustomPolicyStore = $null,
     [Parameter(Mandatory = $False)]
     [switch] $PreferLocalOneDrive,
+    [Parameter(Mandatory = $False)]
+    [switch] $CreateScheduledTask,
     [ValidateSet('Custom Policy Store', 'Windows 10', 'Windows 11', 'Windows 2022', 'Windows 2025', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft FSLogix', 'Adobe Acrobat', 'Adobe Reader', 'Adobe DC', 'BIS-F', 'Citrix Workspace App', 'Google Chrome', 'Mozilla Firefox', 'Mozilla Thunderbird', 'Zoom', 'Zoom VDI', 'Microsoft AVD', 'Microsoft Winget', 'Microsoft PowerToys', 'Windows Terminal', 'Brave Browser', 'Microsoft Notepad', 'Microsoft Clipchamp', 'Microsoft Visual Studio', 'Microsoft VS Code', 'Slack', '1Password', 'TeamViewer', 'Security ADMX', 'Dell Command Update', 'Winget-AutoUpdate', 'Winget-AutoUpdate-Intune', 'PSAppDeployToolkit', 'Devolutions Remote Desktop Manager', 'Dropbox', 'Foxit PDF', 'LibreOffice', 'HP Anyware')]
     [System.String[]] $Include = $(
         switch ($WindowsVersion) {
@@ -177,6 +189,49 @@ Write-Verbose "Admx path:`t`'$($WorkingDirectory)\admx'"
 Write-Verbose "Download path:`t`'$($WorkingDirectory)\downloads'"
 Write-Verbose "Included:`t`'$($Include -join ', ')'"
 Write-Verbose "PreferLocalOneDrive:`t'$($PreferLocalOneDrive)'"
+Write-Verbose "CreateScheduledTask:`t'$($CreateScheduledTask)'"
+
+if ($CreateScheduledTask) {
+    $ScriptPath = $PSCommandPath
+    if (-not $ScriptPath) { $ScriptPath = $MyInvocation.MyCommand.Path }
+    if (-not $ScriptPath -or -not (Test-Path -LiteralPath $ScriptPath)) {
+        throw 'Unable to resolve the path to EvergreenAdmx.ps1 for scheduled task registration.'
+    }
+
+    $ArgumentList = [System.Collections.Generic.List[System.String]]::new()
+    $ArgumentList.Add('-NoProfile')
+    $ArgumentList.Add('-ExecutionPolicy')
+    $ArgumentList.Add('Bypass')
+    $ArgumentList.Add('-File')
+    $ArgumentList.Add("`"$ScriptPath`"")
+
+    foreach ($Key in $PSBoundParameters.Keys) {
+        if ($Key -eq 'CreateScheduledTask') { continue }
+        $Value = $PSBoundParameters[$Key]
+        if ($Value -is [System.Management.Automation.SwitchParameter]) {
+            if ($Value.IsPresent) { $ArgumentList.Add("-$Key") }
+            continue
+        }
+        if ($Value -is [System.Array]) {
+            $QuotedItems = foreach ($Item in $Value) {
+                "'$($Item -replace "'", "''")'"
+            }
+            $ArgumentList.Add("-$Key")
+            $ArgumentList.Add("@($($QuotedItems -join ','))")
+            continue
+        }
+        $ArgumentList.Add("-$Key")
+        $ArgumentList.Add("`"$($Value -replace '"', '`"')`"")
+    }
+
+    $TaskAction = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -Argument ($ArgumentList -join ' ')
+    $TaskTrigger = New-ScheduledTaskTrigger -Weekly -DaysOfWeek Sunday -At 1am
+    $TaskPrincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+    $TaskSettings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Hours 1) -MultipleInstances IgnoreNew
+    $null = Register-ScheduledTask -TaskName 'EvergreenAdmx' -Action $TaskAction -Trigger $TaskTrigger -Principal $TaskPrincipal -Settings $TaskSettings -Force
+    Write-Host "Scheduled task 'EvergreenAdmx' created or updated (weekly on Sunday at 01:00, runs as SYSTEM)."
+    return
+}
 #endregion
 
 #region functions

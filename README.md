@@ -3,7 +3,7 @@
 [![Release][github-release-badge]][github-release]
 [![PowerShell Gallery][psgallery-downloads-badge]][poshgallery-evergreenadmx]
 [![Codacy][code-quality-badge]][code-quality]
-[![Twitter][twitter-follow-badge]][twitter-follow]
+[![X][x-follow-badge]][x-follow]
 
 After deploying several Azure Virtual Desktop environments I decided I no
 longer wanted to manually download the Admx files I needed, and I wanted a
@@ -34,8 +34,9 @@ You can also install the script from the PowerShell Gallery
 Install-Script -Name EvergreenAdmx
 ```
 
-If you wish to run a scheduled task on a daily basis, you can import the
-sample XML file in Task Scheduler provided with this script.
+To register a weekly scheduled task (Sunday at 01:00, runs as SYSTEM), use
+`-CreateScheduledTask`. Bound parameters are forwarded to the task; the
+script exits after registration and does not download Admx files in that run.
 
 ### 💡 Examples
 
@@ -92,6 +93,17 @@ Keep a locally installed OneDrive build when processing OneDrive ADMX:
 
 ```powershell
 .\EvergreenAdmx.ps1 -Include @('Microsoft OneDrive') -PreferLocalOneDrive
+```
+
+Create or update a weekly SYSTEM scheduled task that refreshes the Central
+Store (exits after registration):
+
+```powershell
+.\EvergreenAdmx.ps1 `
+  -PolicyStore "C:\Windows\SYSVOL\domain\Policies\PolicyDefinitions" `
+  -Languages @('en-US', 'nl-NL') `
+  -UseProductFolders `
+  -CreateScheduledTask
 ```
 
 ## ⚙️ Parameters
@@ -239,6 +251,16 @@ Microsoft OneDrive Admx files are only available after installing OneDrive.
 If this script is running on a machine that has OneDrive installed locally,
 use this switch to prevent automatically uninstalling OneDrive.
 
+### 🗓️ -CreateScheduledTask
+
+Creates or updates a Windows Scheduled Task named `EvergreenAdmx` that runs
+this script weekly (Sunday at 01:00) as `SYSTEM` with highest privileges.
+Compatible with Windows Server 2022 and 2025 via `Register-ScheduledTask`.
+
+Other parameters bound on the same command line are forwarded to the task
+action. The script exits after registering the task and does not download
+Admx files in that run.
+
 ## ⚠️ Breaking changes
 
 See the [Change Log][change-log] for the full history. Highlights in
@@ -285,10 +307,8 @@ Thank you [Dan Gough][dan-gough] for the `Get-Link`, `Get-Version`, and
 [psgallery-downloads-badge]: https://img.shields.io/powershellgallery/dt/EvergreenAdmx.svg?style=flat-square
 [code-quality-badge]: https://app.codacy.com/project/badge/Grade/c0efab02b66442399bb16b0493cdfbef?style=flat-square
 [code-quality]: https://www.codacy.com/gh/msfreaks/EvergreenAdmx/dashboard?utm_source=github.com&utm_medium=referral&utm_content=msfreaks/EvergreenAdmx&utm_campaign=Badge_Grade
-[twitter-follow-badge]: https://img.shields.io/twitter/follow/menschab?style=flat-square
-[twitter-follow]: https://x.com/menschab?ref_src=twsrc%5Etfw
-[twitter-follow-jonathan-badge]: https://img.shields.io/twitter/follow/JonathanPitre?style=flat-square
-[twitter-follow-jonathan]: https://x.com/JonathanPitre?ref_src=twsrc%5Etfw
+[x-follow-badge]: https://img.shields.io/twitter/follow/menschab?style=flat-square&logo=x
+[x-follow]: https://x.com/menschab
 [change-log]: https://github.com/msfreaks/EvergreenAdmx/blob/main/CHANGELOG.md
 [poshgallery-evergreenadmx]: https://www.powershellgallery.com/packages/EvergreenAdmx/
 [evergreen-module]: https://github.com/EUCPilots/evergreen-module

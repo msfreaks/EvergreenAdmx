@@ -11,6 +11,8 @@
 
 ## 2607.1
 
+- Added `-CreateScheduledTask` to create or update a weekly SYSTEM scheduled task (`EvergreenAdmx`, Sunday at 01:00) via `Register-ScheduledTask`; bound parameters are forwarded and the script exits after registration
+- Removed `EvergreenAdmx.xml` sample Task Scheduler export in favor of `-CreateScheduledTask`
 - Replaced `Invoke-WebRequest -OutFile` downloads with HttpClient-based `Invoke-FileDownload` (TLS 1.3 preferred, TLS 1.2 fallback) for faster, streamed downloads on PowerShell 5.1 [#39](https://github.com/msfreaks/EvergreenAdmx/issues/39)
 - Added Microsoft PowerToys ADMX [#75](https://github.com/msfreaks/EvergreenAdmx/issues/75)
 - Added Windows Terminal ADMX [#76](https://github.com/msfreaks/EvergreenAdmx/issues/76)
