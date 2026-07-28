@@ -7,7 +7,7 @@
 - Detect user domain automatically (Get code from PSADT)
 - Add ADMX versioning automatically, very useful for Intune
 
-## 2607.1
+## 2607.0
 
 - Added `-CleanPolicyStore` to remove known obsolete or conflicting Admx/Adml from `-PolicyStore` after processing (WinStoreUI, legacy Office `*12*`–`*15*`, Adobe Classic 2017/2020, `ctxprofile*`, non-policy junk files/folders)
 - Added `-CleanPolicyStoreOnly` to run Policy Store cleanup without downloading Admx files

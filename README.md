@@ -310,7 +310,7 @@ Admx files in that run.
 ## ⚠️ Breaking changes
 
 See the [Change Log][change-log] for the full history. Highlights in
-**2607.1**:
+**2607.0**:
 
 - Removed Adobe Acrobat/Reader Classic 2017 and Classic 2020 tracks (EOL);
   Continuous track only
