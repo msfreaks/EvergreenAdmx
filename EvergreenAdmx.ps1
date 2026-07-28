@@ -1,7 +1,4 @@
-﻿#Requires -RunAsAdministrator
-
-#region init
-<#PSScriptInfo
+﻿<#PSScriptInfo
 
 .VERSION 2607.1
 
@@ -9,18 +6,39 @@
 
 .AUTHOR Arjan Mensch & Jonathan Pitre
 
+.COMPANYNAME
+
+.COPYRIGHT
+
 .TAGS GroupPolicy GPO Admx Evergreen Automation
 
 .LICENSEURI https://github.com/msfreaks/EvergreenAdmx/blob/main/LICENSE
 
+.PROJECTURI https://github.com/msfreaks/EvergreenAdmx
+
+.ICONURI
+
+.EXTERNALMODULEDEPENDENCIES
+
+.REQUIREDSCRIPTS
+
+.EXTERNALSCRIPTDEPENDENCIES
+
+.RELEASENOTES
+
+.PRIVATEDATA
+
 #>
+
+#Requires -Version 5.1
+#Requires -RunAsAdministrator
 
 <#
 .SYNOPSIS
-    Script to automatically download latest Admx files for several products.
+    Downloads the latest Admx files for several products.
 
 .DESCRIPTION
-    Script to automatically download latest Admx files for several products.
+    Automatically downloads the latest Admx files for several products.
     Optionally copies the latest Admx files to a folder of your choosing, for example a Policy Store.
 
 .PARAMETER WindowsVersion
@@ -59,12 +77,21 @@
 
 .PARAMETER Include
     Array containing Admx products to include when checking for updates.
-    Valid values are: "Windows 10", "Windows 11", "Windows 2022", "Windows 2025", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "Adobe DC", "BIS-F", "Citrix Workspace App", "Google Chrome", "Mozilla Firefox", "Mozilla Thunderbird", "Zoom", "Zoom VDI", "Microsoft AVD", "Microsoft Winget", "Microsoft PowerToys", "Windows Terminal", "Brave Browser", "Microsoft Notepad", "Microsoft Clipchamp", "Microsoft Visual Studio", "Microsoft VS Code", "Slack", "1Password", "TeamViewer", "Security ADMX", "Dell Command Update", "Winget-AutoUpdate", "Winget-AutoUpdate-Intune", "PSAppDeployToolkit", "Devolutions Remote Desktop Manager", "Dropbox", "Foxit PDF", "LibreOffice", "HP Anyware".
+    Valid values are: "Windows 10", "Windows 11", "Windows 2022", "Windows 2025", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "Adobe DC", "BIS-F", "Citrix Workspace App", "Google Chrome", "Mozilla Firefox", "Mozilla Thunderbird", "Zoom", "Zoom VDI", "Microsoft AVD", "Microsoft Winget", "Microsoft PowerToys", "Windows Terminal", "Brave Browser", "Microsoft Notepad", "Microsoft Clipchamp", "Microsoft Visual Studio", "Microsoft VS Code", "Slack", "1Password", "TeamViewer", "Security ADMX", "Schannel", "Dell Command Update", "Winget-AutoUpdate", "Winget-AutoUpdate-Intune", "PSAppDeployToolkit", "Devolutions Remote Desktop Manager", "Dropbox", "Foxit PDF", "LibreOffice", "HP Anyware".
     Defaults to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft Clipchamp", "Microsoft Notepad", "Microsoft Winget", "Windows Terminal".
 
 .PARAMETER PreferLocalOneDrive
     Microsoft OneDrive Admx files are only available after installing OneDrive.
     If this script is running on a machine that has OneDrive installed locally, use this switch to prevent automatically uninstalling OneDrive.
+
+.PARAMETER CleanPolicyStore
+    After processing, remove known obsolete or conflicting Admx/Adml files from -PolicyStore
+    (WinStoreUI, legacy Office *12-*15, Adobe Classic 2017/2020, ctxprofile*, non-policy junk).
+    Requires -PolicyStore. Supports -WhatIf.
+
+.PARAMETER CleanPolicyStoreOnly
+    Skip downloads and only clean -PolicyStore using the same obsolete-file rules as -CleanPolicyStore.
+    Requires -PolicyStore. Supports -WhatIf.
 
 .PARAMETER CreateScheduledTask
     Creates or updates a weekly Windows Scheduled Task named EvergreenAdmx that runs this script
@@ -96,6 +123,16 @@
 
     Creates or updates a weekly SYSTEM scheduled task named EvergreenAdmx that runs this script with the bound parameters (Sunday at 01:00), then exits.
 
+.EXAMPLE
+    .\EvergreenAdmx.ps1 -PolicyStore "\\contoso.com\SYSVOL\contoso.com\Policies\PolicyDefinitions" -Include @('Windows 11', 'Microsoft Edge') -CleanPolicyStore
+
+    Downloads the specified products, copies them to the Central Policy Store (creating it if missing), then removes known obsolete Admx files.
+
+.EXAMPLE
+    .\EvergreenAdmx.ps1 -PolicyStore "\\contoso.com\SYSVOL\contoso.com\Policies\PolicyDefinitions" -CleanPolicyStoreOnly -WhatIf
+
+    Shows which obsolete Admx/Adml files would be removed from the Central Policy Store without deleting anything.
+
 .LINK
     https://github.com/msfreaks/EvergreenAdmx
 
@@ -104,9 +141,9 @@
 
 #>
 
-[CmdletBinding()]
+[CmdletBinding(SupportsShouldProcess = $true)]
 param(
-    [Parameter(Mandatory = $False, Position = 0)]
+    [Parameter(Mandatory = $false, Position = 0)]
     [ValidateSet('10', '11', '2022', '2025')]
     [System.String] $WindowsVersion = '11',
     [Alias('WindowsFeatureEdition')]
@@ -118,21 +155,25 @@ param(
             default { '25H2' }
         }
     ),
-    [Parameter(Mandatory = $False)]
+    [Parameter(Mandatory = $false)]
     [System.String] $WorkingDirectory,
-    [Parameter(Mandatory = $False)]
+    [Parameter(Mandatory = $false)]
     [System.String] $PolicyStore = $null,
-    [Parameter(Mandatory = $False)]
+    [Parameter(Mandatory = $false)]
     [System.String[]] $Languages = @('en-US'),
-    [Parameter(Mandatory = $False)]
+    [Parameter(Mandatory = $false)]
     [switch] $UseProductFolders,
-    [Parameter(Mandatory = $False)]
+    [Parameter(Mandatory = $false)]
     [System.String] $CustomPolicyStore = $null,
-    [Parameter(Mandatory = $False)]
+    [Parameter(Mandatory = $false)]
     [switch] $PreferLocalOneDrive,
-    [Parameter(Mandatory = $False)]
+    [Parameter(Mandatory = $false)]
+    [switch] $CleanPolicyStore,
+    [Parameter(Mandatory = $false)]
+    [switch] $CleanPolicyStoreOnly,
+    [Parameter(Mandatory = $false)]
     [switch] $CreateScheduledTask,
-    [ValidateSet('Custom Policy Store', 'Windows 10', 'Windows 11', 'Windows 2022', 'Windows 2025', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft FSLogix', 'Adobe Acrobat', 'Adobe Reader', 'Adobe DC', 'BIS-F', 'Citrix Workspace App', 'Google Chrome', 'Mozilla Firefox', 'Mozilla Thunderbird', 'Zoom', 'Zoom VDI', 'Microsoft AVD', 'Microsoft Winget', 'Microsoft PowerToys', 'Windows Terminal', 'Brave Browser', 'Microsoft Notepad', 'Microsoft Clipchamp', 'Microsoft Visual Studio', 'Microsoft VS Code', 'Slack', '1Password', 'TeamViewer', 'Security ADMX', 'Dell Command Update', 'Winget-AutoUpdate', 'Winget-AutoUpdate-Intune', 'PSAppDeployToolkit', 'Devolutions Remote Desktop Manager', 'Dropbox', 'Foxit PDF', 'LibreOffice', 'HP Anyware')]
+    [ValidateSet('Custom Policy Store', 'Windows 10', 'Windows 11', 'Windows 2022', 'Windows 2025', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft FSLogix', 'Adobe Acrobat', 'Adobe Reader', 'Adobe DC', 'BIS-F', 'Citrix Workspace App', 'Google Chrome', 'Mozilla Firefox', 'Mozilla Thunderbird', 'Zoom', 'Zoom VDI', 'Microsoft AVD', 'Microsoft Winget', 'Microsoft PowerToys', 'Windows Terminal', 'Brave Browser', 'Microsoft Notepad', 'Microsoft Clipchamp', 'Microsoft Visual Studio', 'Microsoft VS Code', 'Slack', '1Password', 'TeamViewer', 'Security ADMX', 'Schannel', 'Dell Command Update', 'Winget-AutoUpdate', 'Winget-AutoUpdate-Intune', 'PSAppDeployToolkit', 'Devolutions Remote Desktop Manager', 'Dropbox', 'Foxit PDF', 'LibreOffice', 'HP Anyware')]
     [System.String[]] $Include = $(
         switch ($WindowsVersion) {
             '10' { @('Windows 10', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft Clipchamp', 'Microsoft Notepad', 'Microsoft Winget', 'Windows Terminal') }
@@ -143,6 +184,8 @@ param(
         }
     )
 )
+
+#region init
 
 # Validate feature version based on Windows version
 if ($WindowsVersion -eq '2022' -and ($PSBoundParameters.ContainsKey('WindowsFeatureVersion'))) {
@@ -160,6 +203,10 @@ if (Test-Path -Path "$($WorkingDirectory)\AdmxVersions.xml") { $AdmxVersions = I
 if ($null -eq $AdmxVersions) { $AdmxVersions = @{} }
 if (-not (Test-Path -Path "$($WorkingDirectory)\admx")) { $null = New-Item -Path "$($WorkingDirectory)\admx" -ItemType Directory -Force }
 if (-not (Test-Path -Path "$($WorkingDirectory)\downloads")) { $null = New-Item -Path "$($WorkingDirectory)\downloads" -ItemType Directory -Force }
+$PolicyStoreSpecified = $PSBoundParameters.ContainsKey('PolicyStore')
+if (($CleanPolicyStore -or $CleanPolicyStoreOnly) -and -not $PolicyStoreSpecified) {
+    throw '-CleanPolicyStore and -CleanPolicyStoreOnly require -PolicyStore.'
+}
 if ($PolicyStore -and -not $PolicyStore.EndsWith('\')) { $PolicyStore += '\' }
 elseif ($null -eq $PolicyStore) { $PolicyStore = $PWD }
 # Allow 'xx', 'xx-XX', and numeric region tags like 'es-419'
@@ -189,6 +236,8 @@ Write-Verbose "Admx path:`t`'$($WorkingDirectory)\admx'"
 Write-Verbose "Download path:`t`'$($WorkingDirectory)\downloads'"
 Write-Verbose "Included:`t`'$($Include -join ', ')'"
 Write-Verbose "PreferLocalOneDrive:`t'$($PreferLocalOneDrive)'"
+Write-Verbose "CleanPolicyStore:`t'$($CleanPolicyStore)'"
+Write-Verbose "CleanPolicyStoreOnly:`t'$($CleanPolicyStoreOnly)'"
 Write-Verbose "CreateScheduledTask:`t'$($CreateScheduledTask)'"
 
     function New-EvergreenAdmxTaskArgumentList {
@@ -799,6 +848,141 @@ function Copy-Admx {
             Copy-Item -Path "$($SourceFolder)\$($language)\*.adml" -Destination "$($PolicyStore)$($language)" -Force
         }
     }
+}
+
+function Get-EvergreenAdmxObsoleteFilePatterns {
+    <#
+    .SYNOPSIS
+        Returns file name patterns for obsolete or conflicting Policy Store Admx/Adml files.
+    #>
+    [CmdletBinding()]
+    [OutputType([string[]])]
+    param()
+
+    return @(
+        'WinStoreUI.admx'
+        'WinStoreUI.adml'
+        '*12*.admx'
+        '*12*.adml'
+        '*13*.admx'
+        '*13*.adml'
+        '*14*.admx'
+        '*14*.adml'
+        '*15*.admx'
+        '*15*.adml'
+        'Acrobat2017.admx'
+        'Acrobat2017.adml'
+        'AcrobatReader2017.admx'
+        'AcrobatReader2017.adml'
+        'Acrobat2020.admx'
+        'Acrobat2020.adml'
+        'AcrobatReader2020.admx'
+        'AcrobatReader2020.adml'
+        'ctxprofile*.admx'
+        'ctxprofile*.adml'
+    )
+}
+
+function Initialize-PolicyStore {
+    <#
+    .SYNOPSIS
+        Creates a Central Policy Store folder and language subfolders when missing.
+    #>
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$PolicyStore,
+        [Parameter(Mandatory = $false)]
+        [string[]]$Languages = @('en-US')
+    )
+
+    if (-not $Languages -or $Languages -eq '') { $Languages = @('en-US') }
+
+    $store = $PolicyStore.TrimEnd('\')
+    if (-not (Test-Path -LiteralPath $store)) {
+        if ($PSCmdlet.ShouldProcess($store, 'Create Policy Store directory')) {
+            Write-Verbose "Creating Policy Store '$store'"
+            $null = New-Item -Path $store -ItemType Directory -Force
+        }
+    }
+
+    foreach ($language in $Languages) {
+        $languagePath = Join-Path -Path $store -ChildPath $language
+        if (-not (Test-Path -LiteralPath $languagePath)) {
+            if ($PSCmdlet.ShouldProcess($languagePath, 'Create Policy Store language folder')) {
+                Write-Verbose "Creating Policy Store language folder '$languagePath'"
+                $null = New-Item -Path $languagePath -ItemType Directory -Force
+            }
+        }
+    }
+}
+
+function Clear-ObsoleteAdmx {
+    <#
+    .SYNOPSIS
+        Removes known obsolete or conflicting Admx/Adml files from a Policy Store.
+    #>
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    [OutputType([string[]])]
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$PolicyStore,
+        [Parameter(Mandatory = $false)]
+        [string[]]$Languages = @('en-US')
+    )
+
+    if (-not $Languages -or $Languages -eq '') { $Languages = @('en-US') }
+
+    $store = $PolicyStore.TrimEnd('\')
+    if (-not (Test-Path -LiteralPath $store)) {
+        Write-Verbose "Policy Store '$store' does not exist; nothing to clean."
+        return @()
+    }
+
+    $removed = [System.Collections.Generic.List[string]]::new()
+    $patterns = Get-EvergreenAdmxObsoleteFilePatterns
+    $languagePattern = '^([A-Za-z]{2})(-([A-Za-z]{2}|\d{3}))?$'
+
+    $obsoleteFiles = @(
+        Get-ChildItem -Path $store -Recurse -File -Include $patterns -ErrorAction SilentlyContinue
+    )
+    foreach ($file in $obsoleteFiles) {
+        if ($PSCmdlet.ShouldProcess($file.FullName, 'Remove obsolete policy definition file')) {
+            Write-Verbose "Removing obsolete file '$($file.FullName)'"
+            Remove-Item -LiteralPath $file.FullName -Force
+            $removed.Add($file.FullName)
+        }
+    }
+
+    $junkFiles = @(
+        Get-ChildItem -LiteralPath $store -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension -notin @('.admx', '.adml') }
+    )
+    foreach ($file in $junkFiles) {
+        if ($PSCmdlet.ShouldProcess($file.FullName, 'Remove non-policy file from Policy Store')) {
+            Write-Verbose "Removing non-policy file '$($file.FullName)'"
+            Remove-Item -LiteralPath $file.FullName -Force
+            $removed.Add($file.FullName)
+        }
+    }
+
+    $junkFolders = @(
+        Get-ChildItem -LiteralPath $store -Directory -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.Name -notmatch $languagePattern -and
+                ($Languages -notcontains $_.Name)
+            }
+    )
+    foreach ($folder in $junkFolders) {
+        if ($PSCmdlet.ShouldProcess($folder.FullName, 'Remove non-language folder from Policy Store')) {
+            Write-Verbose "Removing non-language folder '$($folder.FullName)'"
+            Remove-Item -LiteralPath $folder.FullName -Recurse -Force
+            $removed.Add($folder.FullName)
+        }
+    }
+
+    Write-Verbose "Policy Store cleanup removed $($removed.Count) item(s)"
+    return $removed.ToArray()
 }
 
 # Get-EvergreenAdmx functions
@@ -2104,6 +2288,77 @@ function Invoke-EvergreenAdmxSecurityAdmx {
         }
     } else {
         # version already processed
+        return $null
+    }
+}
+
+function Get-EvergreenAdmxSchannel {
+    <#
+    .SYNOPSIS
+        Returns latest Version and Uri for Schannel ADMX files
+    #>
+
+    try {
+        $repo = 'Crosse/SchannelGroupPolicy'
+        $latestCommit = Invoke-RestMethod -Uri "https://api.github.com/repos/$($repo)/commits/master" -UseBasicParsing
+
+        $Version = $latestCommit.sha.Substring(0, 7)
+        $URI = "https://github.com/$($repo)/archive/refs/heads/master.zip"
+
+        return @{ Version = $Version; URI = $URI }
+    } catch {
+        Throw $_
+    }
+}
+
+function Invoke-EvergreenAdmxSchannel {
+    <#
+    .SYNOPSIS
+        Process Schannel Admx files
+
+    .PARAMETER Version
+        Current Version present
+
+    .PARAMETER PolicyStore
+        Destination for the Admx files
+    #>
+
+    param(
+        [string]$Version,
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
+    )
+
+    $Evergreen = Get-EvergreenAdmxSchannel
+    $ProductName = 'Schannel'
+    $ProductFolder = ''; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
+
+    if (-not $Version -or $Evergreen.Version -ne $Version) {
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
+
+        $OutFile = "$($WorkingDirectory)\downloads\SchannelGroupPolicy-master.zip"
+        try {
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+            Invoke-FileDownload -Uri $Evergreen.URI -OutFile $OutFile -UseDefaultCredentials
+
+            Write-Verbose "Extracting '$($OutFile)' to '$($env:TEMP)\$($ProductName)'"
+            $TempFolder = "$($env:TEMP)\$($ProductName)"
+            Expand-Archive -Path $OutFile -DestinationPath $TempFolder -Force
+
+            $SourceAdmx = (Get-ChildItem -Path $TempFolder -Recurse -Directory -Filter 'template' | Select-Object -First 1).FullName
+            if (-not $SourceAdmx) {
+                throw "Unable to locate 'template' folder in Schannel Group Policy archive."
+            }
+
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+
+            Remove-Item -Path $TempFolder -Recurse -Force
+            return $Evergreen
+        } catch {
+            Throw $_
+        }
+    } else {
         return $null
     }
 }
@@ -4226,6 +4481,18 @@ function Update-AdmxVersion {
 #endregion
 
 #region execution
+# Ensure Central Policy Store exists when explicitly requested
+if ($PolicyStoreSpecified) {
+    Initialize-PolicyStore -PolicyStore $PolicyStore -Languages $Languages
+}
+
+# Cleanup-only mode skips downloads
+if ($CleanPolicyStoreOnly) {
+    Write-Verbose "`nCleanPolicyStoreOnly: skipping Admx downloads"
+    $null = Clear-ObsoleteAdmx -PolicyStore $PolicyStore -Languages $Languages
+    return
+}
+
 # Custom Policy Store
 if ($Include -notcontains 'Custom Policy Store') {
     Write-Verbose "`nSkipping Custom Policy Store"
@@ -4510,6 +4777,15 @@ if ($Include -notcontains 'Security ADMX') {
     Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'SecurityAdmx' -AdmxData $admx
 }
 
+# Schannel
+if ($Include -notcontains 'Schannel') {
+    Write-Verbose "`nSkipping Schannel"
+} else {
+    Write-Verbose "`nProcessing Admx files for Schannel"
+    $admx = Invoke-EvergreenAdmxSchannel -Version $AdmxVersions.Schannel.Version -PolicyStore $PolicyStore -Languages $Languages
+    Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'Schannel' -AdmxData $admx
+}
+
 # Dell Command Update
 if ($Include -notcontains 'Dell Command Update') {
     Write-Verbose "`nSkipping Dell Command Update"
@@ -4616,6 +4892,11 @@ if ($Include -notcontains 'HP Anyware') {
     Write-Verbose "`nProcessing Admx files for HP Anyware"
     $admx = Invoke-EvergreenAdmxHPAnyware -Version $AdmxVersions.HPAnyware.Version -PolicyStore $PolicyStore -Languages $Languages
     Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'HPAnyware' -AdmxData $admx
+}
+
+if ($CleanPolicyStore -and $PolicyStoreSpecified) {
+    Write-Verbose "`nCleaning obsolete Admx files from Policy Store '$($PolicyStore)'"
+    $null = Clear-ObsoleteAdmx -PolicyStore $PolicyStore -Languages $Languages
 }
 
 Write-Verbose "`nSaving Admx versions to '$($WorkingDirectory)\AdmxVersions.xml'"

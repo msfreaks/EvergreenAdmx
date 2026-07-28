@@ -106,6 +106,27 @@ Store (exits after registration):
   -CreateScheduledTask
 ```
 
+Download products to the Central Store and remove known obsolete Admx files:
+
+```powershell
+.\EvergreenAdmx.ps1 `
+  -PolicyStore "\\contoso.com\SYSVOL\contoso.com\Policies\PolicyDefinitions" `
+  -Include @('Windows 11', 'Microsoft Edge', 'Schannel') `
+  -CleanPolicyStore
+```
+
+Preview obsolete-file cleanup without downloading or deleting:
+
+```powershell
+.\EvergreenAdmx.ps1 `
+  -PolicyStore "\\contoso.com\SYSVOL\contoso.com\Policies\PolicyDefinitions" `
+  -CleanPolicyStoreOnly `
+  -WhatIf
+```
+
+A thin VDI-style orchestrator example (params + optional custom zips) lives in
+[`samples/Update-PolicyDefinitions.ps1`](samples/Update-PolicyDefinitions.ps1).
+
 ## ⚙️ Parameters
 
 Pass parameters with a leading `-` (PowerShell syntax), for example
@@ -154,6 +175,8 @@ Defaults to the current script location.
 ### 🏪 -PolicyStore
 
 Specifies a Policy Store location to copy the Admx files to after processing.
+When this path does not exist, the script creates the Policy Store directory
+and language subfolders from `-Languages`.
 
 ### 🌐 -Languages
 
@@ -176,6 +199,9 @@ Specifies a location for custom policy files (UNC or local folder).
   (any `.admx` or `.adml`)
 - If any file has changed, the script processes all files found in the
   location
+
+Use this for one-off templates (for example Microsoft Defender for Endpoint
+zips you host yourself) that are not first-class `-Include` products.
 
 ### ✅ -Include
 
@@ -229,6 +255,7 @@ Below are all valid values you can use with `-Include`. Each links to the respec
 - [`Mozilla Firefox`][ref-firefox]
 - [`Mozilla Thunderbird`][ref-thunderbird]
 - [`PSAppDeployToolkit`][ref-psadt]
+- [`Schannel`][ref-schannel] (Crosse Schannel Group Policy templates)
 - [`Security ADMX`][ref-security-admx] (Custom template for Windows hardening)
 - [`Slack`][ref-slack]
 - [`TeamViewer`][ref-teamviewer]
@@ -251,6 +278,24 @@ Below are all valid values you can use with `-Include`. Each links to the respec
 Microsoft OneDrive Admx files are only available after installing OneDrive.
 If this script is running on a machine that has OneDrive installed locally,
 use this switch to prevent automatically uninstalling OneDrive.
+
+### 🧹 -CleanPolicyStore
+
+After processing, removes known obsolete or conflicting files from
+`-PolicyStore`:
+
+- `WinStoreUI.admx` / `.adml` (known Group Policy conflict)
+- Legacy Office templates matching `*12*`–`*15*`
+- Adobe Acrobat/Reader Classic 2017 and 2020 templates
+- Citrix Profile Management `ctxprofile*` templates
+- Non-`.admx`/`.adml` files at the store root and non-language extract folders
+
+Requires `-PolicyStore`. Supports `-WhatIf`.
+
+### 🧹 -CleanPolicyStoreOnly
+
+Skips Admx downloads and only runs the Policy Store cleanup described above.
+Requires `-PolicyStore`. Supports `-WhatIf`.
 
 ### 🗓️ -CreateScheduledTask
 
@@ -355,6 +400,7 @@ Thank you [Dan Gough][dan-gough] for the `Get-Link`, `Get-Version`, and
 [ref-winget]: https://github.com/microsoft/winget-cli/releases
 [ref-firefox]: https://github.com/mozilla/policy-templates
 [ref-psadt]: https://github.com/PSAppDeployToolkit/PSAppDeployToolkit
+[ref-schannel]: https://github.com/Crosse/SchannelGroupPolicy
 [ref-security-admx]: https://github.com/Harvester57/Security-ADMX
 [ref-slack]: https://slack.com/help/articles/11906214948755-Manage-desktop-app-configurations
 [ref-teamviewer]: https://github.com/systmworks/TeamViewer-ADMX

@@ -5,13 +5,17 @@
 - Add logging options (yep, since the beginning)
 - Add notification options (yep, also since the beginning)
 - Detect user domain automatically (Get code from PSADT)
-- Add parameter to create Central Policy Store location
-- Add parameter to clean old Office ADMX from Central Policy Store location
-- Add parameter to clean old Adobe Reader ADMX from Central Policy Store location
 - Add ADMX versioning automatically, very useful for Intune
 
 ## 2607.1
 
+- Added `-CleanPolicyStore` to remove known obsolete or conflicting Admx/Adml from `-PolicyStore` after processing (WinStoreUI, legacy Office `*12*`–`*15*`, Adobe Classic 2017/2020, `ctxprofile*`, non-policy junk files/folders)
+- Added `-CleanPolicyStoreOnly` to run Policy Store cleanup without downloading Admx files
+- Creates the Central Policy Store and language folders when `-PolicyStore` is set and the path is missing
+- Added Schannel ADMX support via [Crosse/SchannelGroupPolicy](https://github.com/Crosse/SchannelGroupPolicy) (`-Include 'Schannel'`)
+- Script now supports `-WhatIf` for Policy Store create/cleanup operations
+- Added sample thin orchestrator at `samples/Update-PolicyDefinitions.ps1`
+- Added Pester coverage for obsolete file patterns, `Initialize-PolicyStore`, and `Clear-ObsoleteAdmx` (including `-WhatIf`)
 - Added `-CreateScheduledTask` to create or update a weekly SYSTEM scheduled task (`EvergreenAdmx`, Sunday at 01:00) via `Register-ScheduledTask`; bound parameters are forwarded and the script exits after registration
 - Extracted `New-EvergreenAdmxTaskArgumentList` for scheduled-task argument building (testable without registering a task)
 - Added Pester unit / Integration / Nightly suites under `tests/` and GitHub Actions workflows (`ci.yml`, `release-smoke.yml`, `nightly.yml`)
