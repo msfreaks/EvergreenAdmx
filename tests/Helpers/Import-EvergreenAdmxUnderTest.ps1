@@ -20,7 +20,7 @@ function Get-EvergreenAdmxScriptPath {
 
 function Get-EvergreenAdmxFunctionTexts {
     [CmdletBinding()]
-    [OutputType([string[]])]
+    [OutputType([System.Object[]])]
     param(
         [Parameter()]
         [string] $ScriptPath = (Get-EvergreenAdmxScriptPath)
@@ -42,10 +42,9 @@ function Get-EvergreenAdmxFunctionTexts {
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst]
         }, $true)
 
-    [string[]]$functionTexts = @(
+    return @(
         $functionAsts | ForEach-Object { $_.Extent.Text }
     )
-    return $functionTexts
 }
 
 function Import-EvergreenAdmxUnderTest {
@@ -72,7 +71,7 @@ function Import-EvergreenAdmxUnderTest {
 
 function Get-EvergreenAdmxIncludeValidateSet {
     [CmdletBinding()]
-    [OutputType([string[]])]
+    [OutputType([System.Object[]])]
     param(
         [Parameter()]
         [string] $ScriptPath = (Get-EvergreenAdmxScriptPath)
