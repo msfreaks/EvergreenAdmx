@@ -48,3 +48,16 @@ Invoke-Pester -Configuration $config
 ```
 
 Set `EVERGREENADMX_INCLUDE_BISF=1` to include BIS-F in the nightly matrix (often 403 without GitHub auth).
+
+## Linting
+
+CI runs markdownlint and PSScriptAnalyzer on every PR / push (`ci.yml`). Locally:
+
+```powershell
+# PowerShell (requires PSScriptAnalyzer module)
+Invoke-ScriptAnalyzer -Path .\EvergreenAdmx.ps1 -Settings .\PSScriptAnalyzerSettings.psd1
+Invoke-ScriptAnalyzer -Path .\tests -Recurse -Settings .\PSScriptAnalyzerSettings.psd1
+
+# Markdown (requires Node / npx)
+npx markdownlint-cli2 "**/*.md"
+```

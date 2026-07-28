@@ -10,6 +10,18 @@ permissions:
   contents: read
 
 jobs:
+  lint-markdown:
+    name: Markdownlint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: markdownlint-cli2
+        uses: DavidAnson/markdownlint-cli2-action@v24
+        with:
+          globs: '**/*.md'
+
   analyze-and-unit-test:
     name: PSScriptAnalyzer + Unit tests
     runs-on: windows-latest
@@ -27,7 +39,10 @@ jobs:
       - name: PSScriptAnalyzer
         shell: pwsh
         run: |
-          $results = Invoke-ScriptAnalyzer -Path .\EvergreenAdmx.ps1 -Severity @('Error', 'Warning') -Recurse:$false
+          $paths = @('.\EvergreenAdmx.ps1', '.\tests')
+          $results = foreach ($path in $paths) {
+            Invoke-ScriptAnalyzer -Path $path -Settings .\PSScriptAnalyzerSettings.psd1 -Recurse -Severity @('Error', 'Warning')
+          }
           if ($results) {
             $results | Format-Table -AutoSize | Out-String | Write-Host
             $errors = @($results | Where-Object Severity -eq 'Error')
