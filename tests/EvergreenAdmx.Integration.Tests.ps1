@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-# Integration smoke — small real download. Tag: Integration
+# Integration smoke - small real download. Tag: Integration
 # Run elevated (EvergreenAdmx.ps1 requires Administrator).
 
 BeforeAll {

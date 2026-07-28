@@ -1,5 +1,5 @@
 #Requires -Version 5.1
-# Unit tests — no downloads, no admin required.
+# Unit tests - no downloads, no admin required.
 
 BeforeAll {
     . (Join-Path -Path $PSScriptRoot -ChildPath 'Helpers\Import-EvergreenAdmxUnderTest.ps1')
