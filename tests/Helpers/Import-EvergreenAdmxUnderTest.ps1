@@ -42,9 +42,10 @@ function Get-EvergreenAdmxFunctionTexts {
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst]
         }, $true)
 
-    return @(
+    [string[]]$functionTexts = @(
         $functionAsts | ForEach-Object { $_.Extent.Text }
     )
+    return $functionTexts
 }
 
 function Import-EvergreenAdmxUnderTest {
@@ -56,6 +57,7 @@ function Import-EvergreenAdmxUnderTest {
         or by dot-sourcing each text from Get-EvergreenAdmxFunctionTexts in BeforeAll.
     #>
     [CmdletBinding()]
+    [OutputType([string])]
     param(
         [Parameter()]
         [string] $ScriptPath = (Get-EvergreenAdmxScriptPath)

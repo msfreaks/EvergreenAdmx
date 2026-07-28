@@ -72,11 +72,11 @@ Describe 'CreateScheduledTask registration' -Tag 'Integration' {
         $task.Principal.UserId | Should -Match 'SYSTEM'
         $task.Principal.RunLevel | Should -Be 'Highest'
 
-        $args = $task.Actions.Arguments
-        $args | Should -Match 'en-US'
-        $args | Should -Match 'fr-FR'
-        $args | Should -Match 'Microsoft Edge'
-        $args | Should -Not -Match 'CreateScheduledTask'
+        $taskArgs = $task.Actions.Arguments
+        $taskArgs | Should -Match 'en-US'
+        $taskArgs | Should -Match 'fr-FR'
+        $taskArgs | Should -Match 'Microsoft Edge'
+        $taskArgs | Should -Not -Match 'CreateScheduledTask'
 
         $trigger = $task.Triggers | Select-Object -First 1
         $trigger.CimClass.CimClassName | Should -Be 'MSFT_TaskWeeklyTrigger'

@@ -96,10 +96,10 @@ Describe 'New-EvergreenAdmxTaskArgumentList' {
     }
 
     It 'includes powershell host switches and -File path' {
-        $args = New-EvergreenAdmxTaskArgumentList -ScriptPath $script:FakeScript -BoundParameters @{}
-        ($args -join ' ') | Should -Match '-NoProfile'
-        ($args -join ' ') | Should -Match '-ExecutionPolicy Bypass'
-        ($args -join ' ') | Should -Match ([regex]::Escape("-File `"$script:FakeScript`""))
+        $taskArgs = New-EvergreenAdmxTaskArgumentList -ScriptPath $script:FakeScript -BoundParameters @{}
+        ($taskArgs -join ' ') | Should -Match '-NoProfile'
+        ($taskArgs -join ' ') | Should -Match '-ExecutionPolicy Bypass'
+        ($taskArgs -join ' ') | Should -Match ([regex]::Escape("-File `"$script:FakeScript`""))
     }
 
     It 'forwards bound parameters and omits CreateScheduledTask' {
