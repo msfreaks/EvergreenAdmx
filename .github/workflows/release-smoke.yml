@@ -1,0 +1,43 @@
+name: Release smoke
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration-smoke:
+    name: Integration smoke (Edge + scheduled task)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -MinimumVersion 5.5.0 -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck
+
+      - name: Pester Integration tests
+        shell: pwsh
+        run: |
+          $config = New-PesterConfiguration
+          $config.Run.Path = '.\tests\EvergreenAdmx.Integration.Tests.ps1'
+          $config.Run.Exit = $true
+          $config.Filter.Tag = @('Integration')
+          $config.TestResult.Enabled = $true
+          $config.TestResult.OutputPath = '.\tests\TestResults.Integration.xml'
+          $config.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $config
+
+      - name: Upload integration test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pester-integration-results
+          path: tests/TestResults.Integration.xml

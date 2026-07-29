@@ -1,0 +1,49 @@
+name: Nightly full matrix
+
+on:
+  schedule:
+    # Sundays 06:00 UTC
+    - cron: '0 6 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  full-matrix:
+    name: Full product matrix
+    runs-on: windows-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -MinimumVersion 5.5.0 -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck
+
+      - name: Pester Nightly tests
+        shell: pwsh
+        env:
+          # Unauthenticated GitHub zipball downloads for BIS-F often 403 in CI.
+          # Set to 1 after adding authenticated download support if desired.
+          EVERGREENADMX_INCLUDE_BISF: '0'
+        run: |
+          $config = New-PesterConfiguration
+          $config.Run.Path = '.\tests\EvergreenAdmx.Nightly.Tests.ps1'
+          $config.Run.Exit = $true
+          $config.Filter.Tag = @('Nightly')
+          $config.TestResult.Enabled = $true
+          $config.TestResult.OutputPath = '.\tests\TestResults.Nightly.xml'
+          $config.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $config
+
+      - name: Upload nightly test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pester-nightly-results
+          path: |
+            tests/TestResults.Nightly.xml
