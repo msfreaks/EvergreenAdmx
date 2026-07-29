@@ -288,6 +288,7 @@ After processing, removes known obsolete or conflicting files from
 - Legacy Office templates matching `*12*`–`*15*`
 - Adobe Acrobat/Reader Classic 2017 and 2020 templates
 - Citrix Profile Management `ctxprofile*` templates
+- `CitrixBase.admx` / `.adml` (no longer required; see [CTX696338](https://support.citrix.com/external/article/CTX696338/citrix-workspace-app-admx-download-does.html))
 - Non-`.admx`/`.adml` files at the store root and non-language extract folders
 
 Requires `-PolicyStore`. Supports `-WhatIf`.
@@ -310,7 +311,7 @@ Admx files in that run.
 ## ⚠️ Breaking changes
 
 See the [Change Log][change-log] for the full history. Highlights in
-**2607.0**:
+**2607.1**:
 
 - Removed Adobe Acrobat/Reader Classic 2017 and Classic 2020 tracks (EOL);
   Continuous track only

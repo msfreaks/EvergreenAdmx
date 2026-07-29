@@ -1,6 +1,6 @@
 ﻿<#PSScriptInfo
 
-.VERSION 2607.0
+.VERSION 2607.1
 
 .GUID 999952b7-1337-4018-a1b9-499fad48e734
 
@@ -86,7 +86,7 @@
 
 .PARAMETER CleanPolicyStore
     After processing, remove known obsolete or conflicting Admx/Adml files from -PolicyStore
-    (WinStoreUI, legacy Office *12-*15, Adobe Classic 2017/2020, ctxprofile*, non-policy junk).
+    (WinStoreUI, legacy Office *12-*15, Adobe Classic 2017/2020, ctxprofile*, CitrixBase, non-policy junk).
     Requires -PolicyStore. Supports -WhatIf.
 
 .PARAMETER CleanPolicyStoreOnly
@@ -880,6 +880,8 @@ function Get-EvergreenAdmxObsoleteFilePatterns {
         'AcrobatReader2020.adml'
         'ctxprofile*.admx'
         'ctxprofile*.adml'
+        'CitrixBase.admx'
+        'CitrixBase.adml'
     )
 }
 

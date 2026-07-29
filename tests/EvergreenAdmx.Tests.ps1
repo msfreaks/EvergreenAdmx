@@ -170,7 +170,7 @@ Describe 'Include ValidateSet' {
 }
 
 Describe 'Get-EvergreenAdmxObsoleteFilePatterns' {
-    It 'includes WinStoreUI, legacy Office, Adobe Classic, and ctxprofile patterns' {
+    It 'includes WinStoreUI, legacy Office, Adobe Classic, ctxprofile, and CitrixBase patterns' {
         $patterns = Get-EvergreenAdmxObsoleteFilePatterns
         $patterns | Should -Contain 'WinStoreUI.admx'
         $patterns | Should -Contain 'WinStoreUI.adml'
@@ -179,6 +179,8 @@ Describe 'Get-EvergreenAdmxObsoleteFilePatterns' {
         $patterns | Should -Contain 'Acrobat2017.admx'
         $patterns | Should -Contain 'AcrobatReader2020.adml'
         $patterns | Should -Contain 'ctxprofile*.admx'
+        $patterns | Should -Contain 'CitrixBase.admx'
+        $patterns | Should -Contain 'CitrixBase.adml'
     }
 }
 
@@ -226,6 +228,8 @@ Describe 'Clear-ObsoleteAdmx' {
         Set-Content -Path (Join-Path $script:StoreRoot 'Acrobat2017.admx') -Value 'remove'
         Set-Content -Path (Join-Path $script:StoreRoot 'AcrobatReader2020.admx') -Value 'remove'
         Set-Content -Path (Join-Path $script:StoreRoot 'ctxprofile7.admx') -Value 'remove'
+        Set-Content -Path (Join-Path $script:StoreRoot 'CitrixBase.admx') -Value 'remove'
+        Set-Content -Path (Join-Path $script:StoreRoot 'en-US\CitrixBase.adml') -Value 'remove'
         Set-Content -Path (Join-Path $script:StoreRoot 'readme.txt') -Value 'junk'
         $null = New-Item -Path (Join-Path $script:StoreRoot 'extract-debris') -ItemType Directory -Force
         Set-Content -Path (Join-Path $script:StoreRoot 'extract-debris\file.txt') -Value 'junk'
@@ -247,6 +251,8 @@ Describe 'Clear-ObsoleteAdmx' {
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'Acrobat2017.admx') | Should -BeFalse
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'AcrobatReader2020.admx') | Should -BeFalse
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'ctxprofile7.admx') | Should -BeFalse
+        Test-Path -LiteralPath (Join-Path $script:StoreRoot 'CitrixBase.admx') | Should -BeFalse
+        Test-Path -LiteralPath (Join-Path $script:StoreRoot 'en-US\CitrixBase.adml') | Should -BeFalse
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'readme.txt') | Should -BeFalse
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'extract-debris') | Should -BeFalse
 

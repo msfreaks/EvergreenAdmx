@@ -7,6 +7,10 @@
 - Detect user domain automatically (Get code from PSADT)
 - Add ADMX versioning automatically, very useful for Intune
 
+## 2607.1
+
+- `-CleanPolicyStore` / `-CleanPolicyStoreOnly` now remove obsolete `CitrixBase.admx` / `.adml` ([CTX696338](https://support.citrix.com/external/article/CTX696338/citrix-workspace-app-admx-download-does.html))
+
 ## 2607.0
 
 - Added `-CleanPolicyStore` to remove known obsolete or conflicting Admx/Adml from `-PolicyStore` after processing (WinStoreUI, legacy Office `*12*`–`*15*`, Adobe Classic 2017/2020, `ctxprofile*`, non-policy junk files/folders)
