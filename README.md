@@ -1,4 +1,6 @@
-# ![EvergreenAdmx](assets/logo.png)
+<h1 align="center">
+  <img src="assets/logo.png" alt="EvergreenAdmx" />
+</h1>
 
 [![Release][github-release-badge]][github-release]
 [![PowerShell Gallery][psgallery-downloads-badge]][poshgallery-evergreenadmx]
