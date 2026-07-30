@@ -4,7 +4,7 @@
 BeforeAll {
     . (Join-Path -Path $PSScriptRoot -ChildPath 'Helpers\Import-EvergreenAdmxUnderTest.ps1')
     # Dot-source function bodies in this scope (not inside Import-*).
-    foreach ($text in (Get-EvergreenAdmxFunctionTexts)) {
+    foreach ($text in (Get-EvergreenAdmxFunctionText)) {
         . ([scriptblock]::Create($text))
     }
     $script:ScriptPath = Get-EvergreenAdmxScriptPath
@@ -37,7 +37,7 @@ Describe 'EvergreenAdmx script surface' {
     It 'exposes expected helper functions' {
         Get-Command -Name Get-WindowsDownloadId -CommandType Function | Should -Not -BeNullOrEmpty
         Get-Command -Name New-EvergreenAdmxTaskArgumentList -CommandType Function | Should -Not -BeNullOrEmpty
-        Get-Command -Name Get-EvergreenAdmxObsoleteFilePatterns -CommandType Function | Should -Not -BeNullOrEmpty
+        Get-Command -Name Get-EvergreenAdmxObsoleteFilePattern -CommandType Function | Should -Not -BeNullOrEmpty
         Get-Command -Name Clear-ObsoleteAdmx -CommandType Function | Should -Not -BeNullOrEmpty
         Get-Command -Name Initialize-PolicyStore -CommandType Function | Should -Not -BeNullOrEmpty
         Get-Command -Name Get-EvergreenAdmxProductCatalog -CommandType Function | Should -Not -BeNullOrEmpty
@@ -227,9 +227,9 @@ Describe 'Resolve-EvergreenAdmxInclude' {
     }
 }
 
-Describe 'Get-EvergreenAdmxObsoleteFilePatterns' {
+Describe 'Get-EvergreenAdmxObsoleteFilePattern' {
     It 'includes WinStoreUI, legacy Office, Adobe Classic, ctxprofile, and CitrixBase patterns' {
-        $patterns = Get-EvergreenAdmxObsoleteFilePatterns
+        $patterns = Get-EvergreenAdmxObsoleteFilePattern
         $patterns | Should -Contain 'WinStoreUI.admx'
         $patterns | Should -Contain 'WinStoreUI.adml'
         $patterns | Should -Contain '*12*.admx'

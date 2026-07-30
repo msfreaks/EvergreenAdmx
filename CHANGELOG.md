@@ -26,7 +26,7 @@ and this project uses a `YYMM.patch` release versioning scheme.
 ### Fixed
 
 - `Invoke-FileDownload` now sends a default `User-Agent` (`EvergreenAdmx`) so GitHub API / zipball downloads no longer fail with HTTP 403 (notably BIS-F and other GitHub-hosted ADMX sources)
-- Aligned scheduled-task and Policy Store helper names with the unit suite: `New-EvergreenAdmxTaskArgumentList` and `Get-EvergreenAdmxObsoleteFilePatterns`
+- Aligned scheduled-task and Policy Store helper names with the unit suite: `New-EvergreenAdmxTaskArgumentList` and `Get-EvergreenAdmxObsoleteFilePattern`
 
 ## [2607.0] - 2026-07-29
 

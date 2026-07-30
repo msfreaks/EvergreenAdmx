@@ -18,7 +18,7 @@ function Get-EvergreenAdmxScriptPath {
     return $script:EvergreenAdmxScriptPath
 }
 
-function Get-EvergreenAdmxFunctionTexts {
+function Get-EvergreenAdmxFunctionText {
     [CmdletBinding()]
     [OutputType([System.Object[]])]
     param(
@@ -53,7 +53,7 @@ function Import-EvergreenAdmxUnderTest {
         Dot-sources EvergreenAdmx function definitions into the caller's scope.
     .NOTES
         Must be invoked as:  . { Import-EvergreenAdmxUnderTest }
-        or by dot-sourcing each text from Get-EvergreenAdmxFunctionTexts in BeforeAll.
+        or by dot-sourcing each text from Get-EvergreenAdmxFunctionText in BeforeAll.
     #>
     [CmdletBinding()]
     [OutputType([string])]
@@ -62,7 +62,7 @@ function Import-EvergreenAdmxUnderTest {
         [string] $ScriptPath = (Get-EvergreenAdmxScriptPath)
     )
 
-    foreach ($text in (Get-EvergreenAdmxFunctionTexts -ScriptPath $ScriptPath)) {
+    foreach ($text in (Get-EvergreenAdmxFunctionText -ScriptPath $ScriptPath)) {
         . ([scriptblock]::Create($text))
     }
 

@@ -232,52 +232,52 @@ function Get-EvergreenAdmxProductCatalog {
         Returns canonical -Include product names and accepted aliases.
     #>
     [CmdletBinding()]
-    [OutputType([pscustomobject])]
+    [OutputType([System.Array])]
     param()
 
     @(
-        [pscustomobject]@{ Name = 'Custom Policy Store'; Aliases = @('CustomPolicyStore', 'CustomPolicyLocation') }
-        [pscustomobject]@{ Name = 'Windows 10'; Aliases = @('Windows10', 'Win10') }
-        [pscustomobject]@{ Name = 'Windows 11'; Aliases = @('Windows11', 'Win11') }
-        [pscustomobject]@{ Name = 'Windows 2022'; Aliases = @('Windows2022', 'WindowsServer2022', 'Win2022') }
-        [pscustomobject]@{ Name = 'Windows 2025'; Aliases = @('Windows2025', 'WindowsServer2025', 'Win2025') }
-        [pscustomobject]@{ Name = 'Microsoft Edge'; Aliases = @('Edge', 'MSEdge', 'MicrosoftEdge') }
-        [pscustomobject]@{ Name = 'Microsoft OneDrive'; Aliases = @('OneDrive', 'MicrosoftOneDrive') }
-        [pscustomobject]@{ Name = 'Microsoft 365 Apps'; Aliases = @('365Apps', 'Microsoft365Apps', 'M365', 'Office', 'Microsoft Office', 'MicrosoftOffice') }
-        [pscustomobject]@{ Name = 'Microsoft FSLogix'; Aliases = @('FSLogix', 'MicrosoftFSLogix') }
-        [pscustomobject]@{ Name = 'Adobe Acrobat'; Aliases = @('AdobeAcrobat', 'Acrobat') }
-        [pscustomobject]@{ Name = 'Adobe Reader'; Aliases = @('AdobeReader', 'Reader') }
-        [pscustomobject]@{ Name = 'Adobe DC'; Aliases = @('AdobeDC') }
-        [pscustomobject]@{ Name = 'BIS-F'; Aliases = @('BISF', 'Base Image Script Framework', 'BaseImageScriptFramework') }
-        [pscustomobject]@{ Name = 'Citrix Workspace App'; Aliases = @('CitrixWorkspaceApp', 'Citrix', 'CWA') }
-        [pscustomobject]@{ Name = 'Google Chrome'; Aliases = @('GoogleChrome', 'Chrome') }
-        [pscustomobject]@{ Name = 'Mozilla Firefox'; Aliases = @('MozillaFirefox', 'Firefox') }
-        [pscustomobject]@{ Name = 'Mozilla Thunderbird'; Aliases = @('MozillaThunderbird', 'Thunderbird') }
-        [pscustomobject]@{ Name = 'Zoom'; Aliases = @('Zoom Desktop Client', 'ZoomDesktopClient') }
-        [pscustomobject]@{ Name = 'Zoom VDI'; Aliases = @('ZoomVDI') }
-        [pscustomobject]@{ Name = 'Microsoft AVD'; Aliases = @('AVD', 'AzureVirtualDesktop', 'Azure Virtual Desktop', 'MicrosoftAVD', 'Microsoft Azure Virtual Desktop') }
-        [pscustomobject]@{ Name = 'Microsoft Winget'; Aliases = @('Winget', 'MicrosoftWinget') }
-        [pscustomobject]@{ Name = 'Microsoft PowerToys'; Aliases = @('PowerToys', 'MicrosoftPowerToys') }
-        [pscustomobject]@{ Name = 'Windows Terminal'; Aliases = @('WindowsTerminal', 'Terminal', 'WT') }
-        [pscustomobject]@{ Name = 'Brave Browser'; Aliases = @('Brave', 'BraveBrowser') }
-        [pscustomobject]@{ Name = 'Microsoft Notepad'; Aliases = @('Notepad', 'MicrosoftNotepad') }
-        [pscustomobject]@{ Name = 'Microsoft Clipchamp'; Aliases = @('Clipchamp', 'MicrosoftClipchamp') }
-        [pscustomobject]@{ Name = 'Microsoft Visual Studio'; Aliases = @('VisualStudio', 'MicrosoftVisualStudio', 'VS') }
-        [pscustomobject]@{ Name = 'Microsoft VS Code'; Aliases = @('VSCode', 'MicrosoftVSCode', 'VisualStudioCode') }
-        [pscustomobject]@{ Name = 'Slack'; Aliases = @() }
-        [pscustomobject]@{ Name = '1Password'; Aliases = @('OnePassword') }
-        [pscustomobject]@{ Name = 'TeamViewer'; Aliases = @() }
-        [pscustomobject]@{ Name = 'Security ADMX'; Aliases = @('SecurityAdmx', 'SecurityADMX', 'Security-ADMX') }
-        [pscustomobject]@{ Name = 'Schannel'; Aliases = @() }
-        [pscustomobject]@{ Name = 'Dell Command Update'; Aliases = @('DellCommandUpdate', 'DCU') }
-        [pscustomobject]@{ Name = 'Winget-AutoUpdate'; Aliases = @('WingetAutoUpdate', 'WAU') }
-        [pscustomobject]@{ Name = 'Winget-AutoUpdate-Intune'; Aliases = @('WingetAutoUpdateIntune', 'WAUIntune', 'WAU-Intune') }
-        [pscustomobject]@{ Name = 'PSAppDeployToolkit'; Aliases = @('PSADT') }
-        [pscustomobject]@{ Name = 'Devolutions Remote Desktop Manager'; Aliases = @('DevolutionsRDM', 'Devolutions', 'RDM') }
-        [pscustomobject]@{ Name = 'Dropbox'; Aliases = @() }
-        [pscustomobject]@{ Name = 'Foxit PDF'; Aliases = @('FoxitPDF', 'Foxit') }
-        [pscustomobject]@{ Name = 'LibreOffice'; Aliases = @('Collabora', 'CollaboraOffice') }
-        [pscustomobject]@{ Name = 'HP Anyware'; Aliases = @('HPAnyware', 'Anyware', 'PCoIP') }
+        [PSCustomObject]@{ Name = 'Custom Policy Store'; Aliases = @('CustomPolicyStore', 'CustomPolicyLocation') }
+        [PSCustomObject]@{ Name = 'Windows 10'; Aliases = @('Windows10', 'Win10') }
+        [PSCustomObject]@{ Name = 'Windows 11'; Aliases = @('Windows11', 'Win11') }
+        [PSCustomObject]@{ Name = 'Windows 2022'; Aliases = @('Windows2022', 'WindowsServer2022', 'Win2022') }
+        [PSCustomObject]@{ Name = 'Windows 2025'; Aliases = @('Windows2025', 'WindowsServer2025', 'Win2025') }
+        [PSCustomObject]@{ Name = 'Microsoft Edge'; Aliases = @('Edge', 'MSEdge', 'MicrosoftEdge') }
+        [PSCustomObject]@{ Name = 'Microsoft OneDrive'; Aliases = @('OneDrive', 'MicrosoftOneDrive') }
+        [PSCustomObject]@{ Name = 'Microsoft 365 Apps'; Aliases = @('365Apps', 'Microsoft365Apps', 'M365', 'Office', 'Microsoft Office', 'MicrosoftOffice') }
+        [PSCustomObject]@{ Name = 'Microsoft FSLogix'; Aliases = @('FSLogix', 'MicrosoftFSLogix') }
+        [PSCustomObject]@{ Name = 'Adobe Acrobat'; Aliases = @('AdobeAcrobat', 'Acrobat') }
+        [PSCustomObject]@{ Name = 'Adobe Reader'; Aliases = @('AdobeReader', 'Reader') }
+        [PSCustomObject]@{ Name = 'Adobe DC'; Aliases = @('AdobeDC') }
+        [PSCustomObject]@{ Name = 'BIS-F'; Aliases = @('BISF', 'Base Image Script Framework', 'BaseImageScriptFramework') }
+        [PSCustomObject]@{ Name = 'Citrix Workspace App'; Aliases = @('CitrixWorkspaceApp', 'Citrix', 'CWA') }
+        [PSCustomObject]@{ Name = 'Google Chrome'; Aliases = @('GoogleChrome', 'Chrome') }
+        [PSCustomObject]@{ Name = 'Mozilla Firefox'; Aliases = @('MozillaFirefox', 'Firefox') }
+        [PSCustomObject]@{ Name = 'Mozilla Thunderbird'; Aliases = @('MozillaThunderbird', 'Thunderbird') }
+        [PSCustomObject]@{ Name = 'Zoom'; Aliases = @('Zoom Desktop Client', 'ZoomDesktopClient') }
+        [PSCustomObject]@{ Name = 'Zoom VDI'; Aliases = @('ZoomVDI') }
+        [PSCustomObject]@{ Name = 'Microsoft AVD'; Aliases = @('AVD', 'AzureVirtualDesktop', 'Azure Virtual Desktop', 'MicrosoftAVD', 'Microsoft Azure Virtual Desktop') }
+        [PSCustomObject]@{ Name = 'Microsoft Winget'; Aliases = @('Winget', 'MicrosoftWinget') }
+        [PSCustomObject]@{ Name = 'Microsoft PowerToys'; Aliases = @('PowerToys', 'MicrosoftPowerToys') }
+        [PSCustomObject]@{ Name = 'Windows Terminal'; Aliases = @('WindowsTerminal', 'Terminal', 'WT') }
+        [PSCustomObject]@{ Name = 'Brave Browser'; Aliases = @('Brave', 'BraveBrowser') }
+        [PSCustomObject]@{ Name = 'Microsoft Notepad'; Aliases = @('Notepad', 'MicrosoftNotepad') }
+        [PSCustomObject]@{ Name = 'Microsoft Clipchamp'; Aliases = @('Clipchamp', 'MicrosoftClipchamp') }
+        [PSCustomObject]@{ Name = 'Microsoft Visual Studio'; Aliases = @('VisualStudio', 'MicrosoftVisualStudio', 'VS') }
+        [PSCustomObject]@{ Name = 'Microsoft VS Code'; Aliases = @('VSCode', 'MicrosoftVSCode', 'VisualStudioCode') }
+        [PSCustomObject]@{ Name = 'Slack'; Aliases = @() }
+        [PSCustomObject]@{ Name = '1Password'; Aliases = @('OnePassword') }
+        [PSCustomObject]@{ Name = 'TeamViewer'; Aliases = @() }
+        [PSCustomObject]@{ Name = 'Security ADMX'; Aliases = @('SecurityAdmx', 'SecurityADMX', 'Security-ADMX') }
+        [PSCustomObject]@{ Name = 'Schannel'; Aliases = @() }
+        [PSCustomObject]@{ Name = 'Dell Command Update'; Aliases = @('DellCommandUpdate', 'DCU') }
+        [PSCustomObject]@{ Name = 'Winget-AutoUpdate'; Aliases = @('WingetAutoUpdate', 'WAU') }
+        [PSCustomObject]@{ Name = 'Winget-AutoUpdate-Intune'; Aliases = @('WingetAutoUpdateIntune', 'WAUIntune', 'WAU-Intune') }
+        [PSCustomObject]@{ Name = 'PSAppDeployToolkit'; Aliases = @('PSADT') }
+        [PSCustomObject]@{ Name = 'Devolutions Remote Desktop Manager'; Aliases = @('DevolutionsRDM', 'Devolutions', 'RDM') }
+        [PSCustomObject]@{ Name = 'Dropbox'; Aliases = @() }
+        [PSCustomObject]@{ Name = 'Foxit PDF'; Aliases = @('FoxitPDF', 'Foxit') }
+        [PSCustomObject]@{ Name = 'LibreOffice'; Aliases = @('Collabora', 'CollaboraOffice') }
+        [PSCustomObject]@{ Name = 'HP Anyware'; Aliases = @('HPAnyware', 'Anyware', 'PCoIP') }
     )
 }
 
@@ -311,7 +311,7 @@ function Resolve-EvergreenAdmxInclude {
         Resolves -Include values (canonical names or aliases) to canonical product names.
     #>
     [CmdletBinding()]
-    [OutputType([System.String[]])]
+    [OutputType([System.Object[]])]
     param(
         [Parameter(Mandatory = $true)]
         [AllowEmptyCollection()]
@@ -428,7 +428,7 @@ function New-EvergreenAdmxTaskArgumentList {
     .SYNOPSIS
         Builds powershell.exe arguments for the EvergreenAdmx scheduled task action.
     #>
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true)]
     [OutputType([System.Collections.Generic.List[System.String]])]
     param (
         [Parameter(Mandatory = $true)]
@@ -436,6 +436,10 @@ function New-EvergreenAdmxTaskArgumentList {
         [Parameter(Mandatory = $true)]
         [System.Collections.IDictionary] $BoundParameters
     )
+
+    if (-not $PSCmdlet.ShouldProcess($ScriptPath, 'Build scheduled task argument list')) {
+        return
+    }
 
     $ArgumentList = [System.Collections.Generic.List[System.String]]::new()
     $ArgumentList.Add('-NoProfile')
@@ -1036,13 +1040,13 @@ function Copy-Admx {
     }
 }
 
-function Get-EvergreenAdmxObsoleteFilePatterns {
+function Get-EvergreenAdmxObsoleteFilePattern {
     <#
     .SYNOPSIS
         Returns file name patterns for obsolete or conflicting Policy Store Admx/Adml files.
     #>
     [CmdletBinding()]
-    [OutputType([string[]])]
+    [OutputType([System.Object[]])]
     param()
 
     return @(
@@ -1111,7 +1115,7 @@ function Clear-ObsoleteAdmx {
         Removes known obsolete or conflicting Admx/Adml files from a Policy Store.
     #>
     [CmdletBinding(SupportsShouldProcess = $true)]
-    [OutputType([string[]])]
+    [OutputType([System.Object[]])]
     param (
         [Parameter(Mandatory = $true)]
         [string]$PolicyStore,
@@ -1128,7 +1132,7 @@ function Clear-ObsoleteAdmx {
     }
 
     $removed = [System.Collections.Generic.List[string]]::new()
-    $patterns = Get-EvergreenAdmxObsoleteFilePatterns
+    $patterns = Get-EvergreenAdmxObsoleteFilePattern
     $languagePattern = '^([A-Za-z]{2})(-([A-Za-z]{2}|\d{3}))?$'
 
     $obsoleteFiles = @(
