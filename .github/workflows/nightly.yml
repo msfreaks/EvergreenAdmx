@@ -26,10 +26,6 @@ jobs:
 
       - name: Pester Nightly tests
         shell: pwsh
-        env:
-          # Unauthenticated GitHub zipball downloads for BIS-F often 403 in CI.
-          # Set to 1 after adding authenticated download support if desired.
-          EVERGREENADMX_INCLUDE_BISF: '0'
         run: |
           $config = New-PesterConfiguration
           $config.Run.Path = '.\tests\EvergreenAdmx.Nightly.Tests.ps1'

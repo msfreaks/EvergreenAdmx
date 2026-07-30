@@ -10,14 +10,8 @@ BeforeAll {
     }
     $script:ScriptPath = Get-EvergreenAdmxScriptPath
     $script:Products = @(Get-EvergreenAdmxIncludeValidateSet | Where-Object {
-            $_ -notin @('Custom Policy Store', 'Windows 10', 'BIS-F')
+            $_ -notin @('Custom Policy Store', 'Windows 10')
         })
-
-    # BIS-F is excluded by default in CI because unauthenticated GitHub zipball downloads often 403.
-    # Set EVERGREENADMX_INCLUDE_BISF=1 to include it.
-    if ($env:EVERGREENADMX_INCLUDE_BISF -eq '1') {
-        $script:Products += 'BIS-F'
-    }
 
     $script:WorkRoot = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ("EvergreenAdmx-Nightly-{0}" -f [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $script:WorkRoot -Force | Out-Null

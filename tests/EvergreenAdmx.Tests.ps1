@@ -40,6 +40,8 @@ Describe 'EvergreenAdmx script surface' {
         Get-Command -Name Get-EvergreenAdmxObsoleteFilePatterns -CommandType Function | Should -Not -BeNullOrEmpty
         Get-Command -Name Clear-ObsoleteAdmx -CommandType Function | Should -Not -BeNullOrEmpty
         Get-Command -Name Initialize-PolicyStore -CommandType Function | Should -Not -BeNullOrEmpty
+        Get-Command -Name Get-EvergreenAdmxProductCatalog -CommandType Function | Should -Not -BeNullOrEmpty
+        Get-Command -Name Resolve-EvergreenAdmxInclude -CommandType Function | Should -Not -BeNullOrEmpty
     }
 }
 
@@ -145,9 +147,10 @@ Describe 'New-EvergreenAdmxTaskArgumentList' {
     }
 }
 
-Describe 'Include ValidateSet' {
+Describe 'Include product catalog' {
     BeforeAll {
         $script:Products = Get-EvergreenAdmxIncludeValidateSet
+        $script:Catalog = Get-EvergreenAdmxProductCatalog
     }
 
     It 'includes core products' {
@@ -166,6 +169,61 @@ Describe 'Include ValidateSet' {
 
     It 'has no duplicate product names' {
         $script:Products.Count | Should -Be ($script:Products | Select-Object -Unique).Count
+    }
+
+    It 'has no overlapping aliases across products' {
+        $seen = @{}
+        foreach ($product in $script:Catalog) {
+            $keys = @($product.Name) + @($product.Aliases)
+            foreach ($key in $keys) {
+                if ([string]::IsNullOrWhiteSpace($key)) { continue }
+                $norm = $key.ToLowerInvariant()
+                if ($seen.ContainsKey($norm) -and $seen[$norm] -ne $product.Name) {
+                    throw "Alias/name '$key' overlaps between '$($seen[$norm])' and '$($product.Name)'."
+                }
+                $seen[$norm] = $product.Name
+            }
+        }
+        $seen.Count | Should -BeGreaterThan 0
+    }
+}
+
+Describe 'Resolve-EvergreenAdmxInclude' {
+    It 'resolves ProductKey aliases to canonical names' {
+        $resolved = Resolve-EvergreenAdmxInclude -Include @('BISF', 'Edge', 'Chrome', 'AVD', 'FSLogix')
+        $resolved | Should -Be @('BIS-F', 'Microsoft Edge', 'Google Chrome', 'Microsoft AVD', 'Microsoft FSLogix')
+    }
+
+    It 'resolves historical renames' {
+        $resolved = Resolve-EvergreenAdmxInclude -Include @('Microsoft Office', 'Azure Virtual Desktop', 'Zoom Desktop Client')
+        $resolved | Should -Be @('Microsoft 365 Apps', 'Microsoft AVD', 'Zoom')
+    }
+
+    It 'is case-insensitive and deduplicates' {
+        $resolved = Resolve-EvergreenAdmxInclude -Include @('bisf', 'BIS-F', 'BisF')
+        $resolved | Should -Be @('BIS-F')
+    }
+
+    It 'rejects unknown values with a current-product list' {
+        $err = { Resolve-EvergreenAdmxInclude -Include @('BISFF') } | Should -Throw -PassThru
+        "$err" | Should -Match 'Cannot resolve -Include value'
+        "$err" | Should -Match 'BIS-F'
+        "$err" | Should -Match 'Microsoft Edge'
+        "$err" | Should -Not -Match 'Microsoft Desktop Optimization Pack'
+        "$err" | Should -Not -Match '\bMDOP\b'
+    }
+
+    It 'rejects removed MDOP with a dedicated message' {
+        $err = { Resolve-EvergreenAdmxInclude -Include @('MDOP') } | Should -Throw -PassThru
+        "$err" | Should -Match 'no longer supported'
+        "$err" | Should -Match 'MDOP'
+        "$err" | Should -Not -Match 'Valid products:'
+    }
+
+    It 'rejects removed Adobe Classic tracks' {
+        $err = { Resolve-EvergreenAdmxInclude -Include @('Adobe Acrobat Classic 2017') } | Should -Throw -PassThru
+        "$err" | Should -Match 'no longer supported'
+        "$err" | Should -Match 'Adobe Acrobat'
     }
 }
 

@@ -1,0 +1,99 @@
+name: Feature request (add product)
+description: Request ADMX support for a new product
+title: "[Feature]: Add "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form to request a new `-Include` product.
+
+        Provide either:
+        - a **Group Policy template URL** (direct ADMX/ADML zip, CDN, or public repo), or
+        - an **installer / EXE / winget package** when templates must be extracted from the installer (same model as Dell Command Update and HP Anyware).
+
+  - type: checkboxes
+    id: existing-issue
+    attributes:
+      label: Is there an existing issue for this?
+      description: Please search existing issues before filing a new one.
+      options:
+        - label: I have searched the existing issues
+          required: true
+
+  - type: input
+    id: product-name
+    attributes:
+      label: Product name
+      description: Canonical product name for `-Include` (for example `Lenovo Commercial Vantage`).
+      placeholder: Product Name
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why / use case
+      description: Who needs this product and why should EvergreenAdmx support it?
+      placeholder: Common on enterprise fleets; fills a gap next to existing products...
+    validations:
+      required: true
+
+  - type: input
+    id: docs-link
+    attributes:
+      label: Documentation link
+      description: Vendor documentation for Group Policy / ADMX templates.
+      placeholder: https://...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: source-type
+    attributes:
+      label: Template source type
+      description: How are the ADMX/ADML files distributed?
+      options:
+        - Direct ADMX/ADML download or zip
+        - Extracted from installer (EXE/MSI/winget)
+      default: 0
+    validations:
+      required: true
+
+  - type: input
+    id: template-url
+    attributes:
+      label: Group Policy template URL
+      description: Public evergreen URL, GitHub repo, or CDN path when templates are downloadable directly. Leave blank if templates only ship inside an installer.
+      placeholder: https://... or https://github.com/org/repo
+
+  - type: input
+    id: installer
+    attributes:
+      label: Installer / EXE / package
+      description: EXE or MSI file name, winget package ID, or download URL when ADMX must be extracted from the installer.
+      placeholder: "pcoip-agent-standard_26.05.3.exe or Vendor.PackageId"
+
+  - type: input
+    id: path-inside
+    attributes:
+      label: Path inside package
+      description: Optional path to the ADMX/ADML files inside the installer or archive.
+      placeholder: "configuration\\policyDefinitions\\PCoIP.admx"
+
+  - type: textarea
+    id: blockers
+    attributes:
+      label: Auth / blockers
+      description: Login walls, CDN 403s, missing official ADMX, or other automation blockers.
+      placeholder: Download requires customer portal login...
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional notes
+      description: Acceptance criteria, related issues, or anything else that helps implementation.
+    validations:
+      required: false
