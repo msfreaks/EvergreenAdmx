@@ -1,0 +1,134 @@
+﻿name: Publish to PSGallery
+
+# Publishes EvergreenAdmx.ps1 as a PowerShell Gallery *script* (Install-Script / Install-PSResource).
+# One-time setup: add repository secret PSGALLERY_API_KEY (NuGet API key from
+# https://www.powershellgallery.com/account → API Keys) with Publish permission for EvergreenAdmx.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Validate metadata and WhatIf publish only (do not upload)
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish-Script
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Release events check out the default branch; pin to the release tag when present.
+          ref: ${{ github.event.release.tag_name || github.sha }}
+
+      - name: Validate script metadata and version
+        id: meta
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+          $scriptPath = Join-Path $PWD 'EvergreenAdmx.ps1'
+          if (-not (Test-Path -LiteralPath $scriptPath)) {
+            throw "EvergreenAdmx.ps1 not found at $scriptPath"
+          }
+
+          Test-ScriptFileInfo -Path $scriptPath | Format-List | Out-String | Write-Host
+
+          $info = Test-ScriptFileInfo -Path $scriptPath
+          $version = [string]$info.Version
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            throw 'PSScriptInfo .VERSION is missing or empty.'
+          }
+
+          $tag = '${{ github.event.release.tag_name }}'
+          if (-not [string]::IsNullOrWhiteSpace($tag)) {
+            $normalizedTag = $tag.TrimStart('v', 'V')
+            if ($normalizedTag -ne $version) {
+              throw "Release tag '$tag' does not match script version '$version'. Update <#PSScriptInfo> .VERSION before publishing."
+            }
+          }
+
+          Write-Host "Script version: $version"
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Ensure PowerShellGet is current
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force | Out-Null
+          Install-Module -Name PowerShellGet -MinimumVersion 2.2.5 -Scope CurrentUser -Force -AllowClobber
+
+      - name: Skip if version already on PSGallery
+        id: existing
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = '${{ steps.meta.outputs.version }}'
+          $found = Find-Script -Name EvergreenAdmx -RequiredVersion $version -Repository PSGallery -ErrorAction SilentlyContinue
+          if ($found) {
+            Write-Host "EvergreenAdmx $version is already on PSGallery — skipping publish."
+            "skip=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          } else {
+            "skip=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          }
+
+      - name: Publish to PowerShell Gallery
+        if: steps.existing.outputs.skip != 'true'
+        env:
+          PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+          $isDispatch = '${{ github.event_name }}' -eq 'workflow_dispatch'
+          $dryInput = '${{ inputs.dry_run }}'
+          $dryRun = $isDispatch -and ($dryInput -eq 'true')
+          $scriptPath = (Resolve-Path '.\EvergreenAdmx.ps1').Path
+
+          if ($dryRun) {
+            Write-Host 'Dry run: Publish-Script -WhatIf'
+            Publish-Script -Path $scriptPath -NuGetApiKey '00000000-0000-0000-0000-000000000000' -WhatIf -ErrorAction Stop
+            Write-Host 'Dry run completed (no upload).'
+            return
+          }
+
+          if ([string]::IsNullOrWhiteSpace($env:PSGALLERY_API_KEY)) {
+            throw 'Repository secret PSGALLERY_API_KEY is not set. Add it under Settings > Secrets and variables > Actions.'
+          }
+
+          # PowerShellGet can Write-Error from nested scopes; -ErrorAction Stop is required.
+          Publish-Script -Path $scriptPath -NuGetApiKey $env:PSGALLERY_API_KEY -ErrorAction Stop
+          Write-Host "Published EvergreenAdmx ${{ steps.meta.outputs.version }} to PSGallery."
+
+      - name: Confirm publication
+        if: |
+          steps.existing.outputs.skip != 'true' &&
+          !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = '${{ steps.meta.outputs.version }}'
+          $found = $null
+          for ($attempt = 1; $attempt -le 8; $attempt++) {
+            Start-Sleep -Seconds 5
+            $found = Find-Script -Name EvergreenAdmx -RequiredVersion $version -Repository PSGallery -ErrorAction SilentlyContinue
+            if ($found) { break }
+            Write-Host "Attempt $attempt/8: version $version not visible yet..."
+          }
+          if (-not $found) {
+            throw "Publish appeared to succeed but EvergreenAdmx $version is not visible on PSGallery after ~40s. Check https://www.powershellgallery.com/packages/EvergreenAdmx/$version"
+          }
+          Write-Host "Confirmed: EvergreenAdmx $version is on PSGallery"
+          Write-Host "https://www.powershellgallery.com/packages/EvergreenAdmx/$version"

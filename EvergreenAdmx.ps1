@@ -1,6 +1,6 @@
-﻿<#PSScriptInfo
+<#PSScriptInfo
 
-.VERSION 2607.0
+.VERSION 2607.1
 
 .GUID 999952b7-1337-4018-a1b9-499fad48e734
 
@@ -77,7 +77,8 @@
 
 .PARAMETER Include
     Array containing Admx products to include when checking for updates.
-    Valid values are: "Windows 10", "Windows 11", "Windows 2022", "Windows 2025", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "Adobe DC", "BIS-F", "Citrix Workspace App", "Google Chrome", "Mozilla Firefox", "Mozilla Thunderbird", "Zoom", "Zoom VDI", "Microsoft AVD", "Microsoft Winget", "Microsoft PowerToys", "Windows Terminal", "Brave Browser", "Microsoft Notepad", "Microsoft Clipchamp", "Microsoft Visual Studio", "Microsoft VS Code", "Slack", "1Password", "TeamViewer", "Security ADMX", "Schannel", "Dell Command Update", "Winget-AutoUpdate", "Winget-AutoUpdate-Intune", "PSAppDeployToolkit", "Devolutions Remote Desktop Manager", "Dropbox", "Foxit PDF", "LibreOffice", "HP Anyware".
+    Accepts canonical product names and short aliases (ProductKey, compact forms, and former names), e.g. "BISF" for "BIS-F", "Edge" for "Microsoft Edge".
+    Valid products are: "Custom Policy Store", "Windows 10", "Windows 11", "Windows 2022", "Windows 2025", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "Adobe DC", "BIS-F", "Citrix Workspace App", "Google Chrome", "Mozilla Firefox", "Mozilla Thunderbird", "Zoom", "Zoom VDI", "Microsoft AVD", "Microsoft Winget", "Microsoft PowerToys", "Windows Terminal", "Brave Browser", "Microsoft Notepad", "Microsoft Clipchamp", "Microsoft Visual Studio", "Microsoft VS Code", "Slack", "1Password", "TeamViewer", "Security ADMX", "Schannel", "Dell Command Update", "Winget-AutoUpdate", "Winget-AutoUpdate-Intune", "PSAppDeployToolkit", "Devolutions Remote Desktop Manager", "Dropbox", "Foxit PDF", "LibreOffice", "HP Anyware".
     Defaults to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft Clipchamp", "Microsoft Notepad", "Microsoft Winget", "Windows Terminal".
 
 .PARAMETER PreferLocalOneDrive
@@ -86,7 +87,7 @@
 
 .PARAMETER CleanPolicyStore
     After processing, remove known obsolete or conflicting Admx/Adml files from -PolicyStore
-    (WinStoreUI, legacy Office *12-*15, Adobe Classic 2017/2020, ctxprofile*, non-policy junk).
+    (WinStoreUI, legacy Office *12-*15, Adobe Classic 2017/2020, ctxprofile*, CitrixBase, non-policy junk).
     Requires -PolicyStore. Supports -WhatIf.
 
 .PARAMETER CleanPolicyStoreOnly
@@ -173,7 +174,44 @@ param(
     [switch] $CleanPolicyStoreOnly,
     [Parameter(Mandatory = $false)]
     [switch] $CreateScheduledTask,
-    [ValidateSet('Custom Policy Store', 'Windows 10', 'Windows 11', 'Windows 2022', 'Windows 2025', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft FSLogix', 'Adobe Acrobat', 'Adobe Reader', 'Adobe DC', 'BIS-F', 'Citrix Workspace App', 'Google Chrome', 'Mozilla Firefox', 'Mozilla Thunderbird', 'Zoom', 'Zoom VDI', 'Microsoft AVD', 'Microsoft Winget', 'Microsoft PowerToys', 'Windows Terminal', 'Brave Browser', 'Microsoft Notepad', 'Microsoft Clipchamp', 'Microsoft Visual Studio', 'Microsoft VS Code', 'Slack', '1Password', 'TeamViewer', 'Security ADMX', 'Schannel', 'Dell Command Update', 'Winget-AutoUpdate', 'Winget-AutoUpdate-Intune', 'PSAppDeployToolkit', 'Devolutions Remote Desktop Manager', 'Dropbox', 'Foxit PDF', 'LibreOffice', 'HP Anyware')]
+    [ArgumentCompleter({
+            param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+            $null = $commandName, $parameterName, $fakeBoundParameters
+            $candidates = @()
+            if (Get-Command -Name Get-EvergreenAdmxProductCatalog -ErrorAction SilentlyContinue) {
+                $catalog = Get-EvergreenAdmxProductCatalog
+                $candidates = foreach ($product in $catalog) {
+                    @($product.Name) + @($product.Aliases)
+                }
+            }
+            elseif ($commandAst -and $commandAst.Extent.File -and (Test-Path -LiteralPath $commandAst.Extent.File)) {
+                $tokens = $null
+                $errors = $null
+                $ast = [System.Management.Automation.Language.Parser]::ParseFile($commandAst.Extent.File, [ref]$tokens, [ref]$errors)
+                $fn = $ast.FindAll({
+                        param($node)
+                        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+                        $node.Name -eq 'Get-EvergreenAdmxProductCatalog'
+                    }, $true) | Select-Object -First 1
+                if ($fn) {
+                    $catalog = & ([scriptblock]::Create($fn.Extent.Text + "; Get-EvergreenAdmxProductCatalog"))
+                    $candidates = foreach ($product in $catalog) {
+                        @($product.Name) + @($product.Aliases)
+                    }
+                }
+            }
+            $candidates |
+                Sort-Object -Unique |
+                Where-Object { $_ -like "$wordToComplete*" } |
+                ForEach-Object {
+                    [System.Management.Automation.CompletionResult]::new(
+                        "'$($_ -replace "'", "''")'",
+                        $_,
+                        'ParameterValue',
+                        $_
+                    )
+                }
+        })]
     [System.String[]] $Include = $(
         switch ($WindowsVersion) {
             '10' { @('Windows 10', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft Clipchamp', 'Microsoft Notepad', 'Microsoft Winget', 'Windows Terminal') }
@@ -186,6 +224,146 @@ param(
 )
 
 #region init
+
+
+function Get-EvergreenAdmxProductCatalog {
+    <#
+    .SYNOPSIS
+        Returns canonical -Include product names and accepted aliases.
+    #>
+    [CmdletBinding()]
+    [OutputType([System.Array])]
+    param()
+
+    @(
+        [PSCustomObject]@{ Name = 'Custom Policy Store'; Aliases = @('CustomPolicyStore', 'CustomPolicyLocation') }
+        [PSCustomObject]@{ Name = 'Windows 10'; Aliases = @('Windows10', 'Win10') }
+        [PSCustomObject]@{ Name = 'Windows 11'; Aliases = @('Windows11', 'Win11') }
+        [PSCustomObject]@{ Name = 'Windows 2022'; Aliases = @('Windows2022', 'WindowsServer2022', 'Win2022') }
+        [PSCustomObject]@{ Name = 'Windows 2025'; Aliases = @('Windows2025', 'WindowsServer2025', 'Win2025') }
+        [PSCustomObject]@{ Name = 'Microsoft Edge'; Aliases = @('Edge', 'MSEdge', 'MicrosoftEdge') }
+        [PSCustomObject]@{ Name = 'Microsoft OneDrive'; Aliases = @('OneDrive', 'MicrosoftOneDrive') }
+        [PSCustomObject]@{ Name = 'Microsoft 365 Apps'; Aliases = @('365Apps', 'Microsoft365Apps', 'M365', 'Office', 'Microsoft Office', 'MicrosoftOffice') }
+        [PSCustomObject]@{ Name = 'Microsoft FSLogix'; Aliases = @('FSLogix', 'MicrosoftFSLogix') }
+        [PSCustomObject]@{ Name = 'Adobe Acrobat'; Aliases = @('AdobeAcrobat', 'Acrobat') }
+        [PSCustomObject]@{ Name = 'Adobe Reader'; Aliases = @('AdobeReader', 'Reader') }
+        [PSCustomObject]@{ Name = 'Adobe DC'; Aliases = @('AdobeDC') }
+        [PSCustomObject]@{ Name = 'BIS-F'; Aliases = @('BISF', 'Base Image Script Framework', 'BaseImageScriptFramework') }
+        [PSCustomObject]@{ Name = 'Citrix Workspace App'; Aliases = @('CitrixWorkspaceApp', 'Citrix', 'CWA') }
+        [PSCustomObject]@{ Name = 'Google Chrome'; Aliases = @('GoogleChrome', 'Chrome') }
+        [PSCustomObject]@{ Name = 'Mozilla Firefox'; Aliases = @('MozillaFirefox', 'Firefox') }
+        [PSCustomObject]@{ Name = 'Mozilla Thunderbird'; Aliases = @('MozillaThunderbird', 'Thunderbird') }
+        [PSCustomObject]@{ Name = 'Zoom'; Aliases = @('Zoom Desktop Client', 'ZoomDesktopClient') }
+        [PSCustomObject]@{ Name = 'Zoom VDI'; Aliases = @('ZoomVDI') }
+        [PSCustomObject]@{ Name = 'Microsoft AVD'; Aliases = @('AVD', 'AzureVirtualDesktop', 'Azure Virtual Desktop', 'MicrosoftAVD', 'Microsoft Azure Virtual Desktop') }
+        [PSCustomObject]@{ Name = 'Microsoft Winget'; Aliases = @('Winget', 'MicrosoftWinget') }
+        [PSCustomObject]@{ Name = 'Microsoft PowerToys'; Aliases = @('PowerToys', 'MicrosoftPowerToys') }
+        [PSCustomObject]@{ Name = 'Windows Terminal'; Aliases = @('WindowsTerminal', 'Terminal', 'WT') }
+        [PSCustomObject]@{ Name = 'Brave Browser'; Aliases = @('Brave', 'BraveBrowser') }
+        [PSCustomObject]@{ Name = 'Microsoft Notepad'; Aliases = @('Notepad', 'MicrosoftNotepad') }
+        [PSCustomObject]@{ Name = 'Microsoft Clipchamp'; Aliases = @('Clipchamp', 'MicrosoftClipchamp') }
+        [PSCustomObject]@{ Name = 'Microsoft Visual Studio'; Aliases = @('VisualStudio', 'MicrosoftVisualStudio', 'VS') }
+        [PSCustomObject]@{ Name = 'Microsoft VS Code'; Aliases = @('VSCode', 'MicrosoftVSCode', 'VisualStudioCode') }
+        [PSCustomObject]@{ Name = 'Slack'; Aliases = @() }
+        [PSCustomObject]@{ Name = '1Password'; Aliases = @('OnePassword') }
+        [PSCustomObject]@{ Name = 'TeamViewer'; Aliases = @() }
+        [PSCustomObject]@{ Name = 'Security ADMX'; Aliases = @('SecurityAdmx', 'SecurityADMX', 'Security-ADMX') }
+        [PSCustomObject]@{ Name = 'Schannel'; Aliases = @() }
+        [PSCustomObject]@{ Name = 'Dell Command Update'; Aliases = @('DellCommandUpdate', 'DCU') }
+        [PSCustomObject]@{ Name = 'Winget-AutoUpdate'; Aliases = @('WingetAutoUpdate', 'WAU') }
+        [PSCustomObject]@{ Name = 'Winget-AutoUpdate-Intune'; Aliases = @('WingetAutoUpdateIntune', 'WAUIntune', 'WAU-Intune') }
+        [PSCustomObject]@{ Name = 'PSAppDeployToolkit'; Aliases = @('PSADT') }
+        [PSCustomObject]@{ Name = 'Devolutions Remote Desktop Manager'; Aliases = @('DevolutionsRDM', 'Devolutions', 'RDM') }
+        [PSCustomObject]@{ Name = 'Dropbox'; Aliases = @() }
+        [PSCustomObject]@{ Name = 'Foxit PDF'; Aliases = @('FoxitPDF', 'Foxit') }
+        [PSCustomObject]@{ Name = 'LibreOffice'; Aliases = @('Collabora', 'CollaboraOffice') }
+        [PSCustomObject]@{ Name = 'HP Anyware'; Aliases = @('HPAnyware', 'Anyware', 'PCoIP') }
+    )
+}
+
+function Get-EvergreenAdmxRemovedIncludeMap {
+    <#
+    .SYNOPSIS
+        Maps removed -Include product names to a short removal reason.
+    #>
+    [CmdletBinding()]
+    [OutputType([hashtable])]
+    param()
+
+    return @{
+        'Microsoft Desktop Optimization Pack' = 'Microsoft Desktop Optimization Pack (MDOP) support was removed (extended support ended April 14, 2026).'
+        'MDOP'                                = 'Microsoft Desktop Optimization Pack (MDOP) support was removed (extended support ended April 14, 2026).'
+        'MicrosoftDesktopOptimizationPack'    = 'Microsoft Desktop Optimization Pack (MDOP) support was removed (extended support ended April 14, 2026).'
+        'Adobe Acrobat Classic 2017'          = 'Adobe Acrobat Classic tracks were removed; use Continuous track via ''Adobe Acrobat''.'
+        'Adobe Acrobat Classic 2020'          = 'Adobe Acrobat Classic tracks were removed; use Continuous track via ''Adobe Acrobat''.'
+        'Acrobat2017'                         = 'Adobe Acrobat Classic tracks were removed; use Continuous track via ''Adobe Acrobat''.'
+        'Acrobat2020'                         = 'Adobe Acrobat Classic tracks were removed; use Continuous track via ''Adobe Acrobat''.'
+        'Adobe Reader Classic 2017'           = 'Adobe Reader Classic tracks were removed; use Continuous track via ''Adobe Reader''.'
+        'Adobe Reader Classic 2020'           = 'Adobe Reader Classic tracks were removed; use Continuous track via ''Adobe Reader''.'
+        'AcrobatReader2017'                   = 'Adobe Reader Classic tracks were removed; use Continuous track via ''Adobe Reader''.'
+        'AcrobatReader2020'                   = 'Adobe Reader Classic tracks were removed; use Continuous track via ''Adobe Reader''.'
+    }
+}
+
+function Resolve-EvergreenAdmxInclude {
+    <#
+    .SYNOPSIS
+        Resolves -Include values (canonical names or aliases) to canonical product names.
+    #>
+    [CmdletBinding()]
+    [OutputType([System.Object[]])]
+    param(
+        [Parameter(Mandatory = $true)]
+        [AllowEmptyCollection()]
+        [System.String[]] $Include
+    )
+
+    $catalog = @(Get-EvergreenAdmxProductCatalog)
+    $lookup = @{}
+    foreach ($product in $catalog) {
+        $lookup[$product.Name.ToLowerInvariant()] = $product.Name
+        foreach ($alias in @($product.Aliases)) {
+            if ([string]::IsNullOrWhiteSpace($alias)) { continue }
+            $key = $alias.ToLowerInvariant()
+            if ($lookup.ContainsKey($key) -and $lookup[$key] -ne $product.Name) {
+                throw "Duplicate -Include alias '$alias' maps to both '$($lookup[$key])' and '$($product.Name)'."
+            }
+            $lookup[$key] = $product.Name
+        }
+    }
+
+    $removed = Get-EvergreenAdmxRemovedIncludeMap
+    $resolved = [System.Collections.Generic.List[System.String]]::new()
+    $seen = @{}
+
+    foreach ($value in $Include) {
+        if ([string]::IsNullOrWhiteSpace($value)) { continue }
+        $trimmed = $value.Trim()
+        $key = $trimmed.ToLowerInvariant()
+
+        $removedEntry = $removed.GetEnumerator() | Where-Object { $_.Key.ToLowerInvariant() -eq $key } | Select-Object -First 1
+        if ($removedEntry) {
+            throw "-Include value '$trimmed' is no longer supported. $($removedEntry.Value)"
+        }
+
+        if (-not $lookup.ContainsKey($key)) {
+            $validList = ($catalog.Name | Sort-Object | ForEach-Object { "  $_" }) -join [Environment]::NewLine
+            throw @"
+Cannot resolve -Include value '$trimmed'. Valid products:
+$validList
+Aliases such as ProductKey short names are accepted (e.g. 'BISF' for 'BIS-F').
+"@
+        }
+
+        $canonical = $lookup[$key]
+        if (-not $seen.ContainsKey($canonical)) {
+            $seen[$canonical] = $true
+            $resolved.Add($canonical)
+        }
+    }
+
+    return , @($resolved.ToArray())
+}
 
 # Validate feature version based on Windows version
 if ($WindowsVersion -eq '2022' -and ($PSBoundParameters.ContainsKey('WindowsFeatureVersion'))) {
@@ -214,6 +392,11 @@ if ($Languages -notmatch '^([A-Za-z]{2})(-([A-Za-z]{2}|\d{3}))?$') { Write-Warni
 if ($CustomPolicyStore -and -not (Test-Path -Path "$($CustomPolicyStore)")) { throw "'$($CustomPolicyStore)' is not a valid path." }
 if ($CustomPolicyStore -and -not $CustomPolicyStore.EndsWith('\')) { $CustomPolicyStore += '\' }
 if ($CustomPolicyStore -and (Get-ChildItem -Path $CustomPolicyStore -Directory) -notmatch '^([A-Za-z]{2})(-([A-Za-z]{2}|\d{3}))?$') { throw "'$($CustomPolicyStore)' does not contain at least one subfolder matching the language format (e.g 'en-US', 'es', 'es-419')." }
+$Include = @(Resolve-EvergreenAdmxInclude -Include $Include)
+if ($PSBoundParameters.ContainsKey('Include')) {
+    $PSBoundParameters['Include'] = $Include
+}
+
 If ($PreferLocalOneDrive -and $Include -notcontains 'Microsoft OneDrive') {
     $Include += 'Microsoft OneDrive'
 }
@@ -240,12 +423,12 @@ Write-Verbose "CleanPolicyStore:`t'$($CleanPolicyStore)'"
 Write-Verbose "CleanPolicyStoreOnly:`t'$($CleanPolicyStoreOnly)'"
 Write-Verbose "CreateScheduledTask:`t'$($CreateScheduledTask)'"
 
-    function New-EvergreenAdmxTaskArgumentList {
+function New-EvergreenAdmxTaskArgumentList {
     <#
     .SYNOPSIS
         Builds powershell.exe arguments for the EvergreenAdmx scheduled task action.
     #>
-    [CmdletBinding()]
+    [CmdletBinding(SupportsShouldProcess = $true)]
     [OutputType([System.Collections.Generic.List[System.String]])]
     param (
         [Parameter(Mandatory = $true)]
@@ -253,6 +436,10 @@ Write-Verbose "CreateScheduledTask:`t'$($CreateScheduledTask)'"
         [Parameter(Mandatory = $true)]
         [System.Collections.IDictionary] $BoundParameters
     )
+
+    if (-not $PSCmdlet.ShouldProcess($ScriptPath, 'Build scheduled task argument list')) {
+        return
+    }
 
     $ArgumentList = [System.Collections.Generic.List[System.String]]::new()
     $ArgumentList.Add('-NoProfile')
@@ -296,7 +483,7 @@ if ($CreateScheduledTask) {
     $TaskPrincipal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
     $TaskSettings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Hours 1) -MultipleInstances IgnoreNew
     $null = Register-ScheduledTask -TaskName 'EvergreenAdmx' -Action $TaskAction -Trigger $TaskTrigger -Principal $TaskPrincipal -Settings $TaskSettings -Force
-    Write-Host "Scheduled task 'EvergreenAdmx' created or updated (weekly on Sunday at 01:00, runs as SYSTEM)."
+    Write-Output "Scheduled task 'EvergreenAdmx' created or updated (weekly on Sunday at 01:00, runs as SYSTEM)."
     return
 }
 #endregion
@@ -375,43 +562,45 @@ function Get-Link {
         [Switch] $PrefixParent
     )
 
-    $ProgressPreference = 'SilentlyContinue'
+    process {
+        $ProgressPreference = 'SilentlyContinue'
 
-    $ParamHash = @{
-        Uri = $Uri
-        Method = 'GET'
-        UseBasicParsing = $True
-        DisableKeepAlive = $True
-        ErrorAction = 'Stop'
-    }
-
-    if ($UserAgent) {
-        $ParamHash.UserAgent = $UserAgent
-    }
-
-    if ($Headers) {
-        $ParamHash.Headers = $Headers
-    }
-
-    try {
-        $Response = Invoke-WebRequest @ParamHash
-
-        foreach ($CurrentPattern in $Pattern) {
-            $Link = $Response.Links | Where-Object $MatchProperty -Match $CurrentPattern | Select-Object -First 1 -ExpandProperty $ReturnProperty
-
-            if ($PrefixDomain) {
-                $BaseURL = ($Uri -split '/' | Select-Object -First 3) -join '/'
-                $Link = Set-UriPrefix -Uri $Link -Prefix $BaseURL
-            } elseif ($PrefixParent) {
-                $BaseURL = ($Uri -split '/' | Select-Object -SkipLast 1) -join '/'
-                $Link = Set-UriPrefix -Uri $Link -Prefix $BaseURL
-            }
-
-            $Link
-
+        $ParamHash = @{
+            Uri = $Uri
+            Method = 'GET'
+            UseBasicParsing = $True
+            DisableKeepAlive = $True
+            ErrorAction = 'Stop'
         }
-    } catch {
-        Write-Error "$($MyInvocation.MyCommand): $($_.Exception.Message)"
+
+        if ($UserAgent) {
+            $ParamHash.UserAgent = $UserAgent
+        }
+
+        if ($Headers) {
+            $ParamHash.Headers = $Headers
+        }
+
+        try {
+            $Response = Invoke-WebRequest @ParamHash
+
+            foreach ($CurrentPattern in $Pattern) {
+                $Link = $Response.Links | Where-Object $MatchProperty -Match $CurrentPattern | Select-Object -First 1 -ExpandProperty $ReturnProperty
+
+                if ($PrefixDomain) {
+                    $BaseURL = ($Uri -split '/' | Select-Object -First 3) -join '/'
+                    $Link = Set-UriPrefix -Uri $Link -Prefix $BaseURL
+                } elseif ($PrefixParent) {
+                    $BaseURL = ($Uri -split '/' | Select-Object -SkipLast 1) -join '/'
+                    $Link = Set-UriPrefix -Uri $Link -Prefix $BaseURL
+                }
+
+                $Link
+
+            }
+        } catch {
+            Write-Error "$($MyInvocation.MyCommand): $($_.Exception.Message)"
+        }
     }
 
 }
@@ -680,7 +869,8 @@ function Invoke-FileDownload {
         Use the current user's default network credentials for the request.
 
     .PARAMETER UserAgent
-        Optional User-Agent header value.
+        Optional User-Agent header value. Defaults to 'EvergreenAdmx' when omitted
+        (required by hosts such as api.github.com).
 
     .PARAMETER Headers
         Optional additional request headers.
@@ -701,7 +891,7 @@ function Invoke-FileDownload {
 
         [switch]$UseDefaultCredentials,
 
-        [string]$UserAgent,
+        [string]$UserAgent = 'EvergreenAdmx',
 
         [hashtable]$Headers,
 
@@ -850,13 +1040,13 @@ function Copy-Admx {
     }
 }
 
-function Get-EvergreenAdmxObsoleteFilePatterns {
+function Get-EvergreenAdmxObsoleteFilePattern {
     <#
     .SYNOPSIS
         Returns file name patterns for obsolete or conflicting Policy Store Admx/Adml files.
     #>
     [CmdletBinding()]
-    [OutputType([string[]])]
+    [OutputType([System.Object[]])]
     param()
 
     return @(
@@ -880,6 +1070,8 @@ function Get-EvergreenAdmxObsoleteFilePatterns {
         'AcrobatReader2020.adml'
         'ctxprofile*.admx'
         'ctxprofile*.adml'
+        'CitrixBase.admx'
+        'CitrixBase.adml'
     )
 }
 
@@ -923,7 +1115,7 @@ function Clear-ObsoleteAdmx {
         Removes known obsolete or conflicting Admx/Adml files from a Policy Store.
     #>
     [CmdletBinding(SupportsShouldProcess = $true)]
-    [OutputType([string[]])]
+    [OutputType([System.Object[]])]
     param (
         [Parameter(Mandatory = $true)]
         [string]$PolicyStore,
@@ -940,7 +1132,7 @@ function Clear-ObsoleteAdmx {
     }
 
     $removed = [System.Collections.Generic.List[string]]::new()
-    $patterns = Get-EvergreenAdmxObsoleteFilePatterns
+    $patterns = Get-EvergreenAdmxObsoleteFilePattern
     $languagePattern = '^([A-Za-z]{2})(-([A-Za-z]{2}|\d{3}))?$'
 
     $obsoleteFiles = @(
@@ -1006,7 +1198,7 @@ function Get-EvergreenAdmxFSLogix {
     }
 }
 
-function Get-EvergreenAdmx365Apps {
+function Get-EvergreenAdmx365App {
     <#
     .SYNOPSIS
         Returns latest both x86 and x64 download url and version for Microsoft 365 Apps policy definitions files.
@@ -1054,11 +1246,11 @@ function Get-WindowsDownloadId {
     #>
 
     param (
-        [Parameter(Position = 0, ValueFromPipeline = $true)]
+        [Parameter(Position = 0)]
         [ValidateSet('10', '11', '2022', '2025')]
         [ValidateNotNullOrEmpty()]
         [int]$WindowsVersion = '11',
-        [Parameter(Position = 1, ValueFromPipeline = $true)]
+        [Parameter(Position = 1)]
         [ValidateScript({
                 if ($WindowsVersion -eq '10' -and $_ -in @('21H2', '22H2')) {
                     return $true
@@ -1160,28 +1352,29 @@ function Get-EvergreenAdmxOneDrive {
         $Evergreen = $Evergreen | Where-Object { $_.Architecture -eq $architecture -and $_.Ring -eq $ring -and $_.Type -eq $type } | `
                 Sort-Object -Property @{ Expression = { [System.Version]$_.Version }; Descending = $true } | Select-Object -First 1
 
+        $oneDriveADMXFolder = $null
         If (-not [string]::IsNullOrWhiteSpace($UserInstall)) {
             Write-Verbose "User OneDrive install found: $($UserInstall.DisplayVersion)"
             $isOneDriveInstalled = $true
             $OneDriveInstalledVersion = $UserInstall.DisplayVersion
-            $global:oneDriveADMXFolder = (Get-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\OneDrive').CurrentVersionPath
+            $oneDriveADMXFolder = (Get-ItemProperty -Path 'HKCU:\SOFTWARE\Microsoft\OneDrive').CurrentVersionPath
         } elseif (-not [string]::IsNullOrWhiteSpace($Systemx64Install)) {
             Write-Verbose "System x64 OneDrive install found: $($Systemx64Install.DisplayVersion)"
             $isOneDriveInstalled = $true
             $OneDriveInstalledVersion = $Systemx64Install.DisplayVersion
-            $global:oneDriveADMXFolder = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\OneDrive').CurrentVersionPath
+            $oneDriveADMXFolder = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\OneDrive').CurrentVersionPath
         } elseif (-not [string]::IsNullOrWhiteSpace($Systemx86Install)) {
             Write-Verbose "System x86 OneDrive install found: $($Systemx86Install.DisplayVersion)"
             $isOneDriveInstalled = $true
             $OneDriveInstalledVersion = $Systemx86Install.DisplayVersion
-            $global:oneDriveADMXFolder = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive').CurrentVersionPath
+            $oneDriveADMXFolder = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\OneDrive').CurrentVersionPath
         } else {
             $isOneDriveInstalled = $false
         }
 
         if ($PreferLocalOneDrive) {
             If ($isOneDriveInstalled) {
-                return @{ Version = $OneDriveInstalledVersion }
+                return @{ Version = $OneDriveInstalledVersion; ADMXFolder = $oneDriveADMXFolder }
             } else {
                 Write-Warning 'No local installation of Microsoft OneDrive install found.'
                 # Grab download uri
@@ -2819,7 +3012,7 @@ function Invoke-EvergreenAdmxDevolutionsRDM {
     }
 }
 
-function Get-EvergreenAdmxPowerToys {
+function Get-EvergreenAdmxPowerToy {
     <#
     .SYNOPSIS
         Returns latest Version and Uri for Microsoft PowerToys ADMX files
@@ -2839,7 +3032,7 @@ function Get-EvergreenAdmxPowerToys {
     }
 }
 
-function Invoke-EvergreenAdmxPowerToys {
+function Invoke-EvergreenAdmxPowerToy {
     <#
     .SYNOPSIS
         Process Microsoft PowerToys Admx files
@@ -2851,7 +3044,7 @@ function Invoke-EvergreenAdmxPowerToys {
         [string[]]$Languages = $null
     )
 
-    $Evergreen = Get-EvergreenAdmxPowerToys
+    $Evergreen = Get-EvergreenAdmxPowerToy
     $ProductName = 'Microsoft PowerToys'
     $ProductFolder = ''; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
 
@@ -3097,7 +3290,7 @@ function Get-EvergreenAdmxFoxit {
                 $latest = [PSCustomObject]@{ Version = $ver; URI = $editorUri; Base = $base }
                 break
             } catch {
-                # continue probing
+                Write-Verbose "Foxit ADMX probe missed version '$ver': $($_.Exception.Message)"
             }
         }
 
@@ -3549,7 +3742,7 @@ function Invoke-EvergreenAdmxOneDrive {
                     Write-Verbose "Found '$($installfolder)'"
                 }
             } else {
-                $installfolder = $oneDriveADMXFolder
+                $installfolder = $Evergreen.ADMXFolder
             }
 
             # Copy
@@ -3603,7 +3796,7 @@ function Invoke-EvergreenAdmxOneDrive {
     }
 }
 
-function Invoke-EvergreenAdmx365Apps {
+function Invoke-EvergreenAdmx365App {
     <#
     .SYNOPSIS
         Download Microsoft 365 Apps policy definition files
@@ -3625,7 +3818,7 @@ function Invoke-EvergreenAdmx365Apps {
         [string[]]$Languages = $null
     )
 
-    $Evergreen = Get-EvergreenAdmx365Apps | Where-Object { $_.Architecture -like $Architecture }
+    $Evergreen = Get-EvergreenAdmx365App | Where-Object { $_.Architecture -like $Architecture }
     $ProductName = "Microsoft 365 Apps $($Architecture)"
     $ProductFolder = ''; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
 
@@ -4583,7 +4776,7 @@ if ($Include -notcontains 'Microsoft 365 Apps') {
     Write-Verbose "`nSkipping Microsoft 365 Apps"
 } else {
     Write-Verbose "`nProcessing Admx files for Microsoft 365 Apps"
-    $admx = Invoke-EvergreenAdmx365Apps -Version $AdmxVersions['365Apps'].Version -PolicyStore $PolicyStore -Architecture 'x64' -Languages $Languages
+    $admx = Invoke-EvergreenAdmx365App -Version $AdmxVersions['365Apps'].Version -PolicyStore $PolicyStore -Architecture 'x64' -Languages $Languages
     Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey '365Apps' -AdmxData $admx
 }
 
@@ -4836,7 +5029,7 @@ if ($Include -notcontains 'Microsoft PowerToys') {
     Write-Verbose "`nSkipping Microsoft PowerToys"
 } else {
     Write-Verbose "`nProcessing Admx files for Microsoft PowerToys"
-    $admx = Invoke-EvergreenAdmxPowerToys -Version $AdmxVersions.PowerToys.Version -PolicyStore $PolicyStore -Languages $Languages
+    $admx = Invoke-EvergreenAdmxPowerToy -Version $AdmxVersions.PowerToys.Version -PolicyStore $PolicyStore -Languages $Languages
     Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'PowerToys' -AdmxData $admx
 }
 

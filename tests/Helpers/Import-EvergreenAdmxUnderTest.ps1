@@ -18,7 +18,7 @@ function Get-EvergreenAdmxScriptPath {
     return $script:EvergreenAdmxScriptPath
 }
 
-function Get-EvergreenAdmxFunctionTexts {
+function Get-EvergreenAdmxFunctionText {
     [CmdletBinding()]
     [OutputType([System.Object[]])]
     param(
@@ -53,7 +53,7 @@ function Import-EvergreenAdmxUnderTest {
         Dot-sources EvergreenAdmx function definitions into the caller's scope.
     .NOTES
         Must be invoked as:  . { Import-EvergreenAdmxUnderTest }
-        or by dot-sourcing each text from Get-EvergreenAdmxFunctionTexts in BeforeAll.
+        or by dot-sourcing each text from Get-EvergreenAdmxFunctionText in BeforeAll.
     #>
     [CmdletBinding()]
     [OutputType([string])]
@@ -62,7 +62,7 @@ function Import-EvergreenAdmxUnderTest {
         [string] $ScriptPath = (Get-EvergreenAdmxScriptPath)
     )
 
-    foreach ($text in (Get-EvergreenAdmxFunctionTexts -ScriptPath $ScriptPath)) {
+    foreach ($text in (Get-EvergreenAdmxFunctionText -ScriptPath $ScriptPath)) {
         . ([scriptblock]::Create($text))
     }
 
@@ -70,12 +70,23 @@ function Import-EvergreenAdmxUnderTest {
 }
 
 function Get-EvergreenAdmxIncludeValidateSet {
+    <#
+    .SYNOPSIS
+        Returns canonical -Include product names from Get-EvergreenAdmxProductCatalog.
+    .NOTES
+        Retains the historical helper name used by unit and nightly tests.
+        Prefer importing functions first; falls back to AST extraction from EvergreenAdmx.ps1.
+    #>
     [CmdletBinding()]
     [OutputType([System.Object[]])]
     param(
         [Parameter()]
         [string] $ScriptPath = (Get-EvergreenAdmxScriptPath)
     )
+
+    if (Get-Command -Name Get-EvergreenAdmxProductCatalog -ErrorAction SilentlyContinue) {
+        return @(Get-EvergreenAdmxProductCatalog | ForEach-Object { $_.Name })
+    }
 
     $tokens = $null
     $errors = $null
@@ -84,29 +95,18 @@ function Get-EvergreenAdmxIncludeValidateSet {
         throw "Failed to parse EvergreenAdmx.ps1: $($errors[0].Message)"
     }
 
-    $paramBlock = $ast.ParamBlock
-    if (-not $paramBlock) {
-        throw 'Param block not found in EvergreenAdmx.ps1.'
+    $fn = $ast.FindAll({
+            param($node)
+            $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+            $node.Name -eq 'Get-EvergreenAdmxProductCatalog'
+        }, $true) | Select-Object -First 1
+
+    if (-not $fn) {
+        throw 'Get-EvergreenAdmxProductCatalog not found in EvergreenAdmx.ps1.'
     }
 
-    $includeParam = $paramBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'Include' }
-    if (-not $includeParam) {
-        throw 'Include parameter not found in EvergreenAdmx.ps1.'
-    }
-
-    $validateSet = $includeParam.Attributes | Where-Object {
-        $_.TypeName.Name -eq 'ValidateSet'
-    } | Select-Object -First 1
-
-    if (-not $validateSet) {
-        throw 'ValidateSet attribute not found on Include parameter.'
-    }
-
-    return @(
-        $validateSet.PositionalArguments | ForEach-Object {
-            $_.SafeGetValue()
-        }
-    )
+    $catalog = & ([scriptblock]::Create($fn.Extent.Text + '; Get-EvergreenAdmxProductCatalog'))
+    return @($catalog | ForEach-Object { $_.Name })
 }
 
 function Test-EvergreenAdmxIsAdministrator {

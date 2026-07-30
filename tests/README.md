@@ -47,8 +47,6 @@ $config.Filter.Tag = @('Nightly')
 Invoke-Pester -Configuration $config
 ```
 
-Set `EVERGREENADMX_INCLUDE_BISF=1` to include BIS-F in the nightly matrix (often 403 without GitHub auth).
-
 ## Linting
 
 CI runs markdownlint and PSScriptAnalyzer on every PR / push (`ci.yml`). Locally:

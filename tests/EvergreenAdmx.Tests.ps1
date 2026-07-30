@@ -4,7 +4,7 @@
 BeforeAll {
     . (Join-Path -Path $PSScriptRoot -ChildPath 'Helpers\Import-EvergreenAdmxUnderTest.ps1')
     # Dot-source function bodies in this scope (not inside Import-*).
-    foreach ($text in (Get-EvergreenAdmxFunctionTexts)) {
+    foreach ($text in (Get-EvergreenAdmxFunctionText)) {
         . ([scriptblock]::Create($text))
     }
     $script:ScriptPath = Get-EvergreenAdmxScriptPath
@@ -37,9 +37,11 @@ Describe 'EvergreenAdmx script surface' {
     It 'exposes expected helper functions' {
         Get-Command -Name Get-WindowsDownloadId -CommandType Function | Should -Not -BeNullOrEmpty
         Get-Command -Name New-EvergreenAdmxTaskArgumentList -CommandType Function | Should -Not -BeNullOrEmpty
-        Get-Command -Name Get-EvergreenAdmxObsoleteFilePatterns -CommandType Function | Should -Not -BeNullOrEmpty
+        Get-Command -Name Get-EvergreenAdmxObsoleteFilePattern -CommandType Function | Should -Not -BeNullOrEmpty
         Get-Command -Name Clear-ObsoleteAdmx -CommandType Function | Should -Not -BeNullOrEmpty
         Get-Command -Name Initialize-PolicyStore -CommandType Function | Should -Not -BeNullOrEmpty
+        Get-Command -Name Get-EvergreenAdmxProductCatalog -CommandType Function | Should -Not -BeNullOrEmpty
+        Get-Command -Name Resolve-EvergreenAdmxInclude -CommandType Function | Should -Not -BeNullOrEmpty
     }
 }
 
@@ -145,9 +147,10 @@ Describe 'New-EvergreenAdmxTaskArgumentList' {
     }
 }
 
-Describe 'Include ValidateSet' {
+Describe 'Include product catalog' {
     BeforeAll {
         $script:Products = Get-EvergreenAdmxIncludeValidateSet
+        $script:Catalog = Get-EvergreenAdmxProductCatalog
     }
 
     It 'includes core products' {
@@ -167,11 +170,66 @@ Describe 'Include ValidateSet' {
     It 'has no duplicate product names' {
         $script:Products.Count | Should -Be ($script:Products | Select-Object -Unique).Count
     }
+
+    It 'has no overlapping aliases across products' {
+        $seen = @{}
+        foreach ($product in $script:Catalog) {
+            $keys = @($product.Name) + @($product.Aliases)
+            foreach ($key in $keys) {
+                if ([string]::IsNullOrWhiteSpace($key)) { continue }
+                $norm = $key.ToLowerInvariant()
+                if ($seen.ContainsKey($norm) -and $seen[$norm] -ne $product.Name) {
+                    throw "Alias/name '$key' overlaps between '$($seen[$norm])' and '$($product.Name)'."
+                }
+                $seen[$norm] = $product.Name
+            }
+        }
+        $seen.Count | Should -BeGreaterThan 0
+    }
 }
 
-Describe 'Get-EvergreenAdmxObsoleteFilePatterns' {
-    It 'includes WinStoreUI, legacy Office, Adobe Classic, and ctxprofile patterns' {
-        $patterns = Get-EvergreenAdmxObsoleteFilePatterns
+Describe 'Resolve-EvergreenAdmxInclude' {
+    It 'resolves ProductKey aliases to canonical names' {
+        $resolved = Resolve-EvergreenAdmxInclude -Include @('BISF', 'Edge', 'Chrome', 'AVD', 'FSLogix')
+        $resolved | Should -Be @('BIS-F', 'Microsoft Edge', 'Google Chrome', 'Microsoft AVD', 'Microsoft FSLogix')
+    }
+
+    It 'resolves historical renames' {
+        $resolved = Resolve-EvergreenAdmxInclude -Include @('Microsoft Office', 'Azure Virtual Desktop', 'Zoom Desktop Client')
+        $resolved | Should -Be @('Microsoft 365 Apps', 'Microsoft AVD', 'Zoom')
+    }
+
+    It 'is case-insensitive and deduplicates' {
+        $resolved = Resolve-EvergreenAdmxInclude -Include @('bisf', 'BIS-F', 'BisF')
+        $resolved | Should -Be @('BIS-F')
+    }
+
+    It 'rejects unknown values with a current-product list' {
+        $err = { Resolve-EvergreenAdmxInclude -Include @('BISFF') } | Should -Throw -PassThru
+        "$err" | Should -Match 'Cannot resolve -Include value'
+        "$err" | Should -Match 'BIS-F'
+        "$err" | Should -Match 'Microsoft Edge'
+        "$err" | Should -Not -Match 'Microsoft Desktop Optimization Pack'
+        "$err" | Should -Not -Match '\bMDOP\b'
+    }
+
+    It 'rejects removed MDOP with a dedicated message' {
+        $err = { Resolve-EvergreenAdmxInclude -Include @('MDOP') } | Should -Throw -PassThru
+        "$err" | Should -Match 'no longer supported'
+        "$err" | Should -Match 'MDOP'
+        "$err" | Should -Not -Match 'Valid products:'
+    }
+
+    It 'rejects removed Adobe Classic tracks' {
+        $err = { Resolve-EvergreenAdmxInclude -Include @('Adobe Acrobat Classic 2017') } | Should -Throw -PassThru
+        "$err" | Should -Match 'no longer supported'
+        "$err" | Should -Match 'Adobe Acrobat'
+    }
+}
+
+Describe 'Get-EvergreenAdmxObsoleteFilePattern' {
+    It 'includes WinStoreUI, legacy Office, Adobe Classic, ctxprofile, and CitrixBase patterns' {
+        $patterns = Get-EvergreenAdmxObsoleteFilePattern
         $patterns | Should -Contain 'WinStoreUI.admx'
         $patterns | Should -Contain 'WinStoreUI.adml'
         $patterns | Should -Contain '*12*.admx'
@@ -179,6 +237,8 @@ Describe 'Get-EvergreenAdmxObsoleteFilePatterns' {
         $patterns | Should -Contain 'Acrobat2017.admx'
         $patterns | Should -Contain 'AcrobatReader2020.adml'
         $patterns | Should -Contain 'ctxprofile*.admx'
+        $patterns | Should -Contain 'CitrixBase.admx'
+        $patterns | Should -Contain 'CitrixBase.adml'
     }
 }
 
@@ -226,6 +286,8 @@ Describe 'Clear-ObsoleteAdmx' {
         Set-Content -Path (Join-Path $script:StoreRoot 'Acrobat2017.admx') -Value 'remove'
         Set-Content -Path (Join-Path $script:StoreRoot 'AcrobatReader2020.admx') -Value 'remove'
         Set-Content -Path (Join-Path $script:StoreRoot 'ctxprofile7.admx') -Value 'remove'
+        Set-Content -Path (Join-Path $script:StoreRoot 'CitrixBase.admx') -Value 'remove'
+        Set-Content -Path (Join-Path $script:StoreRoot 'en-US\CitrixBase.adml') -Value 'remove'
         Set-Content -Path (Join-Path $script:StoreRoot 'readme.txt') -Value 'junk'
         $null = New-Item -Path (Join-Path $script:StoreRoot 'extract-debris') -ItemType Directory -Force
         Set-Content -Path (Join-Path $script:StoreRoot 'extract-debris\file.txt') -Value 'junk'
@@ -247,6 +309,8 @@ Describe 'Clear-ObsoleteAdmx' {
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'Acrobat2017.admx') | Should -BeFalse
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'AcrobatReader2020.admx') | Should -BeFalse
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'ctxprofile7.admx') | Should -BeFalse
+        Test-Path -LiteralPath (Join-Path $script:StoreRoot 'CitrixBase.admx') | Should -BeFalse
+        Test-Path -LiteralPath (Join-Path $script:StoreRoot 'en-US\CitrixBase.adml') | Should -BeFalse
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'readme.txt') | Should -BeFalse
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'extract-debris') | Should -BeFalse
 
