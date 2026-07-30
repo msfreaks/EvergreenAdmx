@@ -1,12 +1,6 @@
-# EvergreenAdmx
+# ![EvergreenAdmx](assets/logo.png)
 
-<p align="center">
-  <img src="assets/logo.png" alt="EvergreenAdmx" width="320" />
-</p>
-
-<p align="center">
-  Download and update ADMX/ADML templates automatically — keep your Group Policy store current with less manual work.
-</p>
+Automatically download and sync ADMX/ADML templates so your Group Policy store stays current.
 
 ---
 
