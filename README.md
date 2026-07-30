@@ -1,7 +1,7 @@
 # EvergreenAdmx
 
 <p align="center">
-  <img src="assets/logo.jpg" alt="EvergreenAdmx" width="320" />
+  <img src="assets/logo.png" alt="EvergreenAdmx" width="320" />
 </p>
 
 <p align="center">
