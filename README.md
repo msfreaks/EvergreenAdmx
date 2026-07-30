@@ -1,13 +1,11 @@
 # ![EvergreenAdmx](assets/logo.png)
 
-Automatically download and sync ADMX/ADML templates so your Group Policy store stays current.
-
----
-
 [![Release][github-release-badge]][github-release]
 [![PowerShell Gallery][psgallery-downloads-badge]][poshgallery-evergreenadmx]
 [![Codacy][code-quality-badge]][code-quality]
 [![X][x-follow-badge]][x-follow]
+
+Automatically download and sync ADMX/ADML templates so your Group Policy store stays current.
 
 After deploying several Azure Virtual Desktop environments I decided I no longer wanted to manually download the Admx files I needed, and I wanted a way to keep them up-to-date.
 
