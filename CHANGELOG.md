@@ -20,6 +20,10 @@ and this project uses a `YYMM.patch` release versioning scheme.
 - Added `-StampAdmxRevision` to stamp ADMX/ADML `revision` (and ADMX `minRequiredRevision` when `1.0`) from the product release Version as Major.Minor, so Intune shows a meaningful template version; files already above `1.0` are left unchanged
 - `-CleanPolicyStore` / `-CleanPolicyStoreOnly` now also remove `Microsoft-Windows-Geolocation-WLPAdm.admx` / `.adml` (superseded by `LocationProviderAdm`) and copy missing language ADMLs from `en-US` when available
 
+### Fixed
+
+- Fixed PSGallery publish workflow failing on `Install-PackageProvider -Name NuGet` under PowerShell 7 on GitHub Actions runners ([#87](https://github.com/msfreaks/EvergreenAdmx/issues/87))
+
 ## [2607.1] - 2026-07-29
 
 ### Added
@@ -47,7 +51,7 @@ and this project uses a `YYMM.patch` release versioning scheme.
 
 ### Added
 
-- Added `-CleanPolicyStore` to remove known obsolete or conflicting Admx/Adml from `-PolicyStore` after processing (WinStoreUI, legacy Office `*12*`–`*15*`, Adobe Classic 2017/2020, `ctxprofile*`, non-policy junk files/folders)
+- Added `-CleanPolicyStore` to remove known obsolete or conflicting Admx/Adml from `-PolicyStore` after processing (WinStoreUI, legacy Office `*12*`â€“`*15*`, Adobe Classic 2017/2020, `ctxprofile*`, non-policy junk files/folders)
 - Added `-CleanPolicyStoreOnly` to run Policy Store cleanup without downloading Admx files
 - Added Schannel ADMX support via [Crosse/SchannelGroupPolicy](https://github.com/Crosse/SchannelGroupPolicy) (`-Include 'Schannel'`)
 - Added Pester coverage for obsolete file patterns, `Initialize-PolicyStore`, and `Clear-ObsoleteAdmx` (including `-WhatIf`)
@@ -95,7 +99,7 @@ and this project uses a `YYMM.patch` release versioning scheme.
 - Removed `EvergreenAdmx.xml` sample Task Scheduler export in favor of `-CreateScheduledTask`
 - Removed Adobe Acrobat/Reader Classic 2017 and Classic 2020 tracks (EOL); Continuous track only
 - Removed Microsoft Desktop Optimization Pack ADMX support (extended support ended April 14, 2026)
-- Removed end-of-life Windows 10 feature versions `1903`–`21H1`; Windows 10 now supports `21H2` and `22H2` only
+- Removed end-of-life Windows 10 feature versions `1903`â€“`21H1`; Windows 10 now supports `21H2` and `22H2` only
 - Removed end-of-life Windows 11 feature versions `21H2` and `22H2`; Windows 11 now supports `23H2`, `24H2`, and `25H2` only
 
 ### Fixed

@@ -65,9 +65,24 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+          # Do not call Install-PackageProvider -Name NuGet on pwsh: the legacy
+          # bootstrap feed returns no match on hosted runners and fails the job.
+          # PowerShell 7 already ships a NuGet-capable PackageManagement stack
+          # (same pattern as ci.yml module installs).
+          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+            Register-PSRepository -Default
+          }
           Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-          Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force | Out-Null
-          Install-Module -Name PowerShellGet -MinimumVersion 2.2.5 -Scope CurrentUser -Force -AllowClobber
+
+          $installed = Get-Module -ListAvailable -Name PowerShellGet |
+            Sort-Object -Property Version -Descending |
+            Select-Object -First 1
+          if (-not $installed -or $installed.Version -lt [version]'2.2.5') {
+            Install-Module -Name PowerShellGet -MinimumVersion 2.2.5 -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck
+          } else {
+            Write-Host "PowerShellGet $($installed.Version) already meets minimum 2.2.5"
+          }
 
       - name: Skip if version already on PSGallery
         id: existing
