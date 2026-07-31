@@ -78,7 +78,7 @@
 .PARAMETER Include
     Array containing Admx products to include when checking for updates.
     Accepts canonical product names and short aliases (ProductKey, compact forms, and former names), e.g. "BISF" for "BIS-F", "Edge" for "Microsoft Edge".
-    Valid products are: "Custom Policy Store", "Windows 10", "Windows 11", "Windows 2022", "Windows 2025", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "Adobe DC", "BIS-F", "Citrix Workspace App", "Google Chrome", "Mozilla Firefox", "Mozilla Thunderbird", "Zoom", "Zoom VDI", "Microsoft AVD", "Microsoft Winget", "Microsoft PowerToys", "Windows Terminal", "Brave Browser", "Microsoft Notepad", "Microsoft Clipchamp", "Microsoft Visual Studio", "Microsoft VS Code", "Slack", "1Password", "TeamViewer", "Security ADMX", "Schannel", "Dell Command Update", "Winget-AutoUpdate", "Winget-AutoUpdate-Intune", "PSAppDeployToolkit", "Devolutions Remote Desktop Manager", "Dropbox", "Foxit PDF", "LibreOffice", "HP Anyware".
+    Valid products are: "Custom Policy Store", "Windows 10", "Windows 11", "Windows 2022", "Windows 2025", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "Adobe DC", "BIS-F", "Citrix Workspace App", "Google Chrome", "Mozilla Firefox", "Mozilla Thunderbird", "Zoom", "Zoom VDI", "Microsoft AVD", "Microsoft Winget", "Microsoft PowerToys", "Windows Terminal", "Brave Browser", "Microsoft Notepad", "Microsoft Clipchamp", "Microsoft Visual Studio", "Microsoft VS Code", "Slack", "1Password", "TeamViewer", "Security ADMX", "Schannel", "Dell Command Update", "Winget-AutoUpdate", "Winget-AutoUpdate-Intune", "PSAppDeployToolkit", "Devolutions Remote Desktop Manager", "Dropbox", "Foxit PDF", "LibreOffice", "HP Anyware", "Specops Authentication Client", "WSL", "Lenovo Dock Manager", "PDF-XChange", "RealVNC Connect", "ABBYY FineReader PDF", "Admin By Request", "GoTo".
     Defaults to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft Clipchamp", "Microsoft Notepad", "Microsoft Winget", "Windows Terminal".
 
 .PARAMETER PreferLocalOneDrive
@@ -287,6 +287,14 @@ function Get-EvergreenAdmxProductCatalog {
         [PSCustomObject]@{ Name = 'Foxit PDF'; Aliases = @('FoxitPDF', 'Foxit') }
         [PSCustomObject]@{ Name = 'LibreOffice'; Aliases = @('Collabora', 'CollaboraOffice') }
         [PSCustomObject]@{ Name = 'HP Anyware'; Aliases = @('HPAnyware', 'Anyware', 'PCoIP') }
+        [PSCustomObject]@{ Name = 'Specops Authentication Client'; Aliases = @('Specops', 'SpecopsClient', 'SpecopsAuthenticationClient', 'SPR', 'uReset', 'SpecopsPasswordReset') }
+        [PSCustomObject]@{ Name = 'WSL'; Aliases = @('Windows Subsystem for Linux', 'WindowsSubsystemForLinux') }
+        [PSCustomObject]@{ Name = 'Lenovo Dock Manager'; Aliases = @('DockManager', 'LenovoDockManager') }
+        [PSCustomObject]@{ Name = 'PDF-XChange'; Aliases = @('PDFXChange', 'PDF-X-Change', 'Tracker') }
+        [PSCustomObject]@{ Name = 'RealVNC Connect'; Aliases = @('RealVNC', 'VNC', 'RealVNCServer', 'RealVNCViewer') }
+        [PSCustomObject]@{ Name = 'ABBYY FineReader PDF'; Aliases = @('ABBYY', 'FineReader', 'FineReaderPDF', 'ABBYYFineReader') }
+        [PSCustomObject]@{ Name = 'Admin By Request'; Aliases = @('AdminByRequest', 'ABR') }
+        [PSCustomObject]@{ Name = 'GoTo'; Aliases = @('GoToConnect', 'GoTo App', 'GoToApp', 'LogMeIn GoTo') }
     )
 }
 
@@ -3764,6 +3772,639 @@ function Invoke-EvergreenAdmxHPAnyware {
     }
 }
 
+function Get-EvergreenAdmxSpecops {
+    <#
+    .SYNOPSIS
+        Returns latest Version and Uri for Specops Authentication Client ADMX files
+    #>
+
+    try {
+        $URI = 'https://download.specopssoft.com/Release/Client/Specops.Client.AdmxTemplates.zip'
+        $AzureAdURI = 'https://download.specopssoft.com/Release/Client/Specops.Client.AzureAdJoinedComputer.AdmxTemplates.zip'
+
+        $TempZip = Join-Path -Path $env:TEMP -ChildPath 'Specops.Client.AdmxTemplates.zip'
+        Invoke-FileDownload -Uri $URI -OutFile $TempZip -UseDefaultCredentials
+
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $zip = [System.IO.Compression.ZipFile]::OpenRead($TempZip)
+        try {
+            $entry = $zip.Entries | Where-Object { $_.Name -eq 'version.txt' } | Select-Object -First 1
+            if (-not $entry) {
+                throw 'version.txt was not found in Specops.Client.AdmxTemplates.zip'
+            }
+            $reader = New-Object System.IO.StreamReader($entry.Open())
+            try {
+                $Version = $reader.ReadToEnd().Trim()
+            } finally {
+                $reader.Close()
+            }
+        } finally {
+            $zip.Dispose()
+        }
+
+        Remove-Item -Path $TempZip -Force -ErrorAction SilentlyContinue
+
+        if ([string]::IsNullOrWhiteSpace($Version)) {
+            throw 'Unable to read Specops ADMX version from version.txt'
+        }
+
+        return @{ Version = $Version; URI = $URI; AzureAdURI = $AzureAdURI }
+    } catch {
+        Throw $_
+    }
+}
+
+function Invoke-EvergreenAdmxSpecops {
+    <#
+    .SYNOPSIS
+        Process Specops Authentication Client Admx files (on-prem + Entra ID)
+    #>
+
+    param(
+        [string]$Version,
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
+    )
+
+    $Evergreen = Get-EvergreenAdmxSpecops
+    $ProductName = 'Specops Authentication Client'
+    $ProductFolder = ''; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
+
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version) {
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
+
+        $TempFolder = "$($env:TEMP)\$($ProductName)"
+        $StagingFolder = Join-Path -Path $TempFolder -ChildPath 'staging'
+        try {
+            if (Test-Path -Path $TempFolder) { Remove-Item -Path $TempFolder -Recurse -Force }
+            $null = New-Item -Path $StagingFolder -ItemType Directory -Force
+            $null = New-Item -Path (Join-Path $StagingFolder 'en-US') -ItemType Directory -Force
+
+            foreach ($item in @(
+                    @{ Name = 'Specops.Client.AdmxTemplates.zip'; URI = $Evergreen.URI }
+                    @{ Name = 'Specops.Client.AzureAdJoinedComputer.AdmxTemplates.zip'; URI = $Evergreen.AzureAdURI }
+                )) {
+                $OutFile = "$($WorkingDirectory)\downloads\$($item.Name)"
+                Write-Verbose "Downloading '$($item.URI)' to '$($OutFile)'"
+                Invoke-FileDownload -Uri $item.URI -OutFile $OutFile -UseDefaultCredentials
+
+                $ExtractPath = Join-Path -Path $TempFolder -ChildPath ([IO.Path]::GetFileNameWithoutExtension($item.Name))
+                Expand-Archive -Path $OutFile -DestinationPath $ExtractPath -Force
+
+                Get-ChildItem -Path $ExtractPath -Recurse -Filter '*.admx' -File | ForEach-Object {
+                    Copy-Item -Path $_.FullName -Destination $StagingFolder -Force
+                }
+                Get-ChildItem -Path $ExtractPath -Recurse -Filter '*.adml' -File | ForEach-Object {
+                    $langDir = $_.Directory.Name
+                    $destLang = Join-Path $StagingFolder $langDir
+                    if (-not (Test-Path -Path $destLang)) {
+                        $null = New-Item -Path $destLang -ItemType Directory -Force
+                    }
+                    Copy-Item -Path $_.FullName -Destination $destLang -Force
+                }
+            }
+
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $StagingFolder -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
+
+            Remove-Item -Path $TempFolder -Recurse -Force
+            return $Evergreen
+        } catch {
+            Throw $_
+        }
+    } else {
+        return $null
+    }
+}
+
+function Get-EvergreenAdmxWSL {
+    <#
+    .SYNOPSIS
+        Returns latest Version (commit SHA) for Microsoft WSL Intune ADMX files
+    #>
+
+    try {
+        $commits = Invoke-RestMethod -Uri 'https://api.github.com/repos/microsoft/WSL/commits?path=intune&per_page=1' -Headers @{ 'User-Agent' = 'EvergreenAdmx' } -UseBasicParsing
+        $Version = $commits[0].sha.Substring(0, 7)
+        return @{ Version = $Version; URI = 'https://api.github.com/repos/microsoft/WSL/contents/intune?ref=master' }
+    } catch {
+        Throw $_
+    }
+}
+
+function Invoke-EvergreenAdmxWSL {
+    <#
+    .SYNOPSIS
+        Process Microsoft WSL Intune Admx files from GitHub
+    #>
+
+    param(
+        [string]$Version,
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
+    )
+
+    $Evergreen = Get-EvergreenAdmxWSL
+    $ProductName = 'WSL'
+    $ProductFolder = ''; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
+
+    if (-not $Version -or $Evergreen.Version -ne $Version) {
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
+
+        $TempFolder = "$($env:TEMP)\$($ProductName)"
+        $StagingFolder = Join-Path -Path $TempFolder -ChildPath 'staging'
+        try {
+            if (Test-Path -Path $TempFolder) { Remove-Item -Path $TempFolder -Recurse -Force }
+            $null = New-Item -Path $StagingFolder -ItemType Directory -Force
+
+            function Save-WSLGitHubContents {
+                param(
+                    [string]$ApiUri,
+                    [string]$TargetRoot
+                )
+
+                $entries = Invoke-RestMethod -Uri $ApiUri -Headers @{ 'User-Agent' = 'EvergreenAdmx' } -UseBasicParsing
+                foreach ($entry in $entries) {
+                    if ($entry.type -eq 'dir') {
+                        $subDir = Join-Path -Path $TargetRoot -ChildPath $entry.name
+                        if (-not (Test-Path -Path $subDir)) {
+                            $null = New-Item -Path $subDir -ItemType Directory -Force
+                        }
+                        Save-WSLGitHubContents -ApiUri $entry.url -TargetRoot $subDir
+                    } elseif ($entry.type -eq 'file' -and $entry.name -match '\.(admx|adml)$') {
+                        $outFile = Join-Path -Path $TargetRoot -ChildPath $entry.name
+                        Write-Verbose "Downloading '$($entry.download_url)' to '$($outFile)'"
+                        Invoke-FileDownload -Uri $entry.download_url -OutFile $outFile -UseDefaultCredentials
+                    }
+                }
+            }
+
+            Save-WSLGitHubContents -ApiUri $Evergreen.URI -TargetRoot $StagingFolder
+
+            if (-not (Get-ChildItem -Path $StagingFolder -Filter 'WSL.admx' -File -ErrorAction SilentlyContinue)) {
+                throw 'WSL.admx was not found in the microsoft/WSL intune folder.'
+            }
+
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $StagingFolder -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
+
+            Remove-Item -Path $TempFolder -Recurse -Force
+            return $Evergreen
+        } catch {
+            Throw $_
+        }
+    } else {
+        return $null
+    }
+}
+
+function Get-EvergreenAdmxLenovoDockManager {
+    <#
+    .SYNOPSIS
+        Returns latest Version and Uri for Lenovo Dock Manager ADMX files
+    #>
+
+    try {
+        $URI = 'https://download.lenovo.com/consumer/options/policy_setup.exe'
+        $TempExe = Join-Path -Path $env:TEMP -ChildPath 'policy_setup.exe'
+        Invoke-FileDownload -Uri $URI -OutFile $TempExe -UseDefaultCredentials
+
+        $info = (Get-Item -LiteralPath $TempExe).VersionInfo
+        $Version = $null
+        if ($info.ProductName -match 'Package\s+(\d+(?:\.\d+)+)') {
+            $Version = $Matches[1]
+        } elseif (-not [string]::IsNullOrWhiteSpace($info.FileVersion)) {
+            $Version = ($info.FileVersion).Trim()
+        }
+
+        Remove-Item -Path $TempExe -Force -ErrorAction SilentlyContinue
+
+        if ([string]::IsNullOrWhiteSpace($Version)) {
+            throw 'Unable to determine Lenovo Dock Manager ADMX package version from policy_setup.exe'
+        }
+
+        return @{ Version = $Version; URI = $URI }
+    } catch {
+        Throw $_
+    }
+}
+
+function Invoke-EvergreenAdmxLenovoDockManager {
+    <#
+    .SYNOPSIS
+        Process Lenovo Dock Manager Admx files from policy_setup.exe
+    #>
+
+    param(
+        [string]$Version,
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
+    )
+
+    $Evergreen = Get-EvergreenAdmxLenovoDockManager
+    $ProductName = 'Lenovo Dock Manager'
+    $ProductFolder = ''; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
+
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version) {
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
+
+        $OutFile = "$($WorkingDirectory)\downloads\policy_setup.exe"
+        $TempFolder = "$($env:TEMP)\$($ProductName)"
+        try {
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+            Invoke-FileDownload -Uri $Evergreen.URI -OutFile $OutFile -UseDefaultCredentials
+
+            if (Test-Path -Path $TempFolder) { Remove-Item -Path $TempFolder -Recurse -Force }
+            $null = New-Item -Path $TempFolder -ItemType Directory -Force
+
+            Write-Verbose "Extracting Inno Setup package to '$($TempFolder)'"
+            $proc = Start-Process -FilePath $OutFile -ArgumentList @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$TempFolder`"") -Wait -PassThru
+            if ($proc.ExitCode -ne 0 -and $null -ne $proc.ExitCode) {
+                Write-Verbose "Inno extract exit code: $($proc.ExitCode)"
+            }
+
+            $SourceAdmx = (Get-ChildItem -Path $TempFolder -Recurse -Filter '*.admx' -File -ErrorAction SilentlyContinue |
+                Select-Object -First 1).DirectoryName
+            if (-not $SourceAdmx) {
+                $SourceAdmx = (Get-ChildItem -Path "$env:SystemRoot\PolicyDefinitions" -Filter '*Dock*' -File -ErrorAction SilentlyContinue |
+                    Select-Object -First 1).DirectoryName
+            }
+            if (-not $SourceAdmx) {
+                throw 'Lenovo Dock Manager ADMX files were not found after extracting policy_setup.exe'
+            }
+
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
+
+            Remove-Item -Path $TempFolder -Recurse -Force -ErrorAction SilentlyContinue
+            return $Evergreen
+        } catch {
+            Throw $_
+        }
+    } else {
+        return $null
+    }
+}
+
+function Get-EvergreenAdmxPDFXChange {
+    <#
+    .SYNOPSIS
+        Returns latest Version and Uri for PDF-XChange ADMX files
+    #>
+
+    try {
+        $URI = 'https://www.pdf-xchange.com/Tracker%5FAD%5FAdministrativeTemplates.zip'
+        $LastModifiedDate = (Resolve-Uri -Uri $URI).LastModified
+        [version]$Version = $LastModifiedDate.ToString('yyyy.MM.dd')
+        return @{ Version = $Version.ToString(); URI = $URI }
+    } catch {
+        Throw $_
+    }
+}
+
+function Invoke-EvergreenAdmxPDFXChange {
+    <#
+    .SYNOPSIS
+        Process PDF-XChange Admx files
+    #>
+
+    param(
+        [string]$Version,
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
+    )
+
+    $Evergreen = Get-EvergreenAdmxPDFXChange
+    $ProductName = 'PDF-XChange'
+    $ProductFolder = ''; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
+
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version) {
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
+
+        $OutFile = "$($WorkingDirectory)\downloads\Tracker_AD_AdministrativeTemplates.zip"
+        $TempFolder = "$($env:TEMP)\$($ProductName)"
+        try {
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+            Invoke-FileDownload -Uri $Evergreen.URI -OutFile $OutFile -UseDefaultCredentials
+
+            if (Test-Path -Path $TempFolder) { Remove-Item -Path $TempFolder -Recurse -Force }
+            Expand-Archive -Path $OutFile -DestinationPath $TempFolder -Force
+
+            $SourceAdmx = (Get-ChildItem -Path $TempFolder -Recurse -Filter 'PDFXEditor.admx' | Select-Object -First 1).DirectoryName
+            if (-not $SourceAdmx) {
+                throw 'PDFXEditor.admx was not found in the PDF-XChange administrative templates zip.'
+            }
+
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
+
+            Remove-Item -Path $TempFolder -Recurse -Force
+            return $Evergreen
+        } catch {
+            Throw $_
+        }
+    } else {
+        return $null
+    }
+}
+
+function Get-EvergreenAdmxRealVNC {
+    <#
+    .SYNOPSIS
+        Returns latest Version and Uri for RealVNC Connect Server/Viewer ADMX files
+    #>
+
+    try {
+        $ServerURI = 'https://downloads.realvnc.com/download/file/policy.files/RealVNC-server-admx-templates-Latest.zip'
+        $ViewerURI = 'https://downloads.realvnc.com/download/file/policy.files/RealVNC-viewer-admx-templates-Latest.zip'
+
+        $serverLm = (Resolve-Uri -Uri $ServerURI).LastModified
+        $viewerLm = (Resolve-Uri -Uri $ViewerURI).LastModified
+        $Latest = if ($serverLm -ge $viewerLm) { $serverLm } else { $viewerLm }
+        [version]$Version = $Latest.ToString('yyyy.MM.dd')
+
+        return @{ Version = $Version.ToString(); URI = $ServerURI; ViewerURI = $ViewerURI }
+    } catch {
+        Throw $_
+    }
+}
+
+function Invoke-EvergreenAdmxRealVNC {
+    <#
+    .SYNOPSIS
+        Process RealVNC Connect Server and Viewer Admx files
+    #>
+
+    param(
+        [string]$Version,
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
+    )
+
+    $Evergreen = Get-EvergreenAdmxRealVNC
+    $ProductName = 'RealVNC Connect'
+    $ProductFolder = ''; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
+
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version) {
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
+
+        $TempFolder = "$($env:TEMP)\$($ProductName)"
+        $StagingFolder = Join-Path -Path $TempFolder -ChildPath 'staging'
+        try {
+            if (Test-Path -Path $TempFolder) { Remove-Item -Path $TempFolder -Recurse -Force }
+            $null = New-Item -Path $StagingFolder -ItemType Directory -Force
+            $null = New-Item -Path (Join-Path $StagingFolder 'en-US') -ItemType Directory -Force
+
+            # Viewer first, then Server so newer shared realvnc.admx/adml win
+            foreach ($item in @(
+                    @{ Name = 'RealVNC-viewer-admx-templates-Latest.zip'; URI = $Evergreen.ViewerURI }
+                    @{ Name = 'RealVNC-server-admx-templates-Latest.zip'; URI = $Evergreen.URI }
+                )) {
+                $OutFile = "$($WorkingDirectory)\downloads\$($item.Name)"
+                Write-Verbose "Downloading '$($item.URI)' to '$($OutFile)'"
+                Invoke-FileDownload -Uri $item.URI -OutFile $OutFile -UseDefaultCredentials
+
+                $ExtractPath = Join-Path -Path $TempFolder -ChildPath ([IO.Path]::GetFileNameWithoutExtension($item.Name))
+                Expand-Archive -Path $OutFile -DestinationPath $ExtractPath -Force
+
+                $AdmxRoot = Join-Path -Path $ExtractPath -ChildPath 'admx'
+                if (-not (Test-Path -Path $AdmxRoot)) {
+                    $AdmxRoot = $ExtractPath
+                }
+
+                Get-ChildItem -Path $AdmxRoot -Filter '*.admx' -File | ForEach-Object {
+                    Copy-Item -Path $_.FullName -Destination $StagingFolder -Force
+                }
+                Get-ChildItem -Path $AdmxRoot -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+                    $destLang = Join-Path $StagingFolder $_.Name
+                    if (-not (Test-Path -Path $destLang)) {
+                        $null = New-Item -Path $destLang -ItemType Directory -Force
+                    }
+                    Get-ChildItem -Path $_.FullName -Filter '*.adml' -File | ForEach-Object {
+                        Copy-Item -Path $_.FullName -Destination $destLang -Force
+                    }
+                }
+            }
+
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $StagingFolder -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
+
+            Remove-Item -Path $TempFolder -Recurse -Force
+            return $Evergreen
+        } catch {
+            Throw $_
+        }
+    } else {
+        return $null
+    }
+}
+
+function Get-EvergreenAdmxABBYYFineReader {
+    <#
+    .SYNOPSIS
+        Returns latest Version and Uri for ABBYY FineReader PDF ADMX files
+    #>
+
+    try {
+        $pageUrl = 'https://help.abbyy.com/en-us/finereader/16/admin_guide/gpo_domain/'
+        $admxUri = 'https://support.abbyy.com/hc/en-us/article_attachments/8277004669075/FineReader16.admx'
+        $admlUri = 'https://support.abbyy.com/hc/en-us/article_attachments/8277017934739/FineReader16.adml'
+
+        try {
+            $web = (Invoke-WebRequest -UseDefaultCredentials -Uri $pageUrl -UseBasicParsing).Content
+            $admxMatch = [regex]::Match($web, 'https://support\.abbyy\.com/hc/[^"''\s<>]+FineReader16\.admx')
+            $admlMatch = [regex]::Match($web, 'https://support\.abbyy\.com/hc/[^"''\s<>]+FineReader16\.adml')
+            if ($admxMatch.Success) { $admxUri = $admxMatch.Value }
+            if ($admlMatch.Success) { $admlUri = $admlMatch.Value }
+        } catch {
+            Write-Verbose "ABBYY page scrape failed; using known attachment URLs: $($_.Exception.Message)"
+        }
+
+        $LastModifiedDate = (Resolve-Uri -Uri $admxUri).LastModified
+        [version]$Version = $LastModifiedDate.ToString('yyyy.MM.dd')
+        return @{ Version = $Version.ToString(); URI = $admxUri; AdmlURI = $admlUri }
+    } catch {
+        Throw $_
+    }
+}
+
+function Invoke-EvergreenAdmxABBYYFineReader {
+    <#
+    .SYNOPSIS
+        Process ABBYY FineReader PDF Admx files
+    #>
+
+    param(
+        [string]$Version,
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
+    )
+
+    $Evergreen = Get-EvergreenAdmxABBYYFineReader
+    $ProductName = 'ABBYY FineReader PDF'
+    $ProductFolder = ''; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
+
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version) {
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
+
+        $TempFolder = "$($env:TEMP)\$($ProductName)"
+        $StagingFolder = Join-Path -Path $TempFolder -ChildPath 'staging'
+        try {
+            if (Test-Path -Path $TempFolder) { Remove-Item -Path $TempFolder -Recurse -Force }
+            $null = New-Item -Path (Join-Path $StagingFolder 'en-US') -ItemType Directory -Force
+
+            $OutAdmx = "$($WorkingDirectory)\downloads\FineReader16.admx"
+            $OutAdml = "$($WorkingDirectory)\downloads\FineReader16.adml"
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutAdmx)'"
+            Invoke-FileDownload -Uri $Evergreen.URI -OutFile $OutAdmx -UseDefaultCredentials
+            Write-Verbose "Downloading '$($Evergreen.AdmlURI)' to '$($OutAdml)'"
+            Invoke-FileDownload -Uri $Evergreen.AdmlURI -OutFile $OutAdml -UseDefaultCredentials
+
+            Copy-Item -Path $OutAdmx -Destination $StagingFolder -Force
+            Copy-Item -Path $OutAdml -Destination (Join-Path $StagingFolder 'en-US') -Force
+
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $StagingFolder -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
+
+            Remove-Item -Path $TempFolder -Recurse -Force
+            return $Evergreen
+        } catch {
+            Throw $_
+        }
+    } else {
+        return $null
+    }
+}
+
+function Get-EvergreenAdmxAdminByRequest {
+    <#
+    .SYNOPSIS
+        Returns latest Version (content hash) and Uri for Admin By Request ADMX files
+    #>
+
+    try {
+        $URI = 'https://www.adminbyrequest.com/ADMX'
+        $TempZip = Join-Path -Path $env:TEMP -ChildPath 'AdminByRequest-Admx.zip'
+        Invoke-FileDownload -Uri $URI -OutFile $TempZip -UseDefaultCredentials
+
+        $hash = (Get-FileHash -Path $TempZip -Algorithm SHA256).Hash.ToLowerInvariant()
+        $Version = $hash.Substring(0, 12)
+        Remove-Item -Path $TempZip -Force -ErrorAction SilentlyContinue
+
+        return @{ Version = $Version; URI = $URI }
+    } catch {
+        Throw $_
+    }
+}
+
+function Invoke-EvergreenAdmxAdminByRequest {
+    <#
+    .SYNOPSIS
+        Process Admin By Request Admx files
+    #>
+
+    param(
+        [string]$Version,
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
+    )
+
+    $Evergreen = Get-EvergreenAdmxAdminByRequest
+    $ProductName = 'Admin By Request'
+    $ProductFolder = ''; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
+
+    if (-not $Version -or $Evergreen.Version -ne $Version) {
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
+
+        $OutFile = "$($WorkingDirectory)\downloads\AdminByRequest-Admx.zip"
+        $TempFolder = "$($env:TEMP)\$($ProductName)"
+        try {
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+            Invoke-FileDownload -Uri $Evergreen.URI -OutFile $OutFile -UseDefaultCredentials
+
+            if (Test-Path -Path $TempFolder) { Remove-Item -Path $TempFolder -Recurse -Force }
+            Expand-Archive -Path $OutFile -DestinationPath $TempFolder -Force
+
+            $SourceAdmx = (Get-ChildItem -Path $TempFolder -Recurse -Filter 'AdminByRequest.admx' | Select-Object -First 1).DirectoryName
+            if (-not $SourceAdmx) {
+                throw 'AdminByRequest.admx was not found in the Admin By Request ADMX zip.'
+            }
+
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
+
+            Remove-Item -Path $TempFolder -Recurse -Force
+            return $Evergreen
+        } catch {
+            Throw $_
+        }
+    } else {
+        return $null
+    }
+}
+
+function Get-EvergreenAdmxGoTo {
+    <#
+    .SYNOPSIS
+        Returns latest Version and Uri for GoTo app ADMX files
+    #>
+
+    try {
+        $URI = 'https://goto-desktop.goto.com/GoToAppAdministrativeTemplates.zip'
+        $LastModifiedDate = (Resolve-Uri -Uri $URI).LastModified
+        [version]$Version = $LastModifiedDate.ToString('yyyy.MM.dd')
+        return @{ Version = $Version.ToString(); URI = $URI }
+    } catch {
+        Throw $_
+    }
+}
+
+function Invoke-EvergreenAdmxGoTo {
+    <#
+    .SYNOPSIS
+        Process GoTo app Admx files
+    #>
+
+    param(
+        [string]$Version,
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
+    )
+
+    $Evergreen = Get-EvergreenAdmxGoTo
+    $ProductName = 'GoTo'
+    $ProductFolder = ''; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
+
+    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version) {
+        Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
+
+        $OutFile = "$($WorkingDirectory)\downloads\GoToAppAdministrativeTemplates.zip"
+        $TempFolder = "$($env:TEMP)\$($ProductName)"
+        try {
+            Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutFile)'"
+            Invoke-FileDownload -Uri $Evergreen.URI -OutFile $OutFile -UseDefaultCredentials
+
+            if (Test-Path -Path $TempFolder) { Remove-Item -Path $TempFolder -Recurse -Force }
+            Expand-Archive -Path $OutFile -DestinationPath $TempFolder -Force
+
+            $SourceAdmx = (Get-ChildItem -Path $TempFolder -Recurse -Filter 'GoTo.admx' | Select-Object -First 1).DirectoryName
+            if (-not $SourceAdmx) {
+                throw 'GoTo.admx was not found in GoToAppAdministrativeTemplates.zip'
+            }
+
+            $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
+
+            Remove-Item -Path $TempFolder -Recurse -Force
+            return $Evergreen
+        } catch {
+            Throw $_
+        }
+    } else {
+        return $null
+    }
+}
+
 # Download functions
 function Invoke-EvergreenAdmxWindows {
     <#
@@ -5352,6 +5993,78 @@ if ($Include -notcontains 'HP Anyware') {
     Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'HPAnyware' -AdmxData $admx
 }
 
+
+# Specops Authentication Client
+if ($Include -notcontains 'Specops Authentication Client') {
+    Write-Verbose "`nSkipping Specops Authentication Client"
+} else {
+    Write-Verbose "`nProcessing Admx files for Specops Authentication Client"
+    $admx = Invoke-EvergreenAdmxSpecops -Version $AdmxVersions.SpecopsAuthenticationClient.Version -PolicyStore $PolicyStore -Languages $Languages
+    Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'SpecopsAuthenticationClient' -AdmxData $admx
+}
+
+# WSL
+if ($Include -notcontains 'WSL') {
+    Write-Verbose "`nSkipping WSL"
+} else {
+    Write-Verbose "`nProcessing Admx files for WSL"
+    $admx = Invoke-EvergreenAdmxWSL -Version $AdmxVersions.WSL.Version -PolicyStore $PolicyStore -Languages $Languages
+    Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'WSL' -AdmxData $admx
+}
+
+# Lenovo Dock Manager
+if ($Include -notcontains 'Lenovo Dock Manager') {
+    Write-Verbose "`nSkipping Lenovo Dock Manager"
+} else {
+    Write-Verbose "`nProcessing Admx files for Lenovo Dock Manager"
+    $admx = Invoke-EvergreenAdmxLenovoDockManager -Version $AdmxVersions.LenovoDockManager.Version -PolicyStore $PolicyStore -Languages $Languages
+    Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'LenovoDockManager' -AdmxData $admx
+}
+
+# PDF-XChange
+if ($Include -notcontains 'PDF-XChange') {
+    Write-Verbose "`nSkipping PDF-XChange"
+} else {
+    Write-Verbose "`nProcessing Admx files for PDF-XChange"
+    $admx = Invoke-EvergreenAdmxPDFXChange -Version $AdmxVersions.PDFXChange.Version -PolicyStore $PolicyStore -Languages $Languages
+    Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'PDFXChange' -AdmxData $admx
+}
+
+# RealVNC Connect
+if ($Include -notcontains 'RealVNC Connect') {
+    Write-Verbose "`nSkipping RealVNC Connect"
+} else {
+    Write-Verbose "`nProcessing Admx files for RealVNC Connect"
+    $admx = Invoke-EvergreenAdmxRealVNC -Version $AdmxVersions.RealVNCConnect.Version -PolicyStore $PolicyStore -Languages $Languages
+    Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'RealVNCConnect' -AdmxData $admx
+}
+
+# ABBYY FineReader PDF
+if ($Include -notcontains 'ABBYY FineReader PDF') {
+    Write-Verbose "`nSkipping ABBYY FineReader PDF"
+} else {
+    Write-Verbose "`nProcessing Admx files for ABBYY FineReader PDF"
+    $admx = Invoke-EvergreenAdmxABBYYFineReader -Version $AdmxVersions.ABBYYFineReaderPDF.Version -PolicyStore $PolicyStore -Languages $Languages
+    Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'ABBYYFineReaderPDF' -AdmxData $admx
+}
+
+# Admin By Request
+if ($Include -notcontains 'Admin By Request') {
+    Write-Verbose "`nSkipping Admin By Request"
+} else {
+    Write-Verbose "`nProcessing Admx files for Admin By Request"
+    $admx = Invoke-EvergreenAdmxAdminByRequest -Version $AdmxVersions.AdminByRequest.Version -PolicyStore $PolicyStore -Languages $Languages
+    Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'AdminByRequest' -AdmxData $admx
+}
+
+# GoTo
+if ($Include -notcontains 'GoTo') {
+    Write-Verbose "`nSkipping GoTo"
+} else {
+    Write-Verbose "`nProcessing Admx files for GoTo"
+    $admx = Invoke-EvergreenAdmxGoTo -Version $AdmxVersions.GoTo.Version -PolicyStore $PolicyStore -Languages $Languages
+    Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'GoTo' -AdmxData $admx
+}
 if ($CleanPolicyStore -and $PolicyStoreSpecified) {
     Write-Verbose "`nCleaning obsolete Admx files from Policy Store '$($PolicyStore)'"
     $null = Clear-ObsoleteAdmx -PolicyStore $PolicyStore -Languages $Languages

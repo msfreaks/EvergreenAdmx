@@ -9,6 +9,14 @@ and this project uses a `YYMM.patch` release versioning scheme.
 
 ### Added
 
+- Added Specops Authentication Client ADMX (on-prem + Entra ID templates)
+- Added WSL ADMX from [microsoft/WSL intune](https://github.com/microsoft/WSL/tree/master/intune) folder
+- Added Lenovo Dock Manager ADMX via policy_setup.exe (partially addresses #84; Commercial Vantage still tracked)
+- Added PDF-XChange ADMX
+- Added RealVNC Connect ADMX (Server + Viewer)
+- Added ABBYY FineReader PDF ADMX
+- Added Admin By Request ADMX
+- Added GoTo ADMX
 - Added `-StampAdmxRevision` to stamp ADMX/ADML `revision` (and ADMX `minRequiredRevision` when `1.0`) from the product release Version as Major.Minor, so Intune shows a meaningful template version; files already above `1.0` are left unchanged
 - `-CleanPolicyStore` / `-CleanPolicyStoreOnly` now also remove `Microsoft-Windows-Geolocation-WLPAdm.admx` / `.adml` (superseded by `LocationProviderAdm`) and copy missing language ADMLs from `en-US` when available
 

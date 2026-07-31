@@ -227,6 +227,8 @@ Shared defaults: `Microsoft Edge`, `Microsoft OneDrive`, `Microsoft 365 Apps`, `
 <summary>Supported <code>-Include</code> products</summary>
 
 - `1Password`
+- `ABBYY FineReader PDF` (FineReader 16)
+- `Admin By Request`
 - `Adobe DC` (community combined template)
 - `Adobe Acrobat` (Continuous track)
 - `Adobe Reader` (Continuous track)
@@ -239,7 +241,9 @@ Shared defaults: `Microsoft Edge`, `Microsoft OneDrive`, `Microsoft 365 Apps`, `
 - `Dropbox`
 - `Foxit PDF` (Reader + Editor)
 - `Google Chrome`
+- `GoTo` (GoTo app / GoTo Connect)
 - `HP Anyware` (PCoIP ADMX from Standard Agent; requires 7-Zip)
+- `Lenovo Dock Manager` (policy_setup.exe Group Policy templates)
 - `LibreOffice` (Collabora Office / LibreOffice GPO templates)
 - `Microsoft 365 Apps`
 - `Microsoft AVD`
@@ -254,10 +258,13 @@ Shared defaults: `Microsoft Edge`, `Microsoft OneDrive`, `Microsoft 365 Apps`, `
 - `Microsoft Winget`
 - `Mozilla Firefox`
 - `Mozilla Thunderbird`
+- `PDF-XChange` (Editor, Tools, Driver, Updater, Vault)
 - `PSAppDeployToolkit`
+- `RealVNC Connect` (Server + Viewer)
 - `Schannel` (Crosse Schannel GPO templates)
 - `Security ADMX` (Custom template for Windows hardening)
 - `Slack`
+- `Specops Authentication Client` (on-prem + Entra ID)
 - `TeamViewer`
 - `Windows 10` (`21H2` / `22H2`)
 - `Windows 11` (`23H2` / `24H2` / `25H2`)
@@ -266,6 +273,7 @@ Shared defaults: `Microsoft Edge`, `Microsoft OneDrive`, `Microsoft 365 Apps`, `
 - `Windows Terminal`
 - `Winget-AutoUpdate`
 - `Winget-AutoUpdate-Intune`
+- `WSL` (Windows Subsystem for Linux Intune ADMX)
 - `Zoom`
 - `Zoom VDI`
 
