@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses a `YYMM.patch` release versioning scheme.
 
-## [Unreleased]
+## [2608.0] 2026-08-01
 
 ### Added
 
@@ -26,7 +26,7 @@ and this project uses a `YYMM.patch` release versioning scheme.
 
 - Added GitHub Actions workflow to publish `EvergreenAdmx.ps1` to the PowerShell Gallery on release (`publish-psgallery.yml`)
 - Added tab-completion for `-Include` names and aliases via ArgumentCompleter
-- Added project logo (`assets/logo.webp`) and show it in README.md
+- Added project logo (`assets/logo.png`) and show it in README.md
 
 ### Changed
 
@@ -50,7 +50,6 @@ and this project uses a `YYMM.patch` release versioning scheme.
 - Added `-CleanPolicyStore` to remove known obsolete or conflicting Admx/Adml from `-PolicyStore` after processing (WinStoreUI, legacy Office `*12*`–`*15*`, Adobe Classic 2017/2020, `ctxprofile*`, non-policy junk files/folders)
 - Added `-CleanPolicyStoreOnly` to run Policy Store cleanup without downloading Admx files
 - Added Schannel ADMX support via [Crosse/SchannelGroupPolicy](https://github.com/Crosse/SchannelGroupPolicy) (`-Include 'Schannel'`)
-- Added sample thin orchestrator at `samples/Update-PolicyDefinitions.ps1`
 - Added Pester coverage for obsolete file patterns, `Initialize-PolicyStore`, and `Clear-ObsoleteAdmx` (including `-WhatIf`)
 - Added `-CreateScheduledTask` to create or update a weekly SYSTEM scheduled task (`EvergreenAdmx`, Sunday at 01:00) via `Register-ScheduledTask`; bound parameters are forwarded and the script exits after registration
 - Added Pester unit / Integration / Nightly suites under `tests/` and GitHub Actions workflows (`ci.yml`, `release-smoke.yml`, `nightly.yml`)

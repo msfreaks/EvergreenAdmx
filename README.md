@@ -18,7 +18,7 @@ This script solves both problems:
 
 Named as an homage to the [Evergreen module](https://github.com/EUCPilots/evergreen-module) by Aaron Parker ([@stealthpuppy](https://x.com/stealthpuppy)).
 
-## Contents
+## 📚 Contents
 
 - [Requirements](#requirements)
 - [Install](#install)
@@ -156,7 +156,7 @@ Thin orchestrator sample: [`samples/Update-PolicyDefinitions.ps1`](samples/Updat
 
 <a id="parameters"></a>
 
-## ⚙ Parameters
+## ⚙️ Parameters
 
 Pass parameters with a leading `-` (PowerShell syntax), for example `-WorkingDirectory` or `-Include`.
 
@@ -226,56 +226,56 @@ Shared defaults: `Microsoft Edge`, `Microsoft OneDrive`, `Microsoft 365 Apps`, `
 <details>
 <summary>Supported <code>-Include</code> products</summary>
 
-- `1Password`
-- `ABBYY FineReader PDF` (FineReader 16)
-- `Admin By Request`
-- `Adobe DC` (community combined template)
-- `Adobe Acrobat` (Continuous track)
-- `Adobe Reader` (Continuous track)
-- `BIS-F` (Base Image Script Framework)
-- `Brave Browser`
-- `Citrix Workspace app`
-- `Custom Policy Store` (local / UNC path you provide)
-- `Dell Command Update` (latest Universal installer via winget)
-- `Devolutions Remote Desktop Manager`
-- `Dropbox`
-- `Foxit PDF` (Reader + Editor)
-- `Google Chrome`
-- `GoTo` (GoTo app / GoTo Connect)
-- `HP Anyware` (PCoIP ADMX from Standard Agent; requires 7-Zip)
-- `Lenovo Dock Manager` (policy_setup.exe Group Policy templates)
-- `LibreOffice` (Collabora Office / LibreOffice GPO templates)
-- `Microsoft 365 Apps`
-- `Microsoft AVD`
-- `Microsoft Clipchamp`
-- `Microsoft Edge`
-- `Microsoft FSLogix`
-- `Microsoft Notepad`
-- `Microsoft OneDrive` (local installation or download from Evergreen)
-- `Microsoft PowerToys`
-- `Microsoft Visual Studio`
-- `Microsoft VS Code`
-- `Microsoft Winget`
-- `Mozilla Firefox`
-- `Mozilla Thunderbird`
-- `PDF-XChange` (Editor, Tools, Driver, Updater, Vault)
-- `PSAppDeployToolkit`
-- `RealVNC Connect` (Server + Viewer)
-- `Schannel` (Crosse Schannel GPO templates)
-- `Security ADMX` (Custom template for Windows hardening)
-- `Slack`
-- `Specops Authentication Client` (on-prem + Entra ID)
-- `TeamViewer`
-- `Windows 10` (`21H2` / `22H2`)
-- `Windows 11` (`23H2` / `24H2` / `25H2`)
-- `Windows 2022` (Windows Server 2022)
-- `Windows 2025` (Windows Server 2025)
-- `Windows Terminal`
-- `Winget-AutoUpdate`
-- `Winget-AutoUpdate-Intune`
-- `WSL` (Windows Subsystem for Linux Intune ADMX)
-- `Zoom`
-- `Zoom VDI`
+- [`1Password`][ref-1password]
+- [`ABBYY FineReader PDF`][ref-abbyy] (FineReader 16)
+- [`Admin By Request`][ref-admin-by-request]
+- [`Adobe DC`][ref-adobe-dc] (community combined template)
+- [`Adobe Acrobat`][ref-adobe-acrobat] (Continuous track)
+- [`Adobe Reader`][ref-adobe-reader] (Continuous track)
+- [`BIS-F`][ref-bisf] (Base Image Script Framework)
+- [`Brave Browser`][ref-brave]
+- [`Citrix Workspace app`][ref-citrix]
+- [`Custom Policy Store`][ref-custom-policy-store] (local / UNC path you provide)
+- [`Dell Command Update`][ref-dell-command-update] (latest Universal installer via winget)
+- [`Devolutions Remote Desktop Manager`][ref-devolutions]
+- [`Dropbox`][ref-dropbox]
+- [`Foxit PDF`][ref-foxit] (Reader + Editor)
+- [`Google Chrome`][ref-chrome]
+- [`GoTo`][ref-goto] (GoTo app / GoTo Connect)
+- [`HP Anyware`][ref-hp-anyware] (PCoIP ADMX from Standard Agent; requires 7-Zip)
+- [`Lenovo Dock Manager`][ref-lenovo-dock] (policy_setup.exe Group Policy templates)
+- [`LibreOffice`][ref-libreoffice] (Collabora Office / LibreOffice GPO templates)
+- [`Microsoft 365 Apps`][ref-365-apps]
+- [`Microsoft AVD`][ref-avd]
+- [`Microsoft Clipchamp`][ref-clipchamp]
+- [`Microsoft Edge`][ref-edge]
+- [`Microsoft FSLogix`][ref-fslogix]
+- [`Microsoft Notepad`][ref-notepad]
+- [`Microsoft OneDrive`][ref-onedrive] (local installation or download from Evergreen)
+- [`Microsoft PowerToys`][ref-powertoys]
+- [`Microsoft Visual Studio`][ref-visual-studio]
+- [`Microsoft VS Code`][ref-vscode]
+- [`Microsoft Winget`][ref-winget]
+- [`Mozilla Firefox`][ref-firefox]
+- [`Mozilla Thunderbird`][ref-thunderbird]
+- [`PDF-XChange`][ref-pdf-xchange] (Editor, Tools, Driver, Updater, Vault)
+- [`PSAppDeployToolkit`][ref-psadt]
+- [`RealVNC Connect`][ref-realvnc] (Server + Viewer)
+- [`Schannel`][ref-schannel] (Crosse Schannel GPO templates)
+- [`Security ADMX`][ref-security-admx] (Custom template for Windows hardening)
+- [`Slack`][ref-slack]
+- [`Specops Authentication Client`][ref-specops] (on-prem + Entra ID)
+- [`TeamViewer`][ref-teamviewer]
+- [`Windows 10`][ref-win10-22h2] ([`21H2`][ref-win10-21h2] / [`22H2`][ref-win10-22h2])
+- [`Windows 11`][ref-win11-25h2] ([`23H2`][ref-win11-23h2] / [`24H2`][ref-win11-24h2] / [`25H2`][ref-win11-25h2])
+- [`Windows 2022`][ref-winserver-2022] (Windows Server 2022)
+- [`Windows 2025`][ref-winserver-2025] (Windows Server 2025)
+- [`Windows Terminal`][ref-windows-terminal]
+- [`Winget-AutoUpdate`][ref-wau]
+- [`Winget-AutoUpdate-Intune`][ref-wau-intune]
+- [`WSL`][ref-wsl] (Windows Subsystem for Linux Intune ADMX)
+- [`Zoom`][ref-zoom]
+- [`Zoom VDI`][ref-zoom-vdi]
 
 </details>
 
@@ -322,7 +322,7 @@ Higher vendor revisions are left unchanged. Default is off so Central Policy Sto
 
 <a id="breaking-changes"></a>
 
-## ⚠ Breaking changes
+## ⚠️ Breaking changes
 
 Highlights in **2607.0** (full history and earlier breaking changes in the [Changelog](CHANGELOG.md)):
 
@@ -377,3 +377,56 @@ This project is licensed under the [MIT License](LICENSE).
 [x-follow-badge]: https://img.shields.io/twitter/follow/menschab?style=flat-square&logo=x
 [x-follow]: https://x.com/menschab
 [poshgallery-evergreenadmx]: https://www.powershellgallery.com/packages/EvergreenAdmx/
+[ref-1password]: https://support.1password.com/mobile-device-management/?windows=
+[ref-abbyy]: https://help.abbyy.com/en-us/finereader/16/admin_guide/gpo_domain/
+[ref-admin-by-request]: https://www.adminbyrequest.com/ADMX
+[ref-adobe-acrobat]: https://ardownload2.adobe.com/pub/adobe/acrobat/win/AcrobatDC/misc/AcrobatADMTemplate.zip
+[ref-adobe-dc]: https://github.com/systmworks/Adobe-DC-ADMX
+[ref-adobe-reader]: https://ardownload2.adobe.com/pub/adobe/reader/win/AcrobatDC/misc/ReaderADMTemplate.zip
+[ref-bisf]: https://github.com/EUCweb/BIS-F
+[ref-brave]: https://github.com/brave/brave-browser/wiki/Deploying-Brave-with-Group-Policy
+[ref-citrix]: https://docs.citrix.com/en-us/citrix-workspace-app-for-windows/group-policy
+[ref-custom-policy-store]: https://learn.microsoft.com/en-us/troubleshoot/windows-client/group-policy/create-and-manage-central-store
+[ref-dell-command-update]: https://www.dell.com/support/kbdoc/en-us/000293701/how-do-i-access-amdx-and-adml-files-for-use-with-dell-command-update
+[ref-devolutions]: https://docs.devolutions.net/rdm/knowledge-base/how-to-articles/apply-policies-gpos
+[ref-dropbox]: https://github.com/dropbox/GPO-Templates
+[ref-foxit]: https://kb.foxit.com/s/articles/360040241112-Available-GPO-templates
+[ref-goto]: https://goto-desktop.goto.com/GoToAppAdministrativeTemplates.zip
+[ref-hp-anyware]: https://anyware.hp.com/components/standard-agent-for-windows/26.05/documentation/administrators-guide/reference/install-gpo-template-files
+[ref-lenovo-dock]: https://download.lenovo.com/consumer/options/policy_setup.exe
+[ref-libreoffice]: https://github.com/CollaboraOnline/ADMX
+[ref-chrome]: https://chromeenterprise.google/policies/
+[ref-pdf-xchange]: https://www.pdf-xchange.com/Tracker%5FAD%5FAdministrativeTemplates.zip
+[ref-powertoys]: https://github.com/microsoft/PowerToys/releases
+[ref-realvnc]: https://downloads.realvnc.com/download/file/policy.files/RealVNC-server-admx-templates-Latest.zip
+[ref-specops]: https://download.specopssoft.com/Release/Client/Specops.Client.AdmxTemplates.zip
+[ref-thunderbird]: https://github.com/thunderbird/policy-templates
+[ref-windows-terminal]: https://github.com/microsoft/terminal/releases
+[ref-wsl]: https://github.com/microsoft/WSL/tree/master/intune
+[ref-365-apps]: https://www.microsoft.com/en-us/download/details.aspx?id=49030
+[ref-avd]: https://aka.ms/avdgpo
+[ref-clipchamp]: https://www.microsoft.com/en-us/download/details.aspx?id=105674
+[ref-edge]: https://learn.microsoft.com/en-us/deployedge/configure-microsoft-edge
+[ref-fslogix]: https://learn.microsoft.com/en-us/fslogix/how-to-use-group-policy-templates
+[ref-notepad]: https://download.microsoft.com/download/72ea16a9-4cc9-4032-945d-3a56a483d034/WindowsNotepadAdminTemplates.cab
+[ref-onedrive]: https://learn.microsoft.com/en-us/sharepoint/use-group-policy
+[ref-visual-studio]: https://www.microsoft.com/en-us/download/details.aspx?id=104405
+[ref-vscode]: https://code.visualstudio.com/docs/setup/enterprise
+[ref-win10-21h2]: https://www.microsoft.com/en-us/download/details.aspx?id=104042
+[ref-win10-22h2]: https://www.microsoft.com/en-us/download/details.aspx?id=104677
+[ref-win11-23h2]: https://www.microsoft.com/en-us/download/details.aspx?id=105667
+[ref-win11-24h2]: https://www.microsoft.com/en-us/download/details.aspx?id=106254
+[ref-win11-25h2]: https://www.microsoft.com/en-us/download/details.aspx?id=108542
+[ref-winserver-2022]: https://www.microsoft.com/en-us/download/details.aspx?id=104003
+[ref-winserver-2025]: https://www.microsoft.com/en-us/download/details.aspx?id=106295
+[ref-winget]: https://github.com/microsoft/winget-cli/releases
+[ref-firefox]: https://github.com/mozilla/policy-templates
+[ref-psadt]: https://github.com/PSAppDeployToolkit/PSAppDeployToolkit
+[ref-schannel]: https://github.com/Crosse/SchannelGroupPolicy
+[ref-security-admx]: https://github.com/Harvester57/Security-ADMX
+[ref-slack]: https://slack.com/help/articles/11906214948755-Manage-desktop-app-configurations
+[ref-teamviewer]: https://github.com/systmworks/TeamViewer-ADMX
+[ref-wau]: https://github.com/Romanitho/Winget-AutoUpdate
+[ref-wau-intune]: https://github.com/Weatherlights/Winget-AutoUpdate-Intune
+[ref-zoom]: https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0065466
+[ref-zoom-vdi]: https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0064784
