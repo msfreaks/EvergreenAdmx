@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses a `YYMM.patch` release versioning scheme.
 
+## [Unreleased]
+
+### Added
+
+- Added `-StampAdmxRevision` to stamp ADMX/ADML `revision` (and ADMX `minRequiredRevision` when `1.0`) from the product release Version as Major.Minor, so Intune shows a meaningful template version; files already above `1.0` are left unchanged
+- `-CleanPolicyStore` / `-CleanPolicyStoreOnly` now also remove `Microsoft-Windows-Geolocation-WLPAdm.admx` / `.adml` (superseded by `LocationProviderAdm`) and copy missing language ADMLs from `en-US` when available
+
 ## [2607.1] - 2026-07-29
 
 ### Added

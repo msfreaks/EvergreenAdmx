@@ -277,14 +277,16 @@ Microsoft OneDrive Admx files are only available after installing OneDrive. If t
 
 ### -CleanPolicyStore
 
-After processing, removes known obsolete or conflicting files from `-PolicyStore`:
+After processing, removes known obsolete or conflicting files from `-PolicyStore` and repairs missing ADMLs:
 
-- `WinStoreUI.admx` / `.adml` (known Group Policy conflict)
+- `WinStoreUI.admx` / `.adml` (replaced by `WindowsStore.admx`; namespace conflict if both present)
+- `Microsoft-Windows-Geolocation-WLPAdm.admx` / `.adml` (replaced by `LocationProviderAdm.admx`)
 - Legacy Office templates matching `*12*`–`*15*`
 - Adobe Acrobat/Reader Classic 2017 and 2020 templates
 - Citrix Profile Management `ctxprofile*` templates
 - `CitrixBase.admx` / `.adml` (no longer required; see [CTX696338](https://support.citrix.com/external/article/CTX696338/citrix-workspace-app-admx-download-does.html))
 - Non-`.admx`/`.adml` files at the store root and non-language extract folders
+- Missing language `.adml` files: copies from `en-US` into requested `-Languages` folders when available; warns if an `.admx` has no ADML at all
 
 Requires `-PolicyStore`. Supports `-WhatIf`.
 
@@ -297,6 +299,18 @@ Skips Admx downloads and only runs the Policy Store cleanup described above. Req
 Creates or updates a Windows Scheduled Task named `EvergreenAdmx` that runs this script weekly (Sunday at 01:00) as `SYSTEM` with highest privileges. Compatible with Windows Server 2022 and 2025 via `Register-ScheduledTask`.
 
 Other parameters bound on the same command line are forwarded to the task action. The script exits after registering the task and does not download Admx files in that run. Change day/time later in Task Scheduler.
+
+### -StampAdmxRevision
+
+When set, stamps ADMX/ADML `revision` attributes from the product release Version (GitHub release, download page, etc.) normalized to the ADMX `versionString` **Major.Minor** form (for example `143.0.3624.0` becomes `143.0`). This helps Intune Imported Administrative Templates show a meaningful Version column.
+
+Only attributes currently set to `1.0` are updated:
+
+- ADMX `policyDefinitions/@revision`
+- ADMX `resources/@minRequiredRevision` (when also `1.0`)
+- ADML `policyDefinitionResources/@revision`
+
+Higher vendor revisions are left unchanged. Default is off so Central Policy Store copies keep vendor XML unless you opt in.
 
 <a id="breaking-changes"></a>
 
@@ -314,6 +328,7 @@ Highlights in **2607.0** (full history and earlier breaking changes in the [Chan
 ## 📝 Notes
 
 - This script has not been tested on Windows Core
+- Use `-StampAdmxRevision` when preparing templates for Intune so the Version column reflects the product release (Major.Minor); this does not bypass Intune namespace conflicts on re-upload
 - Some Admx files can only be obtained by installing the downloaded package (for example Windows 10/11 Admx MSI packages, and OneDrive after install)
 - If you use the script to download Windows 10 or Windows 11 Admx files, remove any existing installs of those Admx MSI packages first, or the script will fail
 - For those packages the script installs the package, copies the Admx files, then uninstalls the package
@@ -321,6 +336,8 @@ Highlights in **2607.0** (full history and earlier breaking changes in the [Chan
 - HP Anyware ADMX requires `winget` (to resolve the current version) and 7-Zip to extract `PCoIP.admx` from the Standard Agent installer
 - Windows 10 `22H2` is the last GA release (mainstream support ended October 14, 2025); organizations on [Extended Security Updates (ESU)](https://learn.microsoft.com/en-us/windows/whats-new/extended-security-updates) still need matching ADMX templates
 - Windows 10 `21H2` is the base for **Windows 10 Enterprise LTSC 2021** (supported until January 2027, longer for IoT Enterprise LTSC)
+- Use `-CleanPolicyStore` (or `-CleanPolicyStoreOnly`) to remove known conflicting ADMX files (for example `WinStoreUI` / `Microsoft-Windows-Geolocation-WLPAdm`) and copy missing language ADMLs from `en-US` when available
+- Some Microsoft ADMX upgrades change GPO registry value types or paths (for example ErrorReporting `DefaultConsent` “unexpected type”, or SkyDrive → OneDrive registry keys). Those require rebuilding the affected GPO settings; the script does not rewrite `registry.pol`. See [Known issues for managing Group Policy clients](https://learn.microsoft.com/en-us/troubleshoot/windows-client/active-directory/known-issues-for-group-policy-clients)
 
 <a id="roadmap"></a>
 
@@ -329,7 +346,6 @@ Highlights in **2607.0** (full history and earlier breaking changes in the [Chan
 - Add logging options
 - Add notification options
 - Detect user domain automatically
-- Add ADMX versioning automatically (useful for Intune)
 
 <a id="credits"></a>
 

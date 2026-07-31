@@ -87,17 +87,24 @@
 
 .PARAMETER CleanPolicyStore
     After processing, remove known obsolete or conflicting Admx/Adml files from -PolicyStore
-    (WinStoreUI, legacy Office *12-*15, Adobe Classic 2017/2020, ctxprofile*, CitrixBase, non-policy junk).
+    (WinStoreUI, Microsoft-Windows-Geolocation-WLPAdm, legacy Office *12-*15, Adobe Classic 2017/2020,
+    ctxprofile*, CitrixBase, non-policy junk) and copy missing language ADMLs from en-US when available.
     Requires -PolicyStore. Supports -WhatIf.
 
 .PARAMETER CleanPolicyStoreOnly
-    Skip downloads and only clean -PolicyStore using the same obsolete-file rules as -CleanPolicyStore.
+    Skip downloads and only clean -PolicyStore using the same obsolete-file and ADML-repair rules as -CleanPolicyStore.
     Requires -PolicyStore. Supports -WhatIf.
 
 .PARAMETER CreateScheduledTask
     Creates or updates a weekly Windows Scheduled Task named EvergreenAdmx that runs this script
     as SYSTEM with highest privileges (Sunday at 01:00). Bound parameters are forwarded to the
     task action except CreateScheduledTask. The script exits after registering the task and does not download Admx files in that run.
+
+.PARAMETER StampAdmxRevision
+    When set, stamps ADMX/ADML revision attributes from the product release Version (Major.Minor
+    ADMX versionString form) so Intune Imported Administrative Templates show a meaningful Version.
+    Only attributes currently set to 1.0 are updated; higher vendor revisions are left unchanged.
+    Also updates ADMX resources minRequiredRevision when it is 1.0.
 
 .EXAMPLE
     .\EvergreenAdmx.ps1
@@ -127,12 +134,12 @@
 .EXAMPLE
     .\EvergreenAdmx.ps1 -PolicyStore "\\contoso.com\SYSVOL\contoso.com\Policies\PolicyDefinitions" -Include @('Windows 11', 'Microsoft Edge') -CleanPolicyStore
 
-    Downloads the specified products, copies them to the Central Policy Store (creating it if missing), then removes known obsolete Admx files.
+    Downloads the specified products, copies them to the Central Policy Store (creating it if missing), then removes known obsolete Admx files and repairs missing ADMLs.
 
 .EXAMPLE
     .\EvergreenAdmx.ps1 -PolicyStore "\\contoso.com\SYSVOL\contoso.com\Policies\PolicyDefinitions" -CleanPolicyStoreOnly -WhatIf
 
-    Shows which obsolete Admx/Adml files would be removed from the Central Policy Store without deleting anything.
+    Shows which obsolete Admx/Adml files would be removed (and which missing ADMLs would be copied from en-US) without changing the store.
 
 .LINK
     https://github.com/msfreaks/EvergreenAdmx
@@ -174,6 +181,8 @@ param(
     [switch] $CleanPolicyStoreOnly,
     [Parameter(Mandatory = $false)]
     [switch] $CreateScheduledTask,
+    [Parameter(Mandatory = $false)]
+    [switch] $StampAdmxRevision,
     [ArgumentCompleter({
             param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
             $null = $commandName, $parameterName, $fakeBoundParameters
@@ -422,6 +431,7 @@ Write-Verbose "PreferLocalOneDrive:`t'$($PreferLocalOneDrive)'"
 Write-Verbose "CleanPolicyStore:`t'$($CleanPolicyStore)'"
 Write-Verbose "CleanPolicyStoreOnly:`t'$($CleanPolicyStoreOnly)'"
 Write-Verbose "CreateScheduledTask:`t'$($CreateScheduledTask)'"
+Write-Verbose "StampAdmxRevision:`t'$($StampAdmxRevision)'"
 
 function New-EvergreenAdmxTaskArgumentList {
     <#
@@ -1002,6 +1012,175 @@ function Invoke-FileDownload {
     }
 }
 
+function ConvertTo-AdmxRevisionString {
+    <#
+    .SYNOPSIS
+        Converts a product release Version to an ADMX versionString (Major.Minor).
+    #>
+    [CmdletBinding()]
+    [OutputType([System.String])]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Version
+    )
+
+    $normalized = $Version.Trim()
+    if ($normalized -match '^v(?<ver>.+)$') {
+        $normalized = $Matches['ver']
+    }
+
+    try {
+        $parsed = [version]$normalized
+        return ('{0}.{1}' -f $parsed.Major, $parsed.Minor)
+    } catch {
+        Write-Warning "Unable to convert '$Version' to ADMX revision (Major.Minor)."
+        return $null
+    }
+}
+
+function Test-AdmxRevisionIsOnePointZero {
+    <#
+    .SYNOPSIS
+        Returns $true when an ADMX/ADML revision attribute is exactly 1.0.
+    #>
+    [CmdletBinding()]
+    [OutputType([System.Boolean])]
+    param(
+        [Parameter(Mandatory = $false)]
+        [string]$Value
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Value)) { return $false }
+    try {
+        return ([version]$Value) -eq ([version]'1.0')
+    } catch {
+        return ($Value -eq '1.0')
+    }
+}
+
+function Save-AdmxXmlDocument {
+    <#
+    .SYNOPSIS
+        Saves an XmlDocument as UTF-8 without BOM.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Xml.XmlDocument]$Xml,
+
+        [Parameter(Mandatory = $true)]
+        [string]$FilePath
+    )
+
+    $encoding = New-Object System.Text.UTF8Encoding $false
+    $settings = New-Object System.Xml.XmlWriterSettings
+    $settings.Encoding = $encoding
+    # PreserveWhitespace on load; avoid re-indenting the document on save
+    $settings.Indent = $false
+    $settings.OmitXmlDeclaration = $false
+    $writer = [System.Xml.XmlWriter]::Create($FilePath, $settings)
+    try {
+        $Xml.Save($writer)
+    } finally {
+        $writer.Dispose()
+    }
+}
+
+function Set-AdmxRevision {
+    <#
+    .SYNOPSIS
+        Stamps ADMX/ADML revision attributes when the current value is exactly 1.0.
+
+    .DESCRIPTION
+        Updates policyDefinitions/@revision, resources/@minRequiredRevision (ADMX), and
+        policyDefinitionResources/@revision (ADML) only when each attribute is currently 1.0.
+        Higher vendor revisions are left unchanged.
+    #>
+    [CmdletBinding(SupportsShouldProcess)]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Revision
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        Write-Verbose "Set-AdmxRevision: path '$Path' does not exist"
+        return
+    }
+
+    $admxFiles = @(Get-ChildItem -LiteralPath $Path -Filter '*.admx' -File -ErrorAction SilentlyContinue)
+    $admlFiles = @(Get-ChildItem -LiteralPath $Path -Filter '*.adml' -File -Recurse -ErrorAction SilentlyContinue)
+
+    foreach ($file in $admxFiles) {
+        if (-not $PSCmdlet.ShouldProcess($file.FullName, "Stamp ADMX revision to $Revision when 1.0")) { continue }
+        try {
+            $xml = New-Object System.Xml.XmlDocument
+            $xml.PreserveWhitespace = $true
+            $xml.Load($file.FullName)
+            $root = $xml.DocumentElement
+            if ($null -eq $root -or $root.LocalName -ne 'policyDefinitions') {
+                Write-Verbose "Skipping '$($file.Name)': root is not policyDefinitions"
+                continue
+            }
+
+            $changed = $false
+            $currentRevision = $root.GetAttribute('revision')
+            if (Test-AdmxRevisionIsOnePointZero -Value $currentRevision) {
+                $root.SetAttribute('revision', $Revision)
+                $changed = $true
+                Write-Verbose "Stamped '$($file.Name)' revision $currentRevision -> $Revision"
+            } else {
+                Write-Verbose "Skipped '$($file.Name)' revision '$currentRevision' (not 1.0)"
+            }
+
+            $resources = $root.SelectSingleNode('*[local-name()="resources"]')
+            if ($resources) {
+                $minRequired = $resources.GetAttribute('minRequiredRevision')
+                if (Test-AdmxRevisionIsOnePointZero -Value $minRequired) {
+                    $resources.SetAttribute('minRequiredRevision', $Revision)
+                    $changed = $true
+                    Write-Verbose "Stamped '$($file.Name)' minRequiredRevision $minRequired -> $Revision"
+                } else {
+                    Write-Verbose "Skipped '$($file.Name)' minRequiredRevision '$minRequired' (not 1.0)"
+                }
+            }
+
+            if ($changed) {
+                Save-AdmxXmlDocument -Xml $xml -FilePath $file.FullName
+            }
+        } catch {
+            Write-Warning "Failed to stamp ADMX revision on '$($file.FullName)': $_"
+        }
+    }
+
+    foreach ($file in $admlFiles) {
+        if (-not $PSCmdlet.ShouldProcess($file.FullName, "Stamp ADML revision to $Revision when 1.0")) { continue }
+        try {
+            $xml = New-Object System.Xml.XmlDocument
+            $xml.PreserveWhitespace = $true
+            $xml.Load($file.FullName)
+            $root = $xml.DocumentElement
+            if ($null -eq $root -or $root.LocalName -ne 'policyDefinitionResources') {
+                Write-Verbose "Skipping '$($file.Name)': root is not policyDefinitionResources"
+                continue
+            }
+
+            $currentRevision = $root.GetAttribute('revision')
+            if (Test-AdmxRevisionIsOnePointZero -Value $currentRevision) {
+                $root.SetAttribute('revision', $Revision)
+                Write-Verbose "Stamped '$($file.Name)' revision $currentRevision -> $Revision"
+                Save-AdmxXmlDocument -Xml $xml -FilePath $file.FullName
+            } else {
+                Write-Verbose "Skipped '$($file.Name)' revision '$currentRevision' (not 1.0)"
+            }
+        } catch {
+            Write-Warning "Failed to stamp ADML revision on '$($file.FullName)': $_"
+        }
+    }
+}
+
 function Copy-Admx {
     param (
         [string]$SourceFolder,
@@ -1009,7 +1188,8 @@ function Copy-Admx {
         [string]$PolicyStore = $null,
         [string]$ProductName,
         [switch]$Quiet,
-        [string[]]$Languages = $null
+        [string[]]$Languages = $null,
+        [string]$Revision = $null
     )
     if (-not (Test-Path -Path "$($TargetFolder)")) { $null = (New-Item -Path "$($TargetFolder)" -ItemType Directory -Force) }
     if (-not $Languages -or $Languages -eq '') { $Languages = @('en-US') }
@@ -1038,6 +1218,17 @@ function Copy-Admx {
             Copy-Item -Path "$($SourceFolder)\$($language)\*.adml" -Destination "$($PolicyStore)$($language)" -Force
         }
     }
+
+    if ($Revision) {
+        $normalizedRevision = ConvertTo-AdmxRevisionString -Version $Revision
+        if ($normalizedRevision) {
+            Write-Verbose "Stamping ADMX/ADML revision '$normalizedRevision' for '$ProductName'"
+            Set-AdmxRevision -Path $TargetFolder -Revision $normalizedRevision
+            if ($PolicyStore) {
+                Set-AdmxRevision -Path $PolicyStore -Revision $normalizedRevision
+            }
+        }
+    }
 }
 
 function Get-EvergreenAdmxObsoleteFilePattern {
@@ -1052,6 +1243,8 @@ function Get-EvergreenAdmxObsoleteFilePattern {
     return @(
         'WinStoreUI.admx'
         'WinStoreUI.adml'
+        'Microsoft-Windows-Geolocation-WLPAdm.admx'
+        'Microsoft-Windows-Geolocation-WLPAdm.adml'
         '*12*.admx'
         '*12*.adml'
         '*13*.admx'
@@ -1112,7 +1305,8 @@ function Initialize-PolicyStore {
 function Clear-ObsoleteAdmx {
     <#
     .SYNOPSIS
-        Removes known obsolete or conflicting Admx/Adml files from a Policy Store.
+        Removes known obsolete or conflicting Admx/Adml files from a Policy Store,
+        and copies missing language ADMLs from en-US when available.
     #>
     [CmdletBinding(SupportsShouldProcess = $true)]
     [OutputType([System.Object[]])]
@@ -1170,6 +1364,55 @@ function Clear-ObsoleteAdmx {
             Write-Verbose "Removing non-language folder '$($folder.FullName)'"
             Remove-Item -LiteralPath $folder.FullName -Recurse -Force
             $removed.Add($folder.FullName)
+        }
+    }
+
+    # Repair missing ADMLs: copy en-US into requested language folders when the ADMX has no matching ADML
+    $enUsFolder = Join-Path -Path $store -ChildPath 'en-US'
+    $admxFiles = @(
+        Get-ChildItem -LiteralPath $store -Filter '*.admx' -File -ErrorAction SilentlyContinue |
+            Where-Object {
+                $name = $_.Name
+                -not ($patterns | Where-Object { $name -like $_ })
+            }
+    )
+    $languageFolders = @(
+        Get-ChildItem -LiteralPath $store -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match $languagePattern -or ($Languages -contains $_.Name) }
+    )
+
+    foreach ($admx in $admxFiles) {
+        $admlName = "$($admx.BaseName).adml"
+        $enUsAdml = Join-Path -Path $enUsFolder -ChildPath $admlName
+
+        foreach ($language in $Languages) {
+            if ($language -eq 'en-US') { continue }
+            $languageFolder = Join-Path -Path $store -ChildPath $language
+            $targetAdml = Join-Path -Path $languageFolder -ChildPath $admlName
+            if (Test-Path -LiteralPath $targetAdml) { continue }
+            if (-not (Test-Path -LiteralPath $enUsAdml)) { continue }
+
+            if ($PSCmdlet.ShouldProcess($targetAdml, "Copy missing ADML from en-US for language '$language'")) {
+                if (-not (Test-Path -LiteralPath $languageFolder)) {
+                    $null = New-Item -Path $languageFolder -ItemType Directory -Force
+                }
+                Write-Warning "Missing ADML for '$($admx.Name)' in '$language'; copying from en-US."
+                Copy-Item -LiteralPath $enUsAdml -Destination $targetAdml -Force
+            }
+        }
+
+        $hasAnyAdml = $false
+        foreach ($folder in $languageFolders) {
+            if (Test-Path -LiteralPath (Join-Path -Path $folder.FullName -ChildPath $admlName)) {
+                $hasAnyAdml = $true
+                break
+            }
+        }
+        if (-not $hasAnyAdml -and (Test-Path -LiteralPath $enUsAdml)) {
+            $hasAnyAdml = $true
+        }
+        if (-not $hasAnyAdml) {
+            Write-Warning "No ADML found for '$($admx.Name)' in any language folder under '$store'."
         }
     }
 
@@ -1784,7 +2027,7 @@ function Invoke-EvergreenAdmxNotepad {
             # copy
             $SourceAdmx = (Get-ChildItem -Path $TempFolder -Recurse -Filter 'WindowsNotepad.admx' | Select-Object -First 1).DirectoryName
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path $TempFolder -Recurse -Force
@@ -1869,7 +2112,7 @@ function Invoke-EvergreenAdmxClipchamp {
             # copy
             $SourceAdmx = (Get-ChildItem -Path $TempFolder -Recurse -Filter '*.admx' | Select-Object -First 1).DirectoryName
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path $TempFolder -Recurse -Force
@@ -1957,7 +2200,7 @@ function Invoke-EvergreenAdmxVisualStudio {
             # copy
             $SourceAdmx = "$($TempFolder)\admx"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path $TempFolder -Recurse -Force
@@ -2042,7 +2285,7 @@ function Invoke-EvergreenAdmxVSCode {
 
             # copy
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path $TempFolder -Recurse -Force
@@ -2133,7 +2376,7 @@ function Invoke-EvergreenAdmx1Password {
             # copy (zip layout: 1Password Policies\PolicyDefinitions)
             $SourceAdmx = (Get-ChildItem -Path $TempFolder -Recurse -Filter '1Password.admx' | Select-Object -First 1).DirectoryName
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path $TempFolder -Recurse -Force
@@ -2221,7 +2464,7 @@ function Invoke-EvergreenAdmxSlack {
             # copy
             $SourceAdmx = (Get-ChildItem -Path $TempFolder -Recurse -Filter 'slack.admx' | Select-Object -First 1).DirectoryName
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path $TempFolder -Recurse -Force
@@ -2301,7 +2544,7 @@ function Invoke-EvergreenAdmxTeamViewer {
             # copy
             $SourceAdmx = (Get-ChildItem -Path $TempFolder -Recurse -Filter 'TeamViewer.admx' | Select-Object -First 1).DirectoryName
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path $TempFolder -Recurse -Force
@@ -2390,7 +2633,7 @@ function Invoke-EvergreenAdmxAdobeDC {
 
             # copy
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path $TempFolder -Recurse -Force
@@ -2470,7 +2713,7 @@ function Invoke-EvergreenAdmxSecurityAdmx {
             # copy
             $SourceAdmx = (Get-ChildItem -Path $TempFolder -Directory | Select-Object -First 1).FullName
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path $TempFolder -Recurse -Force
@@ -2544,7 +2787,7 @@ function Invoke-EvergreenAdmxSchannel {
             }
 
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             Remove-Item -Path $TempFolder -Recurse -Force
             return $Evergreen
@@ -2673,7 +2916,7 @@ function Invoke-EvergreenAdmxDellCommandUpdate {
 
             # copy
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path $TempFolder -Recurse -Force -ErrorAction SilentlyContinue
@@ -2753,7 +2996,7 @@ function Invoke-EvergreenAdmxWingetAutoUpdate {
             # copy
             $SourceAdmx = (Get-ChildItem -Path $TempFolder -Recurse -Filter 'WAU.admx' | Select-Object -First 1).DirectoryName
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path $TempFolder -Recurse -Force
@@ -2833,7 +3076,7 @@ function Invoke-EvergreenAdmxWingetAutoUpdateIntune {
             # copy
             $SourceAdmx = (Get-ChildItem -Path $TempFolder -Recurse -Filter 'WinGet-AutoUpdate-Configurator.admx' | Select-Object -First 1).DirectoryName
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path $TempFolder -Recurse -Force
@@ -2913,7 +3156,7 @@ function Invoke-EvergreenAdmxPSAppDeployToolkit {
             # copy
             $SourceAdmx = (Get-ChildItem -Path $TempFolder -Recurse -Filter '*.admx' | Select-Object -First 1).DirectoryName
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path $TempFolder -Recurse -Force
@@ -2997,7 +3240,7 @@ function Invoke-EvergreenAdmxDevolutionsRDM {
             # copy
             $SourceAdmx = (Get-ChildItem -Path $TempFolder -Recurse -Directory -Filter 'Policies' | Select-Object -First 1).FullName
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path $TempFolder -Recurse -Force
@@ -3062,7 +3305,7 @@ function Invoke-EvergreenAdmxPowerToy {
 
             $SourceAdmx = (Get-ChildItem -Path $TempFolder -Recurse -Filter 'PowerToys.admx' | Select-Object -First 1).DirectoryName
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             Remove-Item -Path $TempFolder -Recurse -Force
             return $Evergreen
@@ -3124,7 +3367,7 @@ function Invoke-EvergreenAdmxWindowsTerminal {
 
             $SourceAdmx = (Get-ChildItem -Path $TempFolder -Recurse -Filter 'WindowsTerminal.admx' | Select-Object -First 1).DirectoryName
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             Remove-Item -Path $TempFolder -Recurse -Force
             return $Evergreen
@@ -3185,7 +3428,7 @@ function Invoke-EvergreenAdmxThunderbird {
 
             $SourceAdmx = (Get-ChildItem -Path $TempFolder -Recurse -Filter 'thunderbird.admx' | Select-Object -First 1).DirectoryName
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             Remove-Item -Path $TempFolder -Recurse -Force
             return $Evergreen
@@ -3255,7 +3498,7 @@ function Invoke-EvergreenAdmxDropbox {
             }
 
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             Remove-Item -Path $TempFolder -Recurse -Force
             return $Evergreen
@@ -3352,7 +3595,7 @@ function Invoke-EvergreenAdmxFoxit {
             }
 
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $StagingFolder -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $StagingFolder -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             Remove-Item -Path $TempFolder -Recurse -Force
             return $Evergreen
@@ -3413,7 +3656,7 @@ function Invoke-EvergreenAdmxLibreOffice {
 
             $SourceAdmx = (Get-ChildItem -Path $TempFolder -Recurse -Filter 'Collabora-Office.admx' | Select-Object -First 1).DirectoryName
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             Remove-Item -Path $TempFolder -Recurse -Force
             return $Evergreen
@@ -3509,7 +3752,7 @@ function Invoke-EvergreenAdmxHPAnyware {
             }
 
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             Remove-Item -Path $TempFolder -Recurse -Force -ErrorAction SilentlyContinue
             return $Evergreen
@@ -3585,7 +3828,7 @@ function Invoke-EvergreenAdmxWindows {
             # copy
             $SourceAdmx = "$($TempFolder)\Microsoft Group Policy\$($InstallFolder.Name)\PolicyDefinitions"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path $TempFolder -Recurse -Force
@@ -3644,7 +3887,7 @@ function Invoke-EvergreenAdmxEdge {
             # Copy
             $SourceAdmx = "$($env:TEMP)\$($ProductName)\windows\admx"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # Cleanup
             Remove-Item -Path $OutFile -Force
@@ -3780,6 +4023,18 @@ function Invoke-EvergreenAdmxOneDrive {
                 Write-Warning "No ADMX files found for '$($ProductName)'"
             }
 
+            if ($StampAdmxRevision) {
+                $normalizedRevision = ConvertTo-AdmxRevisionString -Version $Evergreen.Version
+                if ($normalizedRevision) {
+                    if (Test-Path -LiteralPath $TargetAdmx) {
+                        Set-AdmxRevision -Path $TargetAdmx -Revision $normalizedRevision
+                    }
+                    if ($PolicyStore) {
+                        Set-AdmxRevision -Path $PolicyStore -Revision $normalizedRevision
+                    }
+                }
+            }
+
             if (-not $PreferLocalOneDrive) {
                 # Uninstall
                 Write-Verbose 'Uninstalling Microsoft OneDrive installer'
@@ -3840,7 +4095,7 @@ function Invoke-EvergreenAdmx365App {
             # Copy
             $SourceAdmx = "$($env:TEMP)\office\admx"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # Cleanup
             Remove-Item -Path "$($env:TEMP)\office" -Recurse -Force
@@ -3906,6 +4161,16 @@ function Invoke-EvergreenAdmxFSLogix {
                 Copy-Item -Path "$($SourceAdmx)\*.adml" -Destination "$($PolicyStore)en-US" -Force
             }
 
+            if ($StampAdmxRevision) {
+                $normalizedRevision = ConvertTo-AdmxRevisionString -Version $Evergreen.Version
+                if ($normalizedRevision) {
+                    Set-AdmxRevision -Path $TargetAdmx -Revision $normalizedRevision
+                    if ($PolicyStore) {
+                        Set-AdmxRevision -Path $PolicyStore -Revision $normalizedRevision
+                    }
+                }
+            }
+
             # cleanup
             Remove-Item -Path "$($env:TEMP)\$($ProductName)" -Recurse -Force
 
@@ -3958,7 +4223,7 @@ Function Invoke-EvergreenAdmxChrome {
             # Copy
             $SourceAdmx = "$($env:TEMP)\chromeadmx\windows\admx"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # Cleanup
             Remove-Item -Path "$($env:TEMP)\chromeadmx" -Recurse -Force
@@ -3978,7 +4243,7 @@ Function Invoke-EvergreenAdmxChrome {
             # Copy
             $SourceAdmx = "$($env:TEMP)\chromeupdateadmx\GoogleUpdateAdmx"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Quiet -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Quiet -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # Cleanup
             Remove-Item -Path "$($env:TEMP)\chromeupdateadmx" -Recurse -Force
@@ -4032,7 +4297,7 @@ function Invoke-EvergreenAdmxAdobeAcrobat {
             # copy
             $SourceAdmx = "$($env:TEMP)\$($ProductName)"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\$($ProductName)" -Recurse -Force
@@ -4086,7 +4351,7 @@ function Invoke-EvergreenAdmxAdobeReader {
             # copy
             $SourceAdmx = "$($env:TEMP)\AdobeReader"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\AdobeReader" -Recurse -Force
@@ -4142,7 +4407,7 @@ function Invoke-EvergreenAdmxWorkspaceApp {
             # $SourceAdmx = "$($env:TEMP)\citrixworkspaceapp\$($Evergreen.URI.Split("/")[-2].Split("?")[0].SubString(0,$Evergreen.URI.Split("/")[-2].Split("?")[0].IndexOf(".")))"
             $SourceAdmx = (Get-ChildItem -Path "$($env:TEMP)\citrixworkspaceapp\$($Evergreen.URI.Split('/')[-2].Split('?')[0].SubString(0,$Evergreen.URI.Split('/')[-2].Split('?')[0].IndexOf('.')))" -Include '*.admx' -Recurse)[0].DirectoryName
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\citrixworkspaceapp" -Recurse -Force
@@ -4197,7 +4462,7 @@ function Invoke-EvergreenAdmxFirefox {
             # copy
             $SourceAdmx = "$($env:TEMP)\firefoxadmx\windows"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\firefoxadmx" -Recurse -Force
@@ -4260,7 +4525,7 @@ function Invoke-EvergreenAdmxZoom {
             # copy
             $SourceAdmx = "$($env:TEMP)\$($ProductName)"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\$($ProductName)" -Recurse -Force
@@ -4323,7 +4588,7 @@ function Invoke-EvergreenAdmxZoomVDI {
             # copy
             $SourceAdmx = "$($env:TEMP)\$($ProductName)"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\$($ProductName)" -Recurse -Force
@@ -4381,7 +4646,7 @@ function Invoke-EvergreenAdmxBISF {
             # copy
             $SourceAdmx = "$($env:TEMP)\bisfadmx\$($folder)\admx"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\bisfadmx" -Recurse -Force
@@ -4428,7 +4693,7 @@ function Invoke-EvergreenAdmxCustomPolicy {
             # copy
             $SourceAdmx = "$($Evergreen.URI)"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName "$($ProductName)" -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName "$($ProductName)" -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             return $Evergreen
         } catch {
@@ -4484,7 +4749,7 @@ function Invoke-EvergreenAdmxAvd {
             # copy
             $SourceAdmx = "$($env:TEMP)\$($ProductName)"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path $OutFile -Force
@@ -4540,7 +4805,7 @@ function Invoke-EvergreenAdmxWinget {
             # copy
             $SourceAdmx = "$($env:TEMP)\wingetadmx\admx"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\wingetadmx" -Recurse -Force
@@ -4604,7 +4869,7 @@ function Invoke-EvergreenAdmxBrave {
             # copy
             $SourceAdmx = "$($env:TEMP)\braveadmx\windows\admx"
             $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
-            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages
+            Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
 
             # cleanup
             Remove-Item -Path "$($env:TEMP)\braveadmx" -Recurse -Force
