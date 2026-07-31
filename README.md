@@ -160,41 +160,30 @@ Thin orchestrator sample: [`samples/Update-PolicyDefinitions.ps1`](samples/Updat
 
 Pass parameters with a leading `-` (PowerShell syntax), for example `-WorkingDirectory` or `-Include`.
 
-### -WindowsVersion
+### -CleanPolicyStore
 
-Specifies Windows major version. Supports `10`, `11`, `2022`, or `2025`. Default is `11`.
+After processing, removes known obsolete or conflicting files from `-PolicyStore` and repairs missing ADMLs:
 
-### -WindowsFeatureVersion
+- `WinStoreUI.admx` / `.adml` (replaced by `WindowsStore.admx`; namespace conflict if both present)
+- `Microsoft-Windows-Geolocation-WLPAdm.admx` / `.adml` (replaced by `LocationProviderAdm.admx`)
+- Legacy Office templates matching `*12*`–`*15*`
+- Adobe Acrobat/Reader Classic 2017 and 2020 templates
+- Citrix Profile Management `ctxprofile*` templates
+- `CitrixBase.admx` / `.adml` (no longer required; see [CTX696338](https://support.citrix.com/external/article/CTX696338/citrix-workspace-app-admx-download-does.html))
+- Non-`.admx`/`.adml` files at the store root and non-language extract folders
+- Missing language `.adml` files: copies from `en-US` into requested `-Languages` folders when available; warns if an `.admx` has no ADML at all
 
-Specifies the Windows 10 or Windows 11 feature version to get the Admx files for.
+Requires `-PolicyStore`. Supports `-WhatIf`.
 
-- Windows 10: `21H2`, `22H2` (default `22H2`)
-- Windows 11: `23H2`, `24H2`, `25H2` (default `25H2`)
+### -CleanPolicyStoreOnly
 
-Ignored when `-WindowsVersion` is `2022` or `2025`.
+Skips Admx downloads and only runs the Policy Store cleanup described above. Requires `-PolicyStore`. Supports `-WhatIf`.
 
-Current Windows 11 ADMX templates (`23H2` / `24H2` / `25H2`) can also manage Windows 10 clients; some settings apply only to newer OS versions. Windows 10 `21H2` / `22H2` remain available for LTSC and ESU — see [Notes](#notes).
+### -CreateScheduledTask
 
-### -WorkingDirectory
+Creates or updates a Windows Scheduled Task named `EvergreenAdmx` that runs this script weekly (Sunday at 01:00) as `SYSTEM` with highest privileges. Compatible with Windows Server 2022 and 2025 via `Register-ScheduledTask`.
 
-Specifies a working directory for the script.
-
-- Admx files are stored in a subdirectory called `admx`
-- Downloaded files are stored in a subdirectory called `downloads`
-
-Defaults to the current script location.
-
-### -PolicyStore
-
-Specifies a Policy Store location to copy the Admx files to after processing. When this path does not exist, the script creates the Policy Store directory and language subfolders from `-Languages`.
-
-### -Languages
-
-Specifies an array of languages to process. Entries must be in `xy-XY` format (also accepts short forms such as `es` and region tags such as `es-419`). Defaults to `en-US`.
-
-### -UseProductFolders
-
-When set, Admx files are copied to their respective product folders under `admx` in the WorkingDirectory.
+Other parameters bound on the same command line are forwarded to the task action. The script exits after registering the task and does not download Admx files in that run. Change day/time later in Task Scheduler.
 
 ### -CustomPolicyStore
 
@@ -229,8 +218,8 @@ Shared defaults: `Microsoft Edge`, `Microsoft OneDrive`, `Microsoft 365 Apps`, `
 - [`1Password`][ref-1password]
 - [`ABBYY FineReader PDF`][ref-abbyy] (FineReader 16)
 - [`Admin By Request`][ref-admin-by-request]
-- [`Adobe DC`][ref-adobe-dc] (community combined template)
 - [`Adobe Acrobat`][ref-adobe-acrobat] (Continuous track)
+- [`Adobe DC`][ref-adobe-dc] (community combined template)
 - [`Adobe Reader`][ref-adobe-reader] (Continuous track)
 - [`BIS-F`][ref-bisf] (Base Image Script Framework)
 - [`Brave Browser`][ref-brave]
@@ -279,34 +268,17 @@ Shared defaults: `Microsoft Edge`, `Microsoft OneDrive`, `Microsoft 365 Apps`, `
 
 </details>
 
+### -Languages
+
+Specifies an array of languages to process. Entries must be in `xy-XY` format (also accepts short forms such as `es` and region tags such as `es-419`). Defaults to `en-US`.
+
+### -PolicyStore
+
+Specifies a Policy Store location to copy the Admx files to after processing. When this path does not exist, the script creates the Policy Store directory and language subfolders from `-Languages`.
+
 ### -PreferLocalOneDrive
 
 Microsoft OneDrive Admx files are only available after installing OneDrive. If this script is running on a machine that has OneDrive installed locally, use this switch to prevent automatically uninstalling OneDrive.
-
-### -CleanPolicyStore
-
-After processing, removes known obsolete or conflicting files from `-PolicyStore` and repairs missing ADMLs:
-
-- `WinStoreUI.admx` / `.adml` (replaced by `WindowsStore.admx`; namespace conflict if both present)
-- `Microsoft-Windows-Geolocation-WLPAdm.admx` / `.adml` (replaced by `LocationProviderAdm.admx`)
-- Legacy Office templates matching `*12*`–`*15*`
-- Adobe Acrobat/Reader Classic 2017 and 2020 templates
-- Citrix Profile Management `ctxprofile*` templates
-- `CitrixBase.admx` / `.adml` (no longer required; see [CTX696338](https://support.citrix.com/external/article/CTX696338/citrix-workspace-app-admx-download-does.html))
-- Non-`.admx`/`.adml` files at the store root and non-language extract folders
-- Missing language `.adml` files: copies from `en-US` into requested `-Languages` folders when available; warns if an `.admx` has no ADML at all
-
-Requires `-PolicyStore`. Supports `-WhatIf`.
-
-### -CleanPolicyStoreOnly
-
-Skips Admx downloads and only runs the Policy Store cleanup described above. Requires `-PolicyStore`. Supports `-WhatIf`.
-
-### -CreateScheduledTask
-
-Creates or updates a Windows Scheduled Task named `EvergreenAdmx` that runs this script weekly (Sunday at 01:00) as `SYSTEM` with highest privileges. Compatible with Windows Server 2022 and 2025 via `Register-ScheduledTask`.
-
-Other parameters bound on the same command line are forwarded to the task action. The script exits after registering the task and does not download Admx files in that run. Change day/time later in Task Scheduler.
 
 ### -StampAdmxRevision
 
@@ -319,6 +291,34 @@ Only attributes currently set to `1.0` are updated:
 - ADML `policyDefinitionResources/@revision`
 
 Higher vendor revisions are left unchanged. Default is off so Central Policy Store copies keep vendor XML unless you opt in.
+
+### -UseProductFolders
+
+When set, Admx files are copied to their respective product folders under `admx` in the WorkingDirectory.
+
+### -WindowsFeatureVersion
+
+Specifies the Windows 10 or Windows 11 feature version to get the Admx files for.
+
+- Windows 10: `21H2`, `22H2` (default `22H2`)
+- Windows 11: `23H2`, `24H2`, `25H2` (default `25H2`)
+
+Ignored when `-WindowsVersion` is `2022` or `2025`.
+
+Current Windows 11 ADMX templates (`23H2` / `24H2` / `25H2`) can also manage Windows 10 clients; some settings apply only to newer OS versions. Windows 10 `21H2` / `22H2` remain available for LTSC and ESU — see [Notes](#notes).
+
+### -WindowsVersion
+
+Specifies Windows major version. Supports `10`, `11`, `2022`, or `2025`. Default is `11`.
+
+### -WorkingDirectory
+
+Specifies a working directory for the script.
+
+- Admx files are stored in a subdirectory called `admx`
+- Downloaded files are stored in a subdirectory called `downloads`
+
+Defaults to the current script location.
 
 <a id="breaking-changes"></a>
 
