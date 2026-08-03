@@ -5,13 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses a `YYMM.patch` release versioning scheme.
 
+## [2608.0] 2026-08-01
+
+### Added
+
+- Added Specops Authentication Client ADMX (on-prem + Entra ID templates)
+- Added WSL ADMX from [microsoft/WSL intune](https://github.com/microsoft/WSL/tree/master/intune) folder
+- Added Lenovo Dock Manager ADMX via policy_setup.exe (partially addresses #84; Commercial Vantage still tracked)
+- Added PDF-XChange ADMX
+- Added RealVNC Connect ADMX (Server + Viewer)
+- Added ABBYY FineReader PDF ADMX
+- Added Admin By Request ADMX
+- Added GoTo ADMX
+- Added `-StampAdmxRevision` to stamp ADMX/ADML `revision` (and ADMX `minRequiredRevision` when `1.0`) from the product release Version as Major.Minor, so Intune shows a meaningful template version; files already above `1.0` are left unchanged
+- `-CleanPolicyStore` / `-CleanPolicyStoreOnly` now also remove `Microsoft-Windows-Geolocation-WLPAdm.admx` / `.adml` (superseded by `LocationProviderAdm`) and copy missing language ADMLs from `en-US` when available
+
+### Fixed
+
+- Fixed PSGallery publish workflow failing on `Install-PackageProvider -Name NuGet` under PowerShell 7 on GitHub Actions runners ([#87](https://github.com/msfreaks/EvergreenAdmx/issues/87))
+
 ## [2607.1] - 2026-07-29
 
 ### Added
 
 - Added GitHub Actions workflow to publish `EvergreenAdmx.ps1` to the PowerShell Gallery on release (`publish-psgallery.yml`)
 - Added tab-completion for `-Include` names and aliases via ArgumentCompleter
-- Added project logo (`assets/logo.webp`) and show it in README.md
+- Added project logo (`assets/logo.png`) and show it in README.md
 
 ### Changed
 
@@ -32,10 +51,9 @@ and this project uses a `YYMM.patch` release versioning scheme.
 
 ### Added
 
-- Added `-CleanPolicyStore` to remove known obsolete or conflicting Admx/Adml from `-PolicyStore` after processing (WinStoreUI, legacy Office `*12*`–`*15*`, Adobe Classic 2017/2020, `ctxprofile*`, non-policy junk files/folders)
+- Added `-CleanPolicyStore` to remove known obsolete or conflicting Admx/Adml from `-PolicyStore` after processing (WinStoreUI, legacy Office `*12*`â€“`*15*`, Adobe Classic 2017/2020, `ctxprofile*`, non-policy junk files/folders)
 - Added `-CleanPolicyStoreOnly` to run Policy Store cleanup without downloading Admx files
 - Added Schannel ADMX support via [Crosse/SchannelGroupPolicy](https://github.com/Crosse/SchannelGroupPolicy) (`-Include 'Schannel'`)
-- Added sample thin orchestrator at `samples/Update-PolicyDefinitions.ps1`
 - Added Pester coverage for obsolete file patterns, `Initialize-PolicyStore`, and `Clear-ObsoleteAdmx` (including `-WhatIf`)
 - Added `-CreateScheduledTask` to create or update a weekly SYSTEM scheduled task (`EvergreenAdmx`, Sunday at 01:00) via `Register-ScheduledTask`; bound parameters are forwarded and the script exits after registration
 - Added Pester unit / Integration / Nightly suites under `tests/` and GitHub Actions workflows (`ci.yml`, `release-smoke.yml`, `nightly.yml`)
@@ -81,7 +99,7 @@ and this project uses a `YYMM.patch` release versioning scheme.
 - Removed `EvergreenAdmx.xml` sample Task Scheduler export in favor of `-CreateScheduledTask`
 - Removed Adobe Acrobat/Reader Classic 2017 and Classic 2020 tracks (EOL); Continuous track only
 - Removed Microsoft Desktop Optimization Pack ADMX support (extended support ended April 14, 2026)
-- Removed end-of-life Windows 10 feature versions `1903`–`21H1`; Windows 10 now supports `21H2` and `22H2` only
+- Removed end-of-life Windows 10 feature versions `1903`â€“`21H1`; Windows 10 now supports `21H2` and `22H2` only
 - Removed end-of-life Windows 11 feature versions `21H2` and `22H2`; Windows 11 now supports `23H2`, `24H2`, and `25H2` only
 
 ### Fixed

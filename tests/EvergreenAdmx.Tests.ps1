@@ -42,6 +42,8 @@ Describe 'EvergreenAdmx script surface' {
         Get-Command -Name Initialize-PolicyStore -CommandType Function | Should -Not -BeNullOrEmpty
         Get-Command -Name Get-EvergreenAdmxProductCatalog -CommandType Function | Should -Not -BeNullOrEmpty
         Get-Command -Name Resolve-EvergreenAdmxInclude -CommandType Function | Should -Not -BeNullOrEmpty
+        Get-Command -Name ConvertTo-AdmxRevisionString -CommandType Function | Should -Not -BeNullOrEmpty
+        Get-Command -Name Set-AdmxRevision -CommandType Function | Should -Not -BeNullOrEmpty
     }
 }
 
@@ -228,10 +230,12 @@ Describe 'Resolve-EvergreenAdmxInclude' {
 }
 
 Describe 'Get-EvergreenAdmxObsoleteFilePattern' {
-    It 'includes WinStoreUI, legacy Office, Adobe Classic, ctxprofile, and CitrixBase patterns' {
+    It 'includes WinStoreUI, Geolocation WLPAdm, legacy Office, Adobe Classic, ctxprofile, and CitrixBase patterns' {
         $patterns = Get-EvergreenAdmxObsoleteFilePattern
         $patterns | Should -Contain 'WinStoreUI.admx'
         $patterns | Should -Contain 'WinStoreUI.adml'
+        $patterns | Should -Contain 'Microsoft-Windows-Geolocation-WLPAdm.admx'
+        $patterns | Should -Contain 'Microsoft-Windows-Geolocation-WLPAdm.adml'
         $patterns | Should -Contain '*12*.admx'
         $patterns | Should -Contain '*15*.adml'
         $patterns | Should -Contain 'Acrobat2017.admx'
@@ -277,10 +281,15 @@ Describe 'Clear-ObsoleteAdmx' {
         Set-Content -Path (Join-Path $script:StoreRoot 'windows.admx') -Value 'keep'
         Set-Content -Path (Join-Path $script:StoreRoot 'en-US\windows.adml') -Value 'keep'
         Set-Content -Path (Join-Path $script:StoreRoot 'office16.admx') -Value 'keep'
+        Set-Content -Path (Join-Path $script:StoreRoot 'en-US\office16.adml') -Value 'keep'
+        Set-Content -Path (Join-Path $script:StoreRoot 'LocationProviderAdm.admx') -Value 'keep'
+        Set-Content -Path (Join-Path $script:StoreRoot 'en-US\LocationProviderAdm.adml') -Value 'keep'
 
         # Obsolete
         Set-Content -Path (Join-Path $script:StoreRoot 'WinStoreUI.admx') -Value 'remove'
         Set-Content -Path (Join-Path $script:StoreRoot 'en-US\WinStoreUI.adml') -Value 'remove'
+        Set-Content -Path (Join-Path $script:StoreRoot 'Microsoft-Windows-Geolocation-WLPAdm.admx') -Value 'remove'
+        Set-Content -Path (Join-Path $script:StoreRoot 'en-US\Microsoft-Windows-Geolocation-WLPAdm.adml') -Value 'remove'
         Set-Content -Path (Join-Path $script:StoreRoot 'excel15.admx') -Value 'remove'
         Set-Content -Path (Join-Path $script:StoreRoot 'en-US\excel15.adml') -Value 'remove'
         Set-Content -Path (Join-Path $script:StoreRoot 'Acrobat2017.admx') -Value 'remove'
@@ -305,6 +314,8 @@ Describe 'Clear-ObsoleteAdmx' {
         $removed.Count | Should -BeGreaterThan 0
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'WinStoreUI.admx') | Should -BeFalse
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'en-US\WinStoreUI.adml') | Should -BeFalse
+        Test-Path -LiteralPath (Join-Path $script:StoreRoot 'Microsoft-Windows-Geolocation-WLPAdm.admx') | Should -BeFalse
+        Test-Path -LiteralPath (Join-Path $script:StoreRoot 'en-US\Microsoft-Windows-Geolocation-WLPAdm.adml') | Should -BeFalse
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'excel15.admx') | Should -BeFalse
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'Acrobat2017.admx') | Should -BeFalse
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'AcrobatReader2020.admx') | Should -BeFalse
@@ -316,17 +327,71 @@ Describe 'Clear-ObsoleteAdmx' {
 
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'windows.admx') | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'office16.admx') | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $script:StoreRoot 'LocationProviderAdm.admx') | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'en-US') | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'fr-FR') | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'en-US\windows.adml') | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $script:StoreRoot 'fr-FR\windows.adml') | Should -BeTrue
     }
 
-    It 'supports -WhatIf without deleting files' {
-        $null = Clear-ObsoleteAdmx -PolicyStore $script:StoreRoot -Languages @('en-US') -WhatIf
+    It 'copies missing language ADMLs from en-US' {
+        Test-Path -LiteralPath (Join-Path $script:StoreRoot 'fr-FR\windows.adml') | Should -BeFalse
+        $null = Clear-ObsoleteAdmx -PolicyStore $script:StoreRoot -Languages @('en-US', 'fr-FR')
+        Test-Path -LiteralPath (Join-Path $script:StoreRoot 'fr-FR\windows.adml') | Should -BeTrue
+        (Get-Content -LiteralPath (Join-Path $script:StoreRoot 'fr-FR\windows.adml') -Raw).Trim() | Should -Be 'keep'
+    }
+
+    It 'supports -WhatIf without deleting files or copying ADMLs' {
+        $null = Clear-ObsoleteAdmx -PolicyStore $script:StoreRoot -Languages @('en-US', 'fr-FR') -WhatIf
 
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'WinStoreUI.admx') | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $script:StoreRoot 'Microsoft-Windows-Geolocation-WLPAdm.admx') | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'readme.txt') | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'extract-debris') | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $script:StoreRoot 'windows.admx') | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $script:StoreRoot 'fr-FR\windows.adml') | Should -BeFalse
+    }
+
+}
+
+
+Describe 'ADMX revision stamping' {
+    It 'converts <SourceVersion> to <Expected>' -ForEach @(
+        @{ SourceVersion = '143.0.3624.0'; Expected = '143.0' }
+        @{ SourceVersion = '0.95.1'; Expected = '0.95' }
+        @{ SourceVersion = '1.2'; Expected = '1.2' }
+        @{ SourceVersion = '108542.1.0'; Expected = '108542.1' }
+        @{ SourceVersion = 'v1.17.0'; Expected = '1.17' }
+    ) {
+        ConvertTo-AdmxRevisionString -Version $SourceVersion | Should -Be $Expected
+    }
+
+    It 'returns null for non-parseable versions' {
+        ConvertTo-AdmxRevisionString -Version 'not-a-version' -WarningAction SilentlyContinue | Should -BeNullOrEmpty
+    }
+
+    It 'stamps only revision 1.0 attributes and leaves higher revisions alone' {
+        $root = Join-Path -Path $TestDrive -ChildPath 'admxrev'
+        $lang = Join-Path -Path $root -ChildPath 'en-US'
+        $null = New-Item -Path $lang -ItemType Directory -Force
+
+        $admxOne = '<?xml version="1.0" encoding="utf-8"?><policyDefinitions revision="1.0" schemaVersion="1.0"><policyNamespaces><target prefix="demo" namespace="Demo.Policies" /></policyNamespaces><resources minRequiredRevision="1.0" /></policyDefinitions>'
+        $admxHigh = '<?xml version="1.0" encoding="utf-8"?><policyDefinitions revision="4.8" schemaVersion="1.0"><policyNamespaces><target prefix="parent" namespace="Parent.Policies" /></policyNamespaces><resources minRequiredRevision="4.8" /></policyDefinitions>'
+        $admlOne = '<?xml version="1.0" encoding="utf-8"?><policyDefinitionResources revision="1.0" schemaVersion="1.0"><displayName>Demo</displayName><resources /></policyDefinitionResources>'
+        $admlHigh = '<?xml version="1.0" encoding="utf-8"?><policyDefinitionResources revision="1.20" schemaVersion="1.0"><displayName>Parent</displayName><resources /></policyDefinitionResources>'
+
+        Set-Content -LiteralPath (Join-Path $root 'demo.admx') -Value $admxOne -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $root 'parent.admx') -Value $admxHigh -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $lang 'demo.adml') -Value $admlOne -Encoding utf8
+        Set-Content -LiteralPath (Join-Path $lang 'parent.adml') -Value $admlHigh -Encoding utf8
+
+        Set-AdmxRevision -Path $root -Revision '143.0'
+
+        ([xml](Get-Content -LiteralPath (Join-Path $root 'demo.admx') -Raw)).policyDefinitions.revision | Should -Be '143.0'
+        ([xml](Get-Content -LiteralPath (Join-Path $root 'demo.admx') -Raw)).policyDefinitions.resources.minRequiredRevision | Should -Be '143.0'
+        ([xml](Get-Content -LiteralPath (Join-Path $lang 'demo.adml') -Raw)).policyDefinitionResources.revision | Should -Be '143.0'
+        ([xml](Get-Content -LiteralPath (Join-Path $root 'parent.admx') -Raw)).policyDefinitions.revision | Should -Be '4.8'
+        ([xml](Get-Content -LiteralPath (Join-Path $lang 'parent.adml') -Raw)).policyDefinitionResources.revision | Should -Be '1.20'
     }
 }
+

@@ -18,7 +18,7 @@ This script solves both problems:
 
 Named as an homage to the [Evergreen module](https://github.com/EUCPilots/evergreen-module) by Aaron Parker ([@stealthpuppy](https://x.com/stealthpuppy)).
 
-## Contents
+## 📚 Contents
 
 - [Requirements](#requirements)
 - [Install](#install)
@@ -156,45 +156,34 @@ Thin orchestrator sample: [`samples/Update-PolicyDefinitions.ps1`](samples/Updat
 
 <a id="parameters"></a>
 
-## ⚙ Parameters
+## ⚙️ Parameters
 
 Pass parameters with a leading `-` (PowerShell syntax), for example `-WorkingDirectory` or `-Include`.
 
-### -WindowsVersion
+### -CleanPolicyStore
 
-Specifies Windows major version. Supports `10`, `11`, `2022`, or `2025`. Default is `11`.
+After processing, removes known obsolete or conflicting files from `-PolicyStore` and repairs missing ADMLs:
 
-### -WindowsFeatureVersion
+- `WinStoreUI.admx` / `.adml` (replaced by `WindowsStore.admx`; namespace conflict if both present)
+- `Microsoft-Windows-Geolocation-WLPAdm.admx` / `.adml` (replaced by `LocationProviderAdm.admx`)
+- Legacy Office templates matching `*12*`–`*15*`
+- Adobe Acrobat/Reader Classic 2017 and 2020 templates
+- Citrix Profile Management `ctxprofile*` templates
+- `CitrixBase.admx` / `.adml` (no longer required; see [CTX696338](https://support.citrix.com/external/article/CTX696338/citrix-workspace-app-admx-download-does.html))
+- Non-`.admx`/`.adml` files at the store root and non-language extract folders
+- Missing language `.adml` files: copies from `en-US` into requested `-Languages` folders when available; warns if an `.admx` has no ADML at all
 
-Specifies the Windows 10 or Windows 11 feature version to get the Admx files for.
+Requires `-PolicyStore`. Supports `-WhatIf`.
 
-- Windows 10: `21H2`, `22H2` (default `22H2`)
-- Windows 11: `23H2`, `24H2`, `25H2` (default `25H2`)
+### -CleanPolicyStoreOnly
 
-Ignored when `-WindowsVersion` is `2022` or `2025`.
+Skips Admx downloads and only runs the Policy Store cleanup described above. Requires `-PolicyStore`. Supports `-WhatIf`.
 
-Current Windows 11 ADMX templates (`23H2` / `24H2` / `25H2`) can also manage Windows 10 clients; some settings apply only to newer OS versions. Windows 10 `21H2` / `22H2` remain available for LTSC and ESU — see [Notes](#notes).
+### -CreateScheduledTask
 
-### -WorkingDirectory
+Creates or updates a Windows Scheduled Task named `EvergreenAdmx` that runs this script weekly (Sunday at 01:00) as `SYSTEM` with highest privileges. Compatible with Windows Server 2022 and 2025 via `Register-ScheduledTask`.
 
-Specifies a working directory for the script.
-
-- Admx files are stored in a subdirectory called `admx`
-- Downloaded files are stored in a subdirectory called `downloads`
-
-Defaults to the current script location.
-
-### -PolicyStore
-
-Specifies a Policy Store location to copy the Admx files to after processing. When this path does not exist, the script creates the Policy Store directory and language subfolders from `-Languages`.
-
-### -Languages
-
-Specifies an array of languages to process. Entries must be in `xy-XY` format (also accepts short forms such as `es` and region tags such as `es-419`). Defaults to `en-US`.
-
-### -UseProductFolders
-
-When set, Admx files are copied to their respective product folders under `admx` in the WorkingDirectory.
+Other parameters bound on the same command line are forwarded to the task action. The script exits after registering the task and does not download Admx files in that run. Change day/time later in Task Scheduler.
 
 ### -CustomPolicyStore
 
@@ -226,81 +215,114 @@ Shared defaults: `Microsoft Edge`, `Microsoft OneDrive`, `Microsoft 365 Apps`, `
 <details>
 <summary>Supported <code>-Include</code> products</summary>
 
-- `1Password`
-- `Adobe DC` (community combined template)
-- `Adobe Acrobat` (Continuous track)
-- `Adobe Reader` (Continuous track)
-- `BIS-F` (Base Image Script Framework)
-- `Brave Browser`
-- `Citrix Workspace app`
-- `Custom Policy Store` (local / UNC path you provide)
-- `Dell Command Update` (latest Universal installer via winget)
-- `Devolutions Remote Desktop Manager`
-- `Dropbox`
-- `Foxit PDF` (Reader + Editor)
-- `Google Chrome`
-- `HP Anyware` (PCoIP ADMX from Standard Agent; requires 7-Zip)
-- `LibreOffice` (Collabora Office / LibreOffice GPO templates)
-- `Microsoft 365 Apps`
-- `Microsoft AVD`
-- `Microsoft Clipchamp`
-- `Microsoft Edge`
-- `Microsoft FSLogix`
-- `Microsoft Notepad`
-- `Microsoft OneDrive` (local installation or download from Evergreen)
-- `Microsoft PowerToys`
-- `Microsoft Visual Studio`
-- `Microsoft VS Code`
-- `Microsoft Winget`
-- `Mozilla Firefox`
-- `Mozilla Thunderbird`
-- `PSAppDeployToolkit`
-- `Schannel` (Crosse Schannel GPO templates)
-- `Security ADMX` (Custom template for Windows hardening)
-- `Slack`
-- `TeamViewer`
-- `Windows 10` (`21H2` / `22H2`)
-- `Windows 11` (`23H2` / `24H2` / `25H2`)
-- `Windows 2022` (Windows Server 2022)
-- `Windows 2025` (Windows Server 2025)
-- `Windows Terminal`
-- `Winget-AutoUpdate`
-- `Winget-AutoUpdate-Intune`
-- `Zoom`
-- `Zoom VDI`
+- [`1Password`][ref-1password]
+- [`ABBYY FineReader PDF`][ref-abbyy] (FineReader 16)
+- [`Admin By Request`][ref-admin-by-request]
+- [`Adobe Acrobat`][ref-adobe-acrobat] (Continuous track)
+- [`Adobe DC`][ref-adobe-dc] (community combined template)
+- [`Adobe Reader`][ref-adobe-reader] (Continuous track)
+- [`BIS-F`][ref-bisf] (Base Image Script Framework)
+- [`Brave Browser`][ref-brave]
+- [`Citrix Workspace app`][ref-citrix]
+- [`Custom Policy Store`][ref-custom-policy-store] (local / UNC path you provide)
+- [`Dell Command Update`][ref-dell-command-update] (latest Universal installer via winget)
+- [`Devolutions Remote Desktop Manager`][ref-devolutions]
+- [`Dropbox`][ref-dropbox]
+- [`Foxit PDF`][ref-foxit] (Reader + Editor)
+- [`Google Chrome`][ref-chrome]
+- [`GoTo`][ref-goto] (GoTo app / GoTo Connect)
+- [`HP Anyware`][ref-hp-anyware] (PCoIP ADMX from Standard Agent; requires 7-Zip)
+- [`Lenovo Dock Manager`][ref-lenovo-dock] (policy_setup.exe Group Policy templates)
+- [`LibreOffice`][ref-libreoffice] (Collabora Office / LibreOffice GPO templates)
+- [`Microsoft 365 Apps`][ref-365-apps]
+- [`Microsoft AVD`][ref-avd]
+- [`Microsoft Clipchamp`][ref-clipchamp]
+- [`Microsoft Edge`][ref-edge]
+- [`Microsoft FSLogix`][ref-fslogix]
+- [`Microsoft Notepad`][ref-notepad]
+- [`Microsoft OneDrive`][ref-onedrive] (local installation or download from Evergreen)
+- [`Microsoft PowerToys`][ref-powertoys]
+- [`Microsoft Visual Studio`][ref-visual-studio]
+- [`Microsoft VS Code`][ref-vscode]
+- [`Microsoft Winget`][ref-winget]
+- [`Mozilla Firefox`][ref-firefox]
+- [`Mozilla Thunderbird`][ref-thunderbird]
+- [`PDF-XChange`][ref-pdf-xchange] (Editor, Tools, Driver, Updater, Vault)
+- [`PSAppDeployToolkit`][ref-psadt]
+- [`RealVNC Connect`][ref-realvnc] (Server + Viewer)
+- [`Schannel`][ref-schannel] (Crosse Schannel GPO templates)
+- [`Security ADMX`][ref-security-admx] (Custom template for Windows hardening)
+- [`Slack`][ref-slack]
+- [`Specops Authentication Client`][ref-specops] (on-prem + Entra ID)
+- [`TeamViewer`][ref-teamviewer]
+- [`Windows 10`][ref-win10-22h2] ([`21H2`][ref-win10-21h2] / [`22H2`][ref-win10-22h2])
+- [`Windows 11`][ref-win11-25h2] ([`23H2`][ref-win11-23h2] / [`24H2`][ref-win11-24h2] / [`25H2`][ref-win11-25h2])
+- [`Windows 2022`][ref-winserver-2022] (Windows Server 2022)
+- [`Windows 2025`][ref-winserver-2025] (Windows Server 2025)
+- [`Windows Terminal`][ref-windows-terminal]
+- [`Winget-AutoUpdate`][ref-wau]
+- [`Winget-AutoUpdate-Intune`][ref-wau-intune]
+- [`WSL`][ref-wsl] (Windows Subsystem for Linux Intune ADMX)
+- [`Zoom`][ref-zoom]
+- [`Zoom VDI`][ref-zoom-vdi]
 
 </details>
+
+### -Languages
+
+Specifies an array of languages to process. Entries must be in `xy-XY` format (also accepts short forms such as `es` and region tags such as `es-419`). Defaults to `en-US`.
+
+### -PolicyStore
+
+Specifies a Policy Store location to copy the Admx files to after processing. When this path does not exist, the script creates the Policy Store directory and language subfolders from `-Languages`.
 
 ### -PreferLocalOneDrive
 
 Microsoft OneDrive Admx files are only available after installing OneDrive. If this script is running on a machine that has OneDrive installed locally, use this switch to prevent automatically uninstalling OneDrive.
 
-### -CleanPolicyStore
+### -StampAdmxRevision
 
-After processing, removes known obsolete or conflicting files from `-PolicyStore`:
+When set, stamps ADMX/ADML `revision` attributes from the product release Version (GitHub release, download page, etc.) normalized to the ADMX `versionString` **Major.Minor** form (for example `143.0.3624.0` becomes `143.0`). This helps Intune Imported Administrative Templates show a meaningful Version column.
 
-- `WinStoreUI.admx` / `.adml` (known Group Policy conflict)
-- Legacy Office templates matching `*12*`–`*15*`
-- Adobe Acrobat/Reader Classic 2017 and 2020 templates
-- Citrix Profile Management `ctxprofile*` templates
-- `CitrixBase.admx` / `.adml` (no longer required; see [CTX696338](https://support.citrix.com/external/article/CTX696338/citrix-workspace-app-admx-download-does.html))
-- Non-`.admx`/`.adml` files at the store root and non-language extract folders
+Only attributes currently set to `1.0` are updated:
 
-Requires `-PolicyStore`. Supports `-WhatIf`.
+- ADMX `policyDefinitions/@revision`
+- ADMX `resources/@minRequiredRevision` (when also `1.0`)
+- ADML `policyDefinitionResources/@revision`
 
-### -CleanPolicyStoreOnly
+Higher vendor revisions are left unchanged. Default is off so Central Policy Store copies keep vendor XML unless you opt in.
 
-Skips Admx downloads and only runs the Policy Store cleanup described above. Requires `-PolicyStore`. Supports `-WhatIf`.
+### -UseProductFolders
 
-### -CreateScheduledTask
+When set, Admx files are copied to their respective product folders under `admx` in the WorkingDirectory.
 
-Creates or updates a Windows Scheduled Task named `EvergreenAdmx` that runs this script weekly (Sunday at 01:00) as `SYSTEM` with highest privileges. Compatible with Windows Server 2022 and 2025 via `Register-ScheduledTask`.
+### -WindowsFeatureVersion
 
-Other parameters bound on the same command line are forwarded to the task action. The script exits after registering the task and does not download Admx files in that run. Change day/time later in Task Scheduler.
+Specifies the Windows 10 or Windows 11 feature version to get the Admx files for.
+
+- Windows 10: `21H2`, `22H2` (default `22H2`)
+- Windows 11: `23H2`, `24H2`, `25H2` (default `25H2`)
+
+Ignored when `-WindowsVersion` is `2022` or `2025`.
+
+Current Windows 11 ADMX templates (`23H2` / `24H2` / `25H2`) can also manage Windows 10 clients; some settings apply only to newer OS versions. Windows 10 `21H2` / `22H2` remain available for LTSC and ESU — see [Notes](#notes).
+
+### -WindowsVersion
+
+Specifies Windows major version. Supports `10`, `11`, `2022`, or `2025`. Default is `11`.
+
+### -WorkingDirectory
+
+Specifies a working directory for the script.
+
+- Admx files are stored in a subdirectory called `admx`
+- Downloaded files are stored in a subdirectory called `downloads`
+
+Defaults to the current script location.
 
 <a id="breaking-changes"></a>
 
-## ⚠ Breaking changes
+## ⚠️ Breaking changes
 
 Highlights in **2607.0** (full history and earlier breaking changes in the [Changelog](CHANGELOG.md)):
 
@@ -314,6 +336,7 @@ Highlights in **2607.0** (full history and earlier breaking changes in the [Chan
 ## 📝 Notes
 
 - This script has not been tested on Windows Core
+- Use `-StampAdmxRevision` when preparing templates for Intune so the Version column reflects the product release (Major.Minor); this does not bypass Intune namespace conflicts on re-upload
 - Some Admx files can only be obtained by installing the downloaded package (for example Windows 10/11 Admx MSI packages, and OneDrive after install)
 - If you use the script to download Windows 10 or Windows 11 Admx files, remove any existing installs of those Admx MSI packages first, or the script will fail
 - For those packages the script installs the package, copies the Admx files, then uninstalls the package
@@ -321,6 +344,8 @@ Highlights in **2607.0** (full history and earlier breaking changes in the [Chan
 - HP Anyware ADMX requires `winget` (to resolve the current version) and 7-Zip to extract `PCoIP.admx` from the Standard Agent installer
 - Windows 10 `22H2` is the last GA release (mainstream support ended October 14, 2025); organizations on [Extended Security Updates (ESU)](https://learn.microsoft.com/en-us/windows/whats-new/extended-security-updates) still need matching ADMX templates
 - Windows 10 `21H2` is the base for **Windows 10 Enterprise LTSC 2021** (supported until January 2027, longer for IoT Enterprise LTSC)
+- Use `-CleanPolicyStore` (or `-CleanPolicyStoreOnly`) to remove known conflicting ADMX files (for example `WinStoreUI` / `Microsoft-Windows-Geolocation-WLPAdm`) and copy missing language ADMLs from `en-US` when available
+- Some Microsoft ADMX upgrades change GPO registry value types or paths (for example ErrorReporting `DefaultConsent` “unexpected type”, or SkyDrive → OneDrive registry keys). Those require rebuilding the affected GPO settings; the script does not rewrite `registry.pol`. See [Known issues for managing Group Policy clients](https://learn.microsoft.com/en-us/troubleshoot/windows-client/active-directory/known-issues-for-group-policy-clients)
 
 <a id="roadmap"></a>
 
@@ -329,7 +354,6 @@ Highlights in **2607.0** (full history and earlier breaking changes in the [Chan
 - Add logging options
 - Add notification options
 - Detect user domain automatically
-- Add ADMX versioning automatically (useful for Intune)
 
 <a id="credits"></a>
 
@@ -353,3 +377,56 @@ This project is licensed under the [MIT License](LICENSE).
 [x-follow-badge]: https://img.shields.io/twitter/follow/menschab?style=flat-square&logo=x
 [x-follow]: https://x.com/menschab
 [poshgallery-evergreenadmx]: https://www.powershellgallery.com/packages/EvergreenAdmx/
+[ref-1password]: https://support.1password.com/mobile-device-management/?windows=
+[ref-abbyy]: https://help.abbyy.com/en-us/finereader/16/admin_guide/gpo_domain/
+[ref-admin-by-request]: https://www.adminbyrequest.com/ADMX
+[ref-adobe-acrobat]: https://ardownload2.adobe.com/pub/adobe/acrobat/win/AcrobatDC/misc/AcrobatADMTemplate.zip
+[ref-adobe-dc]: https://github.com/systmworks/Adobe-DC-ADMX
+[ref-adobe-reader]: https://ardownload2.adobe.com/pub/adobe/reader/win/AcrobatDC/misc/ReaderADMTemplate.zip
+[ref-bisf]: https://github.com/EUCweb/BIS-F
+[ref-brave]: https://github.com/brave/brave-browser/wiki/Deploying-Brave-with-Group-Policy
+[ref-citrix]: https://docs.citrix.com/en-us/citrix-workspace-app-for-windows/group-policy
+[ref-custom-policy-store]: https://learn.microsoft.com/en-us/troubleshoot/windows-client/group-policy/create-and-manage-central-store
+[ref-dell-command-update]: https://www.dell.com/support/kbdoc/en-us/000293701/how-do-i-access-amdx-and-adml-files-for-use-with-dell-command-update
+[ref-devolutions]: https://docs.devolutions.net/rdm/knowledge-base/how-to-articles/apply-policies-gpos
+[ref-dropbox]: https://github.com/dropbox/GPO-Templates
+[ref-foxit]: https://kb.foxit.com/s/articles/360040241112-Available-GPO-templates
+[ref-goto]: https://goto-desktop.goto.com/GoToAppAdministrativeTemplates.zip
+[ref-hp-anyware]: https://anyware.hp.com/components/standard-agent-for-windows/26.05/documentation/administrators-guide/reference/install-gpo-template-files
+[ref-lenovo-dock]: https://download.lenovo.com/consumer/options/policy_setup.exe
+[ref-libreoffice]: https://github.com/CollaboraOnline/ADMX
+[ref-chrome]: https://chromeenterprise.google/policies/
+[ref-pdf-xchange]: https://www.pdf-xchange.com/Tracker%5FAD%5FAdministrativeTemplates.zip
+[ref-powertoys]: https://github.com/microsoft/PowerToys/releases
+[ref-realvnc]: https://downloads.realvnc.com/download/file/policy.files/RealVNC-server-admx-templates-Latest.zip
+[ref-specops]: https://download.specopssoft.com/Release/Client/Specops.Client.AdmxTemplates.zip
+[ref-thunderbird]: https://github.com/thunderbird/policy-templates
+[ref-windows-terminal]: https://github.com/microsoft/terminal/releases
+[ref-wsl]: https://github.com/microsoft/WSL/tree/master/intune
+[ref-365-apps]: https://www.microsoft.com/en-us/download/details.aspx?id=49030
+[ref-avd]: https://aka.ms/avdgpo
+[ref-clipchamp]: https://www.microsoft.com/en-us/download/details.aspx?id=105674
+[ref-edge]: https://learn.microsoft.com/en-us/deployedge/configure-microsoft-edge
+[ref-fslogix]: https://learn.microsoft.com/en-us/fslogix/how-to-use-group-policy-templates
+[ref-notepad]: https://download.microsoft.com/download/72ea16a9-4cc9-4032-945d-3a56a483d034/WindowsNotepadAdminTemplates.cab
+[ref-onedrive]: https://learn.microsoft.com/en-us/sharepoint/use-group-policy
+[ref-visual-studio]: https://www.microsoft.com/en-us/download/details.aspx?id=104405
+[ref-vscode]: https://code.visualstudio.com/docs/setup/enterprise
+[ref-win10-21h2]: https://www.microsoft.com/en-us/download/details.aspx?id=104042
+[ref-win10-22h2]: https://www.microsoft.com/en-us/download/details.aspx?id=104677
+[ref-win11-23h2]: https://www.microsoft.com/en-us/download/details.aspx?id=105667
+[ref-win11-24h2]: https://www.microsoft.com/en-us/download/details.aspx?id=106254
+[ref-win11-25h2]: https://www.microsoft.com/en-us/download/details.aspx?id=108542
+[ref-winserver-2022]: https://www.microsoft.com/en-us/download/details.aspx?id=104003
+[ref-winserver-2025]: https://www.microsoft.com/en-us/download/details.aspx?id=106295
+[ref-winget]: https://github.com/microsoft/winget-cli/releases
+[ref-firefox]: https://github.com/mozilla/policy-templates
+[ref-psadt]: https://github.com/PSAppDeployToolkit/PSAppDeployToolkit
+[ref-schannel]: https://github.com/Crosse/SchannelGroupPolicy
+[ref-security-admx]: https://github.com/Harvester57/Security-ADMX
+[ref-slack]: https://slack.com/help/articles/11906214948755-Manage-desktop-app-configurations
+[ref-teamviewer]: https://github.com/systmworks/TeamViewer-ADMX
+[ref-wau]: https://github.com/Romanitho/Winget-AutoUpdate
+[ref-wau-intune]: https://github.com/Weatherlights/Winget-AutoUpdate-Intune
+[ref-zoom]: https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0065466
+[ref-zoom-vdi]: https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0064784
