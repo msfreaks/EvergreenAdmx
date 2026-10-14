@@ -5,41 +5,94 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Expected maintenance branch commit (empty for normal manual runs)
+        type: string
+        required: false
 
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint-markdown:
     name: Markdownlint
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify maintenance commit
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          if [ -n "$EXPECTED_SHA" ] && [ "$(git rev-parse HEAD)" != "$EXPECTED_SHA" ]; then
+            echo 'The maintenance branch changed before CI started.' >&2
+            exit 1
+          fi
 
       - name: markdownlint-cli2
-        uses: DavidAnson/markdownlint-cli2-action@v24
+        uses: DavidAnson/markdownlint-cli2-action@21c1be1b93ad9ed58fa840aacc3f279cde2a72ff # v24.2.0
         with:
           globs: '**/*.md'
 
   analyze-and-unit-test:
-    name: PSScriptAnalyzer + Unit tests
-    runs-on: windows-latest
+    name: PSScriptAnalyzer + Unit tests (${{ matrix.shell }})
+    runs-on: windows-2025
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [pwsh, powershell]
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify maintenance commit and load dependency versions
+        shell: pwsh
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+        run: |
+          if ($env:EXPECTED_SHA -and (git rev-parse HEAD) -ne $env:EXPECTED_SHA) {
+            throw 'The maintenance branch changed before CI started.'
+          }
+          ./.github/scripts/Set-DependencyEnvironment.ps1
+
+      - name: Cache test modules
+        id: modules
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .psmodules
+          key: psmodules-${{ runner.os }}-pester-${{ env.PESTER_VERSION }}-pssa-${{ env.PSSA_VERSION }}
 
       - name: Install PSScriptAnalyzer and Pester
+        if: steps.modules.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-          Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force -AllowClobber
-          Install-Module -Name Pester -MinimumVersion 5.5.0 -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck
+          $ErrorActionPreference = 'Stop'
+          $null = New-Item -Path .psmodules -ItemType Directory -Force
+          Save-PSResource -Name PSScriptAnalyzer -Version $env:PSSA_VERSION -Path .psmodules -Repository PSGallery -TrustRepository
+          Save-PSResource -Name Pester -Version $env:PESTER_VERSION -Path .psmodules -Repository PSGallery -TrustRepository
 
       - name: PSScriptAnalyzer
+        if: matrix.shell == 'pwsh'
         shell: pwsh
         run: |
-          $paths = @('.\EvergreenAdmx.ps1', '.\tests')
+          Import-Module "./.psmodules/PSScriptAnalyzer/$env:PSSA_VERSION/PSScriptAnalyzer.psd1"
+          $paths = @('.\EvergreenAdmx.ps1', '.\tests', '.\.github\scripts')
           $results = foreach ($path in $paths) {
             Invoke-ScriptAnalyzer -Path $path -Settings .\PSScriptAnalyzerSettings.psd1 -Recurse -Severity @('Error', 'Warning')
           }
@@ -55,11 +108,11 @@ jobs:
           }
 
       - name: Pester unit tests
-        shell: pwsh
         run: |
+          Import-Module "./.psmodules/Pester/$env:PESTER_VERSION/Pester.psd1"
           $config = New-PesterConfiguration
           # Unit file only — avoids discovering Integration/Nightly containers.
-          $config.Run.Path = '.\tests\EvergreenAdmx.Tests.ps1'
+          $config.Run.Path = @('.\tests\EvergreenAdmx.Tests.ps1', '.\tests\Maintenance.Tests.ps1')
           $config.Run.Exit = $true
           $config.TestResult.Enabled = $true
           $config.TestResult.OutputPath = '.\tests\TestResults.Unit.xml'
@@ -67,8 +120,9 @@ jobs:
           Invoke-Pester -Configuration $config
 
       - name: Upload unit test results
-        if: always()
-        uses: actions/upload-artifact@v4
+        if: always() && !cancelled()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: pester-unit-results
+          name: pester-unit-results-${{ matrix.shell }}
           path: tests/TestResults.Unit.xml
+          retention-days: 7

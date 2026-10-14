@@ -19,6 +19,15 @@ AfterAll {
 }
 
 Describe 'Release smoke download' -Tag 'Integration' {
+    It 'downloads Snagit with language fallback and records its release version' {
+        $work = Join-Path $script:WorkRoot 'Snagit'
+        $null = & $script:ScriptPath -WorkingDirectory $work -Languages @('en-US', 'fr-FR') -Include 'Snagit'
+        Test-Path (Join-Path $work 'admx\Snagit.admx') | Should -BeTrue
+        Test-Path (Join-Path $work 'admx\en-US\Snagit.adml') | Should -BeTrue
+        $versions = Import-Clixml (Join-Path $work 'AdmxVersions.xml')
+        $versions.Snagit.Version | Should -Not -BeNullOrEmpty
+    }
+
     It 'downloads Microsoft Edge for en-US, es, and fr-FR' {
         $null = & $script:ScriptPath `
             -WorkingDirectory $script:WorkRoot `

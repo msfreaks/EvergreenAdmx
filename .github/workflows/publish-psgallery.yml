@@ -18,22 +18,58 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: psgallery-publish
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: pwsh
+
 jobs:
+  smoke:
+    if: github.event_name != 'workflow_dispatch' || !inputs.dry_run
+    uses: ./.github/workflows/release-smoke.yml
+
   publish:
+    needs: smoke
+    if: ${{ !cancelled() && (needs.smoke.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.dry_run && needs.smoke.result == 'skipped')) }}
     name: Publish-Script
-    runs-on: windows-latest
+    runs-on: windows-2025
+    timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Release events check out the default branch; pin to the release tag when present.
-          ref: ${{ github.event.release.tag_name || github.sha }}
+          # Use the same event commit as the smoke gate, even if a release tag moves.
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Load dependency versions
+        run: ./.github/scripts/Set-DependencyEnvironment.ps1
+
+      - name: Ensure PowerShellGet is current
+        run: |
+          $ErrorActionPreference = 'Stop'
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+          # PowerShell 7 includes NuGet support; its legacy provider bootstrap feed is unavailable.
+          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
+            Register-PSRepository -Default
+          }
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          if (-not (Get-Module -ListAvailable -Name PowerShellGet | Where-Object Version -eq ([version]$env:POWERSHELLGET_VERSION))) {
+            Install-PSResource -Name PowerShellGet -Version $env:POWERSHELLGET_VERSION -Scope CurrentUser -Repository PSGallery -TrustRepository
+          }
 
       - name: Validate script metadata and version
         id: meta
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          Import-Module PowerShellGet -RequiredVersion $env:POWERSHELLGET_VERSION
           [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
           $scriptPath = Join-Path $PWD 'EvergreenAdmx.ps1'
@@ -41,15 +77,14 @@ jobs:
             throw "EvergreenAdmx.ps1 not found at $scriptPath"
           }
 
-          Test-ScriptFileInfo -Path $scriptPath | Format-List | Out-String | Write-Host
-
           $info = Test-ScriptFileInfo -Path $scriptPath
+          $info | Format-List | Out-String | Write-Host
           $version = [string]$info.Version
           if ([string]::IsNullOrWhiteSpace($version)) {
             throw 'PSScriptInfo .VERSION is missing or empty.'
           }
 
-          $tag = '${{ github.event.release.tag_name }}'
+          $tag = $env:RELEASE_TAG
           if (-not [string]::IsNullOrWhiteSpace($tag)) {
             $normalizedTag = $tag.TrimStart('v', 'V')
             if ($normalizedTag -ne $version) {
@@ -60,36 +95,15 @@ jobs:
           Write-Host "Script version: $version"
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-      - name: Ensure PowerShellGet is current
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-
-          # Do not call Install-PackageProvider -Name NuGet on pwsh: the legacy
-          # bootstrap feed returns no match on hosted runners and fails the job.
-          # PowerShell 7 already ships a NuGet-capable PackageManagement stack
-          # (same pattern as ci.yml module installs).
-          if (-not (Get-PSRepository -Name PSGallery -ErrorAction SilentlyContinue)) {
-            Register-PSRepository -Default
-          }
-          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-
-          $installed = Get-Module -ListAvailable -Name PowerShellGet |
-            Sort-Object -Property Version -Descending |
-            Select-Object -First 1
-          if (-not $installed -or $installed.Version -lt [version]'2.2.5') {
-            Install-Module -Name PowerShellGet -MinimumVersion 2.2.5 -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck
-          } else {
-            Write-Host "PowerShellGet $($installed.Version) already meets minimum 2.2.5"
-          }
-
       - name: Skip if version already on PSGallery
         id: existing
+        env:
+          SCRIPT_VERSION: ${{ steps.meta.outputs.version }}
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '${{ steps.meta.outputs.version }}'
+          Import-Module PowerShellGet -RequiredVersion $env:POWERSHELLGET_VERSION
+          $version = $env:SCRIPT_VERSION
           $found = Find-Script -Name EvergreenAdmx -RequiredVersion $version -Repository PSGallery -ErrorAction SilentlyContinue
           if ($found) {
             Write-Host "EvergreenAdmx $version is already on PSGallery — skipping publish."
@@ -102,14 +116,15 @@ jobs:
         if: steps.existing.outputs.skip != 'true'
         env:
           PSGALLERY_API_KEY: ${{ secrets.PSGALLERY_API_KEY }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+          SCRIPT_VERSION: ${{ steps.meta.outputs.version }}
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          Import-Module PowerShellGet -RequiredVersion $env:POWERSHELLGET_VERSION
           [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-          $isDispatch = '${{ github.event_name }}' -eq 'workflow_dispatch'
-          $dryInput = '${{ inputs.dry_run }}'
-          $dryRun = $isDispatch -and ($dryInput -eq 'true')
+          $dryRun = $env:DRY_RUN -eq 'true'
           $scriptPath = (Resolve-Path '.\EvergreenAdmx.ps1').Path
 
           if ($dryRun) {
@@ -125,25 +140,28 @@ jobs:
 
           # PowerShellGet can Write-Error from nested scopes; -ErrorAction Stop is required.
           Publish-Script -Path $scriptPath -NuGetApiKey $env:PSGALLERY_API_KEY -ErrorAction Stop
-          Write-Host "Published EvergreenAdmx ${{ steps.meta.outputs.version }} to PSGallery."
+          Write-Host "Published EvergreenAdmx $env:SCRIPT_VERSION to PSGallery."
 
       - name: Confirm publication
+        env:
+          SCRIPT_VERSION: ${{ steps.meta.outputs.version }}
         if: |
           steps.existing.outputs.skip != 'true' &&
           !(github.event_name == 'workflow_dispatch' && inputs.dry_run)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = '${{ steps.meta.outputs.version }}'
+          Import-Module PowerShellGet -RequiredVersion $env:POWERSHELLGET_VERSION
+          $version = $env:SCRIPT_VERSION
           $found = $null
           for ($attempt = 1; $attempt -le 8; $attempt++) {
-            Start-Sleep -Seconds 5
             $found = Find-Script -Name EvergreenAdmx -RequiredVersion $version -Repository PSGallery -ErrorAction SilentlyContinue
             if ($found) { break }
             Write-Host "Attempt $attempt/8: version $version not visible yet..."
+            if ($attempt -lt 8) { Start-Sleep -Seconds 5 }
           }
           if (-not $found) {
-            throw "Publish appeared to succeed but EvergreenAdmx $version is not visible on PSGallery after ~40s. Check https://www.powershellgallery.com/packages/EvergreenAdmx/$version"
+            throw "Publish appeared to succeed but EvergreenAdmx $version is not visible on PSGallery after ~35s. Check https://www.powershellgallery.com/packages/EvergreenAdmx/$version"
           }
           Write-Host "Confirmed: EvergreenAdmx $version is on PSGallery"
           Write-Host "https://www.powershellgallery.com/packages/EvergreenAdmx/$version"

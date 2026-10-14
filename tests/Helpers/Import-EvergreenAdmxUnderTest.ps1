@@ -98,14 +98,14 @@ function Get-EvergreenAdmxIncludeValidateSet {
     $fn = $ast.FindAll({
             param($node)
             $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
-            $node.Name -eq 'Get-EvergreenAdmxProductCatalog'
-        }, $true) | Select-Object -First 1
+            $node.Name -in @('Get-EvergreenAdmxReleaseCatalog', 'Get-EvergreenAdmxProductCatalog')
+        }, $true)
 
     if (-not $fn) {
         throw 'Get-EvergreenAdmxProductCatalog not found in EvergreenAdmx.ps1.'
     }
 
-    $catalog = & ([scriptblock]::Create($fn.Extent.Text + '; Get-EvergreenAdmxProductCatalog'))
+    $catalog = & ([scriptblock]::Create(($fn.Extent.Text -join "`n") + '; Get-EvergreenAdmxProductCatalog'))
     return @($catalog | ForEach-Object { $_.Name })
 }
 

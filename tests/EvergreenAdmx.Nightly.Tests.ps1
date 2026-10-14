@@ -1,6 +1,6 @@
 #Requires -Version 5.1
 # Full-product health check. Tag: Nightly
-# Excludes Custom Policy Store (needs path) and Windows 10 (incompatible with default Win11 25H2).
+# Excludes Custom Policy Store (needs path) and Windows 10 (incompatible with default Win11 26H2).
 # Run elevated (EvergreenAdmx.ps1 requires Administrator).
 
 BeforeAll {
@@ -25,12 +25,14 @@ AfterAll {
 
 Describe 'Full product matrix' -Tag 'Nightly' {
     It 'processes all products for en-US, es, and fr-FR' {
+        $ErrorActionPreference = 'Stop'
         $script:Products.Count | Should -BeGreaterThan 20
 
         & $script:ScriptPath `
             -WorkingDirectory $script:WorkRoot `
             -Languages @('en-US', 'es', 'fr-FR') `
-            -Include $script:Products
+            -Include $script:Products `
+            -Verbose
 
         $admxRoot = Join-Path -Path $script:WorkRoot -ChildPath 'admx'
         Test-Path -LiteralPath $admxRoot | Should -BeTrue
@@ -44,5 +46,9 @@ Describe 'Full product matrix' -Tag 'Nightly' {
         Test-Path -LiteralPath $versionsPath | Should -BeTrue
         $versions = Import-Clixml -LiteralPath $versionsPath
         @($versions.Keys).Count | Should -BeGreaterThan 20
+        Test-Path (Join-Path $admxRoot 'CommercialVantage.admx') | Should -BeTrue
+        Test-Path (Join-Path $enUs 'CommercialVantage.adml') | Should -BeTrue
+        $versions.LenovoCommercialVantage.Version | Should -Not -BeNullOrEmpty
+        $versions.LenovoCommercialVantage.URI | Should -Match '^https://download\.lenovo\.com/.+LenovoCommercialVantage_.+\.zip$'
     }
 }

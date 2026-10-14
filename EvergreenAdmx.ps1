@@ -1,6 +1,6 @@
 <#PSScriptInfo
 
-.VERSION 2607.1
+.VERSION 2610.0
 
 .GUID 999952b7-1337-4018-a1b9-499fad48e734
 
@@ -42,16 +42,14 @@
     Optionally copies the latest Admx files to a folder of your choosing, for example a Policy Store.
 
 .PARAMETER WindowsVersion
-    Specifies Windows major version. Supports 10, 11, 2022 or 2025.
-    Default is 11.
+    Specifies a Windows client major version or Server year from Get-EvergreenAdmxReleaseCatalog.
+    Defaults to the newest reviewed Windows client major.
 
 .PARAMETER WindowsFeatureVersion
-    Specifies Windows 10 or 11 feature version to get the Admx files for.
-    Valid values are: 21H2, 22H2 for Windows 10.
-    Valid values are: 23H2, 24H2, 25H2 for Windows 11.
-    Defaults to 25H2.
+    Specifies a client feature version from Get-EvergreenAdmxReleaseCatalog.
+    Defaults to the reviewed edition for the selected Windows family. Ignored for Server families.
 
-    Note: Current Windows 11 ADMX templates (23H2 / 24H2 / 25H2) can also manage Windows 10 clients; some settings apply only to newer OS versions.
+    Note: Current Windows 11 ADMX templates can also manage Windows 10 clients; some settings apply only to newer OS versions.
 
 .PARAMETER WorkingDirectory
     Specifies a Working Directory for the script.
@@ -77,8 +75,10 @@
 
 .PARAMETER Include
     Array containing Admx products to include when checking for updates.
+    Snagit downloads community policy templates for Snagit 2025 and 2026; 'TechSmith Snagit' is an alias.
+    Lenovo Commercial Vantage downloads the Enterprise deployment ZIP and extracts policy files only; requires explicit -Include.
     Accepts canonical product names and short aliases (ProductKey, compact forms, and former names), e.g. "BISF" for "BIS-F", "Edge" for "Microsoft Edge".
-    Valid products are: "Custom Policy Store", "Windows 10", "Windows 11", "Windows 2022", "Windows 2025", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "Adobe DC", "BIS-F", "Citrix Workspace App", "Google Chrome", "Mozilla Firefox", "Mozilla Thunderbird", "Zoom", "Zoom VDI", "Microsoft AVD", "Microsoft Winget", "Microsoft PowerToys", "Windows Terminal", "Brave Browser", "Microsoft Notepad", "Microsoft Clipchamp", "Microsoft Visual Studio", "Microsoft VS Code", "Slack", "1Password", "TeamViewer", "Security ADMX", "Schannel", "Dell Command Update", "Winget-AutoUpdate", "Winget-AutoUpdate-Intune", "PSAppDeployToolkit", "Devolutions Remote Desktop Manager", "Dropbox", "Foxit PDF", "LibreOffice", "HP Anyware", "Specops Authentication Client", "WSL", "Lenovo Dock Manager", "PDF-XChange", "RealVNC Connect", "ABBYY FineReader PDF", "Admin By Request", "GoTo".
+    Valid products are: "Custom Policy Store", "Windows 10", "Windows 11", "Windows 2022", "Windows 2025", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft FSLogix", "Adobe Acrobat", "Adobe Reader", "Adobe DC", "Snagit", "BIS-F", "Citrix Workspace App", "Google Chrome", "Mozilla Firefox", "Mozilla Thunderbird", "Zoom", "Zoom VDI", "Microsoft AVD", "Microsoft Winget", "Microsoft PowerToys", "Windows Terminal", "Brave Browser", "Microsoft Notepad", "Microsoft Clipchamp", "Microsoft Visual Studio", "Microsoft VS Code", "Slack", "1Password", "TeamViewer", "Security ADMX", "Schannel", "Dell Command Update", "Winget-AutoUpdate", "Winget-AutoUpdate-Intune", "PSAppDeployToolkit", "Devolutions Remote Desktop Manager", "Dropbox", "Foxit PDF", "LibreOffice", "HP Anyware", "Specops Authentication Client", "WSL", "Lenovo Dock Manager", "Lenovo Commercial Vantage", "PDF-XChange", "RealVNC Connect", "ABBYY FineReader PDF", "Admin By Request", "GoTo".
     Defaults to "Windows 11", "Microsoft Edge", "Microsoft OneDrive", "Microsoft 365 Apps", "Microsoft Clipchamp", "Microsoft Notepad", "Microsoft Winget", "Windows Terminal".
 
 .PARAMETER PreferLocalOneDrive
@@ -152,17 +152,11 @@
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
     [Parameter(Mandatory = $false, Position = 0)]
-    [ValidateSet('10', '11', '2022', '2025')]
+    [ValidatePattern('^\d{2,4}$')]
     [System.String] $WindowsVersion = '11',
     [Alias('WindowsFeatureEdition')]
-    [ValidateSet('21H2', '22H2', '23H2', '24H2', '25H2')]
-    [System.String] $WindowsFeatureVersion = $(
-        switch ($WindowsVersion) {
-            '10' { '22H2' }
-            '11' { '25H2' }
-            default { '25H2' }
-        }
-    ),
+    [ValidatePattern('^\d{2}H[12]$')]
+    [System.String] $WindowsFeatureVersion,
     [Parameter(Mandatory = $false)]
     [System.String] $WorkingDirectory,
     [Parameter(Mandatory = $false)]
@@ -200,10 +194,10 @@ param(
                 $fn = $ast.FindAll({
                         param($node)
                         $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
-                        $node.Name -eq 'Get-EvergreenAdmxProductCatalog'
-                    }, $true) | Select-Object -First 1
+                        $node.Name -in @('Get-EvergreenAdmxReleaseCatalog', 'Get-EvergreenAdmxProductCatalog')
+                    }, $true)
                 if ($fn) {
-                    $catalog = & ([scriptblock]::Create($fn.Extent.Text + "; Get-EvergreenAdmxProductCatalog"))
+                    $catalog = & ([scriptblock]::Create(($fn.Extent.Text -join "`n") + "; Get-EvergreenAdmxProductCatalog"))
                     $candidates = foreach ($product in $catalog) {
                         @($product.Name) + @($product.Aliases)
                     }
@@ -221,19 +215,43 @@ param(
                     )
                 }
         })]
-    [System.String[]] $Include = $(
-        switch ($WindowsVersion) {
-            '10' { @('Windows 10', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft Clipchamp', 'Microsoft Notepad', 'Microsoft Winget', 'Windows Terminal') }
-            '11' { @('Windows 11', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft Clipchamp', 'Microsoft Notepad', 'Microsoft Winget', 'Windows Terminal') }
-            '2022' { @('Windows 2022', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft Clipchamp', 'Microsoft Notepad', 'Microsoft Winget', 'Windows Terminal') }
-            '2025' { @('Windows 2025', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft Clipchamp', 'Microsoft Notepad', 'Microsoft Winget', 'Windows Terminal') }
-            default { @('Windows 11', 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft Clipchamp', 'Microsoft Notepad', 'Microsoft Winget', 'Windows Terminal') }
-        }
-    )
+    [System.String[]] $Include = @("Windows $WindowsVersion", 'Microsoft Edge', 'Microsoft OneDrive', 'Microsoft 365 Apps', 'Microsoft Clipchamp', 'Microsoft Notepad', 'Microsoft Winget', 'Windows Terminal')
 )
 
 #region init
 
+function Get-EvergreenAdmxReleaseCatalog {
+    # Embedded because Install-Script distributes EvergreenAdmx.ps1 alone.
+    return @{
+        ABBYYMajor = 16
+        FoxitMajor = 2026
+        Windows = @(
+            @{ Version = '10'; Feature = '21H2'; DownloadId = '104042'; Default = $false }
+            @{ Version = '10'; Feature = '22H2'; DownloadId = '104677'; Default = $true }
+            @{ Version = '11'; Feature = '23H2'; DownloadId = '105667'; Default = $false }
+            @{ Version = '11'; Feature = '24H2'; DownloadId = '106254'; Default = $false }
+            @{ Version = '11'; Feature = '25H2'; DownloadId = '108542'; Default = $false }
+            @{ Version = '11'; Feature = '26H2'; DownloadId = '108847'; Default = $true }
+            @{ Version = '2022'; Feature = ''; DownloadId = '104003'; Default = $true }
+            @{ Version = '2025'; Feature = ''; DownloadId = '108430'; Default = $true }
+        )
+    }
+}
+
+function Get-EvergreenAdmxWindowsRelease {
+    param([string]$WindowsVersion = '11', [string]$WindowsFeatureVersion)
+    $releases = @((Get-EvergreenAdmxReleaseCatalog).Windows | Where-Object Version -eq $WindowsVersion)
+    if (-not $releases) { throw "Unsupported Windows version '$WindowsVersion'." }
+    if (-not $WindowsFeatureVersion -or [int]$WindowsVersion -ge 2000) {
+        $release = @($releases | Where-Object Default)
+    } else {
+        $release = @($releases | Where-Object Feature -eq $WindowsFeatureVersion)
+    }
+    if ($release.Count -ne 1) {
+        throw "Invalid Windows Feature Version '$WindowsFeatureVersion' for Windows $WindowsVersion. Supported: $($releases.Feature -join ', ')."
+    }
+    return $release[0]
+}
 
 function Get-EvergreenAdmxProductCatalog {
     <#
@@ -246,10 +264,11 @@ function Get-EvergreenAdmxProductCatalog {
 
     @(
         [PSCustomObject]@{ Name = 'Custom Policy Store'; Aliases = @('CustomPolicyStore', 'CustomPolicyLocation') }
-        [PSCustomObject]@{ Name = 'Windows 10'; Aliases = @('Windows10', 'Win10') }
-        [PSCustomObject]@{ Name = 'Windows 11'; Aliases = @('Windows11', 'Win11') }
-        [PSCustomObject]@{ Name = 'Windows 2022'; Aliases = @('Windows2022', 'WindowsServer2022', 'Win2022') }
-        [PSCustomObject]@{ Name = 'Windows 2025'; Aliases = @('Windows2025', 'WindowsServer2025', 'Win2025') }
+        foreach ($version in ((Get-EvergreenAdmxReleaseCatalog).Windows.Version | Select-Object -Unique)) {
+            $aliases = @("Windows$version", "Win$version")
+            if ([int]$version -ge 2000) { $aliases += "WindowsServer$version" }
+            [PSCustomObject]@{ Name = "Windows $version"; Aliases = $aliases }
+        }
         [PSCustomObject]@{ Name = 'Microsoft Edge'; Aliases = @('Edge', 'MSEdge', 'MicrosoftEdge') }
         [PSCustomObject]@{ Name = 'Microsoft OneDrive'; Aliases = @('OneDrive', 'MicrosoftOneDrive') }
         [PSCustomObject]@{ Name = 'Microsoft 365 Apps'; Aliases = @('365Apps', 'Microsoft365Apps', 'M365', 'Office', 'Microsoft Office', 'MicrosoftOffice') }
@@ -257,6 +276,7 @@ function Get-EvergreenAdmxProductCatalog {
         [PSCustomObject]@{ Name = 'Adobe Acrobat'; Aliases = @('AdobeAcrobat', 'Acrobat') }
         [PSCustomObject]@{ Name = 'Adobe Reader'; Aliases = @('AdobeReader', 'Reader') }
         [PSCustomObject]@{ Name = 'Adobe DC'; Aliases = @('AdobeDC') }
+        [PSCustomObject]@{ Name = 'Snagit'; Aliases = @('TechSmith Snagit') }
         [PSCustomObject]@{ Name = 'BIS-F'; Aliases = @('BISF', 'Base Image Script Framework', 'BaseImageScriptFramework') }
         [PSCustomObject]@{ Name = 'Citrix Workspace App'; Aliases = @('CitrixWorkspaceApp', 'Citrix', 'CWA') }
         [PSCustomObject]@{ Name = 'Google Chrome'; Aliases = @('GoogleChrome', 'Chrome') }
@@ -290,6 +310,7 @@ function Get-EvergreenAdmxProductCatalog {
         [PSCustomObject]@{ Name = 'Specops Authentication Client'; Aliases = @('Specops', 'SpecopsClient', 'SpecopsAuthenticationClient', 'SPR', 'uReset', 'SpecopsPasswordReset') }
         [PSCustomObject]@{ Name = 'WSL'; Aliases = @('Windows Subsystem for Linux', 'WindowsSubsystemForLinux') }
         [PSCustomObject]@{ Name = 'Lenovo Dock Manager'; Aliases = @('DockManager', 'LenovoDockManager') }
+        [PSCustomObject]@{ Name = 'Lenovo Commercial Vantage'; Aliases = @('LenovoCommercialVantage', 'CommercialVantage') }
         [PSCustomObject]@{ Name = 'PDF-XChange'; Aliases = @('PDFXChange', 'PDF-X-Change', 'Tracker') }
         [PSCustomObject]@{ Name = 'RealVNC Connect'; Aliases = @('RealVNC', 'VNC', 'RealVNCServer', 'RealVNCViewer') }
         [PSCustomObject]@{ Name = 'ABBYY FineReader PDF'; Aliases = @('ABBYY', 'FineReader', 'FineReaderPDF', 'ABBYYFineReader') }
@@ -379,15 +400,15 @@ Aliases such as ProductKey short names are accepted (e.g. 'BISF' for 'BIS-F').
         }
     }
 
-    return , @($resolved.ToArray())
+    return $resolved.ToArray()
 }
 
-# Validate feature version based on Windows version
-if ($WindowsVersion -eq '2022' -and ($PSBoundParameters.ContainsKey('WindowsFeatureVersion'))) {
-    Write-Warning 'Windows feature version parameters are ignored when WindowsVersion is set to 2022'
-} elseif ($WindowsVersion -eq '2025' -and ($PSBoundParameters.ContainsKey('WindowsFeatureVersion'))) {
-    Write-Warning 'Windows feature version parameters are ignored when WindowsVersion is set to 2025'
+# Validate against the reviewed catalog before creating folders or touching the policy store.
+$WindowsRelease = Get-EvergreenAdmxWindowsRelease -WindowsVersion $WindowsVersion -WindowsFeatureVersion $WindowsFeatureVersion
+if ([int]$WindowsVersion -ge 2000 -and $PSBoundParameters.ContainsKey('WindowsFeatureVersion')) {
+    Write-Warning "Windows feature version parameters are ignored when WindowsVersion is set to $WindowsVersion"
 }
+$WindowsFeatureVersion = $WindowsRelease.Feature
 
 $ProgressPreference = 'SilentlyContinue'
 #$ErrorActionPreference = 'SilentlyContinue'
@@ -1487,54 +1508,24 @@ function Get-WindowsDownloadId {
         Returns Windows admx download Id
 
     .PARAMETER WindowsVersion
-        Specifies Windows major version. Supports 10, 11, 2022 or 2025. Default is 11.
+        Specifies a Windows major version or Server year in the reviewed release catalog.
 
     .PARAMETER WindowsFeatureVersion
-        Specifies Windows client feature edition. Default is 25H2.
+        Specifies Windows client feature edition. Defaults to the reviewed edition for that family.
 
     .EXAMPLE
-        Get-WindowsDownloadId -WindowsVersion 11 -WindowsFeatureVersion 25H2
+        Get-WindowsDownloadId -WindowsVersion 11 -WindowsFeatureVersion 26H2
     #>
 
     param (
         [Parameter(Position = 0)]
-        [ValidateSet('10', '11', '2022', '2025')]
         [ValidateNotNullOrEmpty()]
         [int]$WindowsVersion = '11',
         [Parameter(Position = 1)]
-        [ValidateScript({
-                if ($WindowsVersion -eq '10' -and $_ -in @('21H2', '22H2')) {
-                    return $true
-                } elseif ($WindowsVersion -eq '11' -and $_ -in @('23H2', '24H2', '25H2')) {
-                    return $true
-                } elseif ($WindowsVersion -eq '2022' -or $WindowsVersion -eq '2025') {
-                    return $true
-                } else {
-                    throw "Invalid Windows Feature Version '$_' for Windows $WindowsVersion. Windows 10 supports: 21H2, 22H2. Windows 11 supports: 23H2, 24H2, 25H2. Windows 2022 and 2025 has no Windows Feature Versions."
-                }
-            })]
-        [ValidateNotNullOrEmpty()]
-        [string]$WindowsFeatureVersion = '25H2'
+        [string]$WindowsFeatureVersion
     )
 
-    switch ($WindowsVersion) {
-        10 {
-            return (@( @{ '21H2' = '104042' }, @{ '22H2' = '104677' } ).$WindowsFeatureVersion)
-            break
-        }
-        11 {
-            return (@( @{ '23H2' = '105667' }, @{ '24H2' = '106254' }, @{ '25H2' = '108542' } ).$WindowsFeatureVersion)
-            break
-        }
-        2022 {
-            return @( '104003' )
-            break
-        }
-        2025 {
-            return @( '108430' )
-            break
-        }
-    }
+    return (Get-EvergreenAdmxWindowsRelease -WindowsVersion $WindowsVersion -WindowsFeatureVersion $WindowsFeatureVersion).DownloadId
 }
 
 function Get-EvergreenAdmxWindows {
@@ -1560,13 +1551,14 @@ function Get-EvergreenAdmxWindows {
         # Load web page for scrapping url version
         $web = Invoke-WebRequest -UseDefaultCredentials -UseBasicParsing -Uri $urlVersion
 
-        # Grab version
-        $regEx = '(version\":")((?:\d+\.)+(?:\d+))"'
-        $version = ('{0}.{1}' -f $DownloadId, ($web | Select-String -Pattern $regEx).Matches.Groups[2].Value)
-
         # Carve JSON from script tag
         $web = $web.Content | Select-String -Pattern $JSONBlobPattern | Select-Object -ExpandProperty Matches | ForEach-Object { $_.Groups['JSObject'].Value } | Select-Object -First 1 | ConvertFrom-Json
         $href = $web.dlcDetailsView.downloadFile | Where-Object { $_.url -like '*.msi' } | Select-Object -First 1
+        if (-not $href) { throw "Windows download $DownloadId contains no MSI package." }
+        $packageVersion = [string]$href.version
+        if ($packageVersion -notmatch '^\d+(?:\.\d+){0,2}$') { throw "Windows download $DownloadId has an unsupported package version '$packageVersion'." }
+        if ($packageVersion -notmatch '\.') { $packageVersion += '.0' }
+        $version = '{0}.{1}' -f $DownloadId, $packageVersion
 
         # Return Evergreen object
         return @{ Version = $version; URI = $href.url }
@@ -2656,6 +2648,142 @@ function Invoke-EvergreenAdmxAdobeDC {
     }
 }
 
+function Get-EvergreenAdmxLenovoCommercialVantage {
+    <#
+    .SYNOPSIS
+        Discovers the current Lenovo Commercial Vantage Enterprise deployment ZIP.
+    #>
+    $page = Invoke-WebRequest -Uri 'https://pcsupport.lenovo.com/us/en/solutions/hf003321' -UseBasicParsing -TimeoutSec 30 -ErrorAction Stop
+    if ($page.Content -notmatch '/us/en/api/v4/contents/cdn/hf003321_\d+\.js') {
+        throw 'The Lenovo Commercial Vantage page has no deployment metadata link.'
+    }
+    $metadataUri = 'https://pcsupport.lenovo.com' + $Matches[0]
+    $metadata = Invoke-WebRequest -Uri $metadataUri -UseBasicParsing -TimeoutSec 30 -ErrorAction Stop
+    # Decode Lenovo's JSON payload without executing the JavaScript wrapper.
+    if ($metadata.Content -notmatch '(?s)Object\.assign\(\s*window\.cdnData\s*,\s*(\{.*\})\s*\)\s*;?\s*$') {
+        throw 'Unexpected Lenovo Commercial Vantage deployment metadata format.'
+    }
+    $body = ($Matches[1] | ConvertFrom-Json -ErrorAction Stop).body
+    $packages = [regex]::Matches($body, 'https://download\.lenovo\.com/pccbbs/thinkvantage_en/metroapps/Vantage/LenovoCommercialVantage_(?<version>\d+\.\d+\.\d+\.\d+)\.(?<build>\d{14})\.zip')
+    $latest = $packages | Sort-Object -Property @{ Expression = { [version]$_.Groups['version'].Value }; Descending = $true }, @{ Expression = { $_.Groups['build'].Value }; Descending = $true } | Select-Object -First 1
+    if (-not $latest) {
+        throw 'Lenovo Commercial Vantage metadata has no official deployment ZIP.'
+    }
+    return @{ Version = [version]$latest.Groups['version'].Value; URI = $latest.Value }
+}
+
+function Invoke-EvergreenAdmxLenovoCommercialVantage {
+    <#
+    .SYNOPSIS
+        Extracts Commercial Vantage policy templates from the Enterprise ZIP.
+    .PARAMETER CurrentUri
+        Previously processed package URL, used to detect same-version rebuilds.
+    #>
+    param(
+        [string]$Version,
+        [string]$CurrentUri,
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
+    )
+
+    $ErrorActionPreference = 'Stop'
+    $Evergreen = Get-EvergreenAdmxLenovoCommercialVantage
+    if ($Version -and ([version]$Evergreen.Version -lt [version]$Version -or
+            ([version]$Evergreen.Version -eq [version]$Version -and $Evergreen.URI -eq $CurrentUri))) {
+        return $null
+    }
+
+    $ProductName = 'Lenovo Commercial Vantage'
+    $ProductFolder = ''; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
+    $OutFile = Join-Path (Join-Path $WorkingDirectory 'downloads') $Evergreen.URI.Split('/')[-1]
+    $TempFolder = Join-Path $env:TEMP ("EvergreenAdmx-LenovoCommercialVantage-{0}" -f [guid]::NewGuid().ToString('N'))
+    try {
+        Invoke-FileDownload -Uri $Evergreen.URI -OutFile $OutFile
+        Add-Type -AssemblyName System.IO.Compression,System.IO.Compression.FileSystem
+        $zip = [System.IO.Compression.ZipFile]::OpenRead($OutFile)
+        try {
+            # Select known policy paths; leave application payloads in the ZIP.
+            foreach ($entry in $zip.Entries) {
+                $path = $entry.FullName.Replace('\', '/')
+                if ($path -eq 'Group Policy Settings/CommercialVantage.admx') {
+                    $destination = Join-Path $TempFolder 'CommercialVantage.admx'
+                } elseif ($path -match '^Group Policy Settings/([A-Za-z]{2}(?:-(?:[A-Za-z]{2}|\d{3}))?)/CommercialVantage\.adml$') {
+                    $destination = Join-Path (Join-Path $TempFolder $Matches[1]) 'CommercialVantage.adml'
+                } else {
+                    continue
+                }
+                $null = New-Item -Path (Split-Path -Parent $destination) -ItemType Directory -Force
+                [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $destination, $true)
+            }
+        } finally {
+            $zip.Dispose()
+        }
+        if (-not (Test-Path -LiteralPath (Join-Path $TempFolder 'CommercialVantage.admx')) -or
+            -not (Test-Path -LiteralPath (Join-Path $TempFolder 'en-US\CommercialVantage.adml'))) {
+            throw 'The Lenovo deployment ZIP must contain CommercialVantage.admx and en-US/CommercialVantage.adml.'
+        }
+        $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+        Copy-Admx -SourceFolder $TempFolder -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
+        return $Evergreen
+    } finally {
+        if (Test-Path -LiteralPath $TempFolder) {
+            Remove-Item -LiteralPath $TempFolder -Recurse -Force
+        }
+    }
+}
+
+function Get-EvergreenAdmxSnagit {
+    <#
+    .SYNOPSIS
+        Returns the latest community Snagit ADMX release version and zip URI.
+    #>
+    $latest = Invoke-RestMethod -Uri 'https://api.github.com/repos/systmworks/ADMX-Snagit/releases/latest' -ErrorAction Stop
+    $asset = $latest.assets | Where-Object { $_.name -like 'Snagit-ADMX-*.zip' } | Select-Object -First 1
+    if (-not $asset.browser_download_url) {
+        throw 'The latest Snagit ADMX release has no Snagit-ADMX zip asset.'
+    }
+    $version = [version]($latest.tag_name -replace '^v', '')
+    return @{ Version = $version; URI = $asset.browser_download_url }
+}
+
+function Invoke-EvergreenAdmxSnagit {
+    <#
+    .SYNOPSIS
+        Downloads and copies community Snagit 2025 and 2026 policy templates.
+    #>
+    param(
+        [string]$Version,
+        [string]$PolicyStore = $null,
+        [string[]]$Languages = $null
+    )
+
+    $ErrorActionPreference = 'Stop'
+    $Evergreen = Get-EvergreenAdmxSnagit
+    if ($Version -and [version]$Evergreen.Version -le [version]$Version) {
+        return $null
+    }
+
+    $ProductName = 'Snagit'
+    $ProductFolder = ''; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
+    $OutFile = "$($WorkingDirectory)\downloads\$($Evergreen.URI.Split('/')[-1])"
+    $TempFolder = Join-Path $env:TEMP ("EvergreenAdmx-Snagit-{0}" -f [guid]::NewGuid().ToString('N'))
+    try {
+        Invoke-FileDownload -Uri $Evergreen.URI -OutFile $OutFile
+        Expand-Archive -Path $OutFile -DestinationPath $TempFolder -Force
+        $SourceAdmx = (Get-ChildItem -LiteralPath $TempFolder -Recurse -Filter 'Snagit.admx' -File | Select-Object -First 1).DirectoryName
+        if (-not $SourceAdmx -or -not (Test-Path -LiteralPath (Join-Path $SourceAdmx 'en-US\Snagit.adml'))) {
+            throw 'The Snagit ADMX archive must contain Snagit.admx and en-US/Snagit.adml.'
+        }
+        $TargetAdmx = "$($WorkingDirectory)\admx$($ProductFolder)"
+        Copy-Admx -SourceFolder $SourceAdmx -TargetFolder $TargetAdmx -PolicyStore $PolicyStore -ProductName $ProductName -Languages $Languages -Revision $(if ($StampAdmxRevision) { $Evergreen.Version })
+        return $Evergreen
+    } finally {
+        if (Test-Path -LiteralPath $TempFolder) {
+            Remove-Item -LiteralPath $TempFolder -Recurse -Force
+        }
+    }
+}
+
 function Get-EvergreenAdmxSecurityAdmx {
     <#
     .SYNOPSIS
@@ -3524,21 +3652,28 @@ function Get-EvergreenAdmxFoxit {
         Returns latest Version and Uri for Foxit PDF Reader/Editor ADMX files
     #>
 
+    param([int]$MaximumMajor = (Get-EvergreenAdmxReleaseCatalog).FoxitMajor)
+
     try {
-        # Parent directory listing is 403; probe newest-first known version folders
-        $candidates = @(
-            '2026.2.0', '2026.1.5', '2026.1.4', '2026.1.3', '2026.1.2', '2026.1.1', '2026.1.0',
-            '2025.4.0', '2025.3.0', '2025.2.0', '2025.1.0',
-            '2024.4.0', '2024.3.0', '2024.2.2', '2024.2.0', '2024.1.0'
-        )
+        $history = (Invoke-WebRequest -UseDefaultCredentials -Uri 'https://www.foxit.com/pdf-editor/version-history/' -UseBasicParsing -TimeoutSec 30 -ErrorAction Stop).Content
+        $candidates = @([regex]::Matches($history, '(?i)Version\s*(?:<[^>]+>\s*)*(?<version>\d{4}\.\d+\.\d+)(?:\.\d+)?') |
+            ForEach-Object { [version]$_.Groups['version'].Value } | Where-Object Major -le $MaximumMajor | Sort-Object -Unique -Descending)
+        if (-not $candidates) { throw 'Foxit release history contains no recognizable versions.' }
 
         $latest = $null
         foreach ($ver in $candidates) {
             $base = "https://cdn01.foxitsoftware.com/product/phantomPDF/desktop/win/$ver/tools"
             $editorUri = "$base/Foxit%20PDF%20Editor_enu_admx%26adml.zip"
+            $readerUri = "$base/Foxit%20PDF%20Reader_enu_admx%26adml.zip"
             try {
-                $null = Invoke-WebRequest -UseDefaultCredentials -Uri $editorUri -Method Head -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
-                $latest = [PSCustomObject]@{ Version = $ver; URI = $editorUri; Base = $base }
+                foreach ($uri in @($editorUri, $readerUri)) {
+                    # Foxit's signed CDN redirects reject HEAD even when GET succeeds.
+                    $probe = Invoke-WebRequest -UseDefaultCredentials -Uri $uri -Method Get -Headers @{ Range = 'bytes=0-3' } -UseBasicParsing -TimeoutSec 15 -ErrorAction Stop
+                    if ($probe.StatusCode -notin @(200, 206)) { throw "Unexpected Foxit response: $($probe.StatusCode)." }
+                    $signature = if ($probe.Content -is [byte[]]) { [Text.Encoding]::ASCII.GetString($probe.Content, 0, [Math]::Min(4, $probe.Content.Length)) } else { [string]$probe.Content }
+                    if (-not $signature.StartsWith('PK')) { throw 'Foxit returned a non-ZIP response.' }
+                }
+                $latest = @{ Version = $ver.ToString(); URI = $editorUri; ReaderURI = $readerUri }
                 break
             } catch {
                 Write-Verbose "Foxit ADMX probe missed version '$ver': $($_.Exception.Message)"
@@ -3549,8 +3684,7 @@ function Get-EvergreenAdmxFoxit {
             throw 'Unable to locate a Foxit PDF ADMX tools package on the Foxit CDN.'
         }
 
-        $readerUri = "$($latest.Base)/Foxit%20PDF%20Reader_enu_admx%26adml.zip"
-        return @{ Version = $latest.Version; URI = $latest.URI; ReaderURI = $readerUri }
+        return $latest
     } catch {
         Throw $_
     }
@@ -4206,23 +4340,16 @@ function Get-EvergreenAdmxABBYYFineReader {
     #>
 
     try {
-        $pageUrl = 'https://help.abbyy.com/en-us/finereader/16/admin_guide/gpo_domain/'
-        $admxUri = 'https://support.abbyy.com/hc/en-us/article_attachments/8277004669075/FineReader16.admx'
-        $admlUri = 'https://support.abbyy.com/hc/en-us/article_attachments/8277017934739/FineReader16.adml'
-
-        try {
-            $web = (Invoke-WebRequest -UseDefaultCredentials -Uri $pageUrl -UseBasicParsing).Content
-            $admxMatch = [regex]::Match($web, 'https://support\.abbyy\.com/hc/[^"''\s<>]+FineReader16\.admx')
-            $admlMatch = [regex]::Match($web, 'https://support\.abbyy\.com/hc/[^"''\s<>]+FineReader16\.adml')
-            if ($admxMatch.Success) { $admxUri = $admxMatch.Value }
-            if ($admlMatch.Success) { $admlUri = $admlMatch.Value }
-        } catch {
-            Write-Verbose "ABBYY page scrape failed; using known attachment URLs: $($_.Exception.Message)"
-        }
+        $major = (Get-EvergreenAdmxReleaseCatalog).ABBYYMajor
+        $pageUrl = "https://help.abbyy.com/en-us/finereader/$major/admin_guide/gpo_domain/"
+        $web = (Invoke-WebRequest -UseDefaultCredentials -Uri $pageUrl -UseBasicParsing -TimeoutSec 30 -ErrorAction Stop).Content
+        $admxUri = [regex]::Match($web, ('https://support\.abbyy\.com/hc/[^"''\s<>]+FineReader{0}\.admx' -f $major)).Value
+        $admlUri = [regex]::Match($web, ('https://support\.abbyy\.com/hc/[^"''\s<>]+FineReader{0}\.adml' -f $major)).Value
+        if (-not $admxUri -or -not $admlUri) { throw "ABBYY FineReader $major guide does not expose matching ADMX and ADML files." }
 
         $LastModifiedDate = (Resolve-Uri -Uri $admxUri).LastModified
         [version]$Version = $LastModifiedDate.ToString('yyyy.MM.dd')
-        return @{ Version = $Version.ToString(); URI = $admxUri; AdmlURI = $admlUri }
+        return @{ Version = "$major.$($Version.ToString())"; URI = $admxUri; AdmlURI = $admlUri }
     } catch {
         Throw $_
     }
@@ -4244,7 +4371,8 @@ function Invoke-EvergreenAdmxABBYYFineReader {
     $ProductName = 'ABBYY FineReader PDF'
     $ProductFolder = ''; if ($UseProductFolders) { $ProductFolder = "\$($ProductName)" }
 
-    if (-not $Version -or [version]$Evergreen.Version -gt [version]$Version) {
+    # Older records used only the date; migrate once to Major.Year.Month.Day.
+    if (-not $Version -or ([version]$Version).Major -ge 2000 -or [version]$Evergreen.Version -gt [version]$Version) {
         Write-Verbose "Found new version $($Evergreen.Version) for '$($ProductName)'"
 
         $TempFolder = "$($env:TEMP)\$($ProductName)"
@@ -4253,8 +4381,8 @@ function Invoke-EvergreenAdmxABBYYFineReader {
             if (Test-Path -Path $TempFolder) { Remove-Item -Path $TempFolder -Recurse -Force }
             $null = New-Item -Path (Join-Path $StagingFolder 'en-US') -ItemType Directory -Force
 
-            $OutAdmx = "$($WorkingDirectory)\downloads\FineReader16.admx"
-            $OutAdml = "$($WorkingDirectory)\downloads\FineReader16.adml"
+            $OutAdmx = Join-Path "$($WorkingDirectory)\downloads" ([uri]$Evergreen.URI).Segments[-1]
+            $OutAdml = Join-Path "$($WorkingDirectory)\downloads" ([uri]$Evergreen.AdmlURI).Segments[-1]
             Write-Verbose "Downloading '$($Evergreen.URI)' to '$($OutAdmx)'"
             Invoke-FileDownload -Uri $Evergreen.URI -OutFile $OutAdmx -UseDefaultCredentials
             Write-Verbose "Downloading '$($Evergreen.AdmlURI)' to '$($OutAdml)'"
@@ -4435,10 +4563,10 @@ function Invoke-EvergreenAdmxWindows {
         [string[]]$Languages = $null
     )
 
-    If ($WindowsVersion -eq 11 -or $WindowsVersion -eq 10) {
+    If ($WindowsVersion -lt 2000) {
         $id = Get-WindowsDownloadId -WindowsVersion $WindowsVersion -WindowsFeatureVersion $WindowsFeatureVersion
         $ProductName = "Microsoft Windows $($WindowsVersion) $($WindowsFeatureVersion)"
-    } elseif ($WindowsVersion -eq '2022' -or $WindowsVersion -eq '2025') {
+    } else {
         $id = Get-WindowsDownloadId -WindowsVersion $WindowsVersion
         $ProductName = "Microsoft Windows Server $($WindowsVersion)"
     }
@@ -5603,56 +5731,14 @@ if ($Include -notcontains 'Custom Policy Store') {
     Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'CustomPolicyStore' -AdmxData $admx
 }
 
-# Windows 10
-if ($Include -notcontains 'Windows 10') {
-    Write-Verbose "`nSkipping Windows 10"
-} else {
-    Write-Verbose "`nProcessing Admx files for Windows 10 $($WindowsFeatureVersion)"
-    $pkey = 'Windows10'
-    $admx = Invoke-EvergreenAdmxWindows -Version $AdmxVersions[$pkey].Version -PolicyStore $PolicyStore -WindowsFeatureVersion $WindowsFeatureVersion -WindowsVersion 10 -Languages $Languages
+# Windows families from the reviewed embedded catalog.
+foreach ($sku in ((Get-EvergreenAdmxReleaseCatalog).Windows.Version | Select-Object -Unique)) {
+    if ($Include -notcontains "Windows $sku") { continue }
+    $feature = if ($sku -eq $WindowsVersion) { $WindowsFeatureVersion } else { (Get-EvergreenAdmxWindowsRelease -WindowsVersion $sku).Feature }
+    Write-Verbose "`nProcessing Admx files for Windows $sku $feature"
+    $pkey = "Windows$sku"
+    $admx = Invoke-EvergreenAdmxWindows -Version $AdmxVersions[$pkey].Version -PolicyStore $PolicyStore -WindowsFeatureVersion $feature -WindowsVersion $sku -Languages $Languages
     Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey $pkey -AdmxData $admx
-}
-
-# Windows 11
-if ($Include -notcontains 'Windows 11') {
-    Write-Verbose "`nSkipping Windows 11"
-} else {
-    Write-Verbose "`nProcessing Admx files for Windows 11 $($WindowsFeatureVersion)"
-    $pkey = 'Windows11'
-    $admx = Invoke-EvergreenAdmxWindows -Version $AdmxVersions[$pkey].Version -PolicyStore $PolicyStore -WindowsFeatureVersion $WindowsFeatureVersion -WindowsVersion 11 -Languages $Languages
-    if ($null -ne $admx) {
-        Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey $pkey -AdmxData $admx
-    } else {
-        Write-Warning 'Failed to retrieve Windows 11 ADMX files. Skipping update.'
-    }
-}
-
-# Windows 2022
-if ($Include -notcontains 'Windows 2022') {
-    Write-Verbose "`nSkipping Windows Server 2022"
-} else {
-    Write-Verbose "`nProcessing Admx files for Windows Server 2022"
-    $pkey = 'Windows2022'
-    $admx = Invoke-EvergreenAdmxWindows -Version $AdmxVersions[$pkey].Version -PolicyStore $PolicyStore -WindowsVersion 2022 -Languages $Languages
-    if ($null -ne $admx) {
-        Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey $pkey -AdmxData $admx
-    } else {
-        Write-Warning 'Failed to retrieve Windows Server 2022 ADMX files. Skipping update.'
-    }
-}
-
-# Windows 2025
-if ($Include -notcontains 'Windows 2025') {
-    Write-Verbose "`nSkipping Windows Server 2025"
-} else {
-    Write-Verbose "`nProcessing Admx files for Windows Server 2025"
-    $pkey = 'Windows2025'
-    $admx = Invoke-EvergreenAdmxWindows -Version $AdmxVersions[$pkey].Version -PolicyStore $PolicyStore -WindowsVersion 2025 -Languages $Languages
-    if ($null -ne $admx) {
-        Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey $pkey -AdmxData $admx
-    } else {
-        Write-Warning 'Failed to retrieve Windows Server 2025 ADMX files. Skipping update.'
-    }
 }
 
 # Microsoft Edge
@@ -5867,6 +5953,15 @@ if ($Include -notcontains 'Adobe DC') {
     Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'AdobeDC' -AdmxData $admx
 }
 
+# Snagit
+if ($Include -notcontains 'Snagit') {
+    Write-Verbose "`nSkipping Snagit"
+} else {
+    Write-Verbose "`nProcessing Admx files for Snagit"
+    $admx = Invoke-EvergreenAdmxSnagit -Version $AdmxVersions.Snagit.Version -PolicyStore $PolicyStore -Languages $Languages
+    Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'Snagit' -AdmxData $admx
+}
+
 # Security ADMX
 if ($Include -notcontains 'Security ADMX') {
     Write-Verbose "`nSkipping Security ADMX"
@@ -6010,6 +6105,15 @@ if ($Include -notcontains 'WSL') {
     Write-Verbose "`nProcessing Admx files for WSL"
     $admx = Invoke-EvergreenAdmxWSL -Version $AdmxVersions.WSL.Version -PolicyStore $PolicyStore -Languages $Languages
     Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'WSL' -AdmxData $admx
+}
+
+# Lenovo Commercial Vantage
+if ($Include -notcontains 'Lenovo Commercial Vantage') {
+    Write-Verbose "`nSkipping Lenovo Commercial Vantage"
+} else {
+    Write-Verbose "`nProcessing Admx files for Lenovo Commercial Vantage"
+    $admx = Invoke-EvergreenAdmxLenovoCommercialVantage -Version $AdmxVersions.LenovoCommercialVantage.Version -CurrentUri $AdmxVersions.LenovoCommercialVantage.URI -PolicyStore $PolicyStore -Languages $Languages
+    Update-AdmxVersion -AdmxVersions ([ref]$AdmxVersions) -ProductKey 'LenovoCommercialVantage' -AdmxData $admx
 }
 
 # Lenovo Dock Manager

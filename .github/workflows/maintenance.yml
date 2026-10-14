@@ -1,0 +1,76 @@
+name: Dependency and product discovery
+
+on:
+  schedule:
+    - cron: '30 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Discover and validate updates without changing the repository or opening PRs
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: maintenance-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    if: github.event_name == 'workflow_dispatch' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: windows-2025
+    timeout-minutes: 15
+    outputs:
+      changed: ${{ steps.discover.outputs.changed }}
+      matrix: ${{ steps.discover.outputs.matrix }}
+    steps:
+      - name: Checkout trusted maintenance code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Discover stable updates
+        id: discover
+        shell: pwsh
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: ./.github/scripts/Discover-Maintenance.ps1 -DryRun:($env:DRY_RUN -eq 'true')
+      - name: Upload proposed changes
+        if: ${{ !cancelled() && steps.discover.outputs.changed == 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: maintenance-proposals
+          include-hidden-files: true
+          path: ${{ runner.temp }}/maintenance-proposals
+          retention-days: 1
+
+  publish-pr:
+    needs: discover
+    # A vendor discovery failure must not prevent unrelated dependency PRs.
+    if: always() && !cancelled() && needs.discover.outputs.changed == 'true' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.discover.outputs.matrix || '{"kind":["none"]}') }}
+    steps:
+      - name: Checkout trusted publisher code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download changes from this workflow run
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: maintenance-proposals
+          path: ${{ runner.temp }}/maintenance
+      - name: Open or refresh maintenance PR and run CI
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARTIFACT_PATH: ${{ runner.temp }}/maintenance/${{ matrix.kind }}
+        run: ./.github/scripts/Publish-MaintenancePR.ps1 -ArtifactPath $env:ARTIFACT_PATH

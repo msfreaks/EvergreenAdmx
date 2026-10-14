@@ -9,24 +9,60 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   full-matrix:
     name: Full product matrix
-    runs-on: windows-latest
+    runs-on: windows-2025
     timeout-minutes: 180
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Load dependency versions
+        shell: pwsh
+        run: ./.github/scripts/Set-DependencyEnvironment.ps1
+
+      - name: Cache Pester
+        id: modules
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .psmodules
+          key: psmodules-${{ runner.os }}-pester-${{ env.PESTER_VERSION }}
 
       - name: Install Pester
+        if: steps.modules.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
-          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-          Install-Module -Name Pester -MinimumVersion 5.5.0 -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck
+          $ErrorActionPreference = 'Stop'
+          $null = New-Item -Path .psmodules -ItemType Directory -Force
+          Save-PSResource -Name Pester -Version $env:PESTER_VERSION -Path .psmodules -Repository PSGallery -TrustRepository
+
+      - name: Ensure installer extraction tools
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+            Install-PSResource -Name Microsoft.WinGet.Client -Version $env:WINGET_CLIENT_VERSION -Scope CurrentUser -Repository PSGallery -TrustRepository
+            Import-Module Microsoft.WinGet.Client -RequiredVersion $env:WINGET_CLIENT_VERSION
+            Repair-WinGetPackageManager -AllUsers -Force -Latest
+            $wingetPath = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps'
+            $env:PATH = "$wingetPath;$env:PATH"
+            $wingetPath | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          }
+          winget --version
+          if ($LASTEXITCODE -ne 0) { throw 'WinGet is unavailable for installer-based products.' }
+          Get-Command 7z -ErrorAction Stop | Out-Null
 
       - name: Pester Nightly tests
         shell: pwsh
         run: |
+          Import-Module "./.psmodules/Pester/$env:PESTER_VERSION/Pester.psd1"
           $config = New-PesterConfiguration
           $config.Run.Path = '.\tests\EvergreenAdmx.Nightly.Tests.ps1'
           $config.Run.Exit = $true
@@ -37,9 +73,9 @@ jobs:
           Invoke-Pester -Configuration $config
 
       - name: Upload nightly test results
-        if: always()
-        uses: actions/upload-artifact@v4
+        if: always() && !cancelled()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: pester-nightly-results
-          path: |
-            tests/TestResults.Nightly.xml
+          path: tests/TestResults.Nightly.xml
+          retention-days: 7

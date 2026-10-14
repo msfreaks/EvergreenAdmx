@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses a `YYMM.patch` release versioning scheme.
 
+## [2610.0] - Unreleased
+
+### Added
+
+- Added weekly Dependabot updates for SHA-pinned GitHub Actions and a scheduled PowerShell Gallery updater with one dependency manifest shared by all workflows
+- Added automatic patch/minor dependency merges gated by Markdownlint and both PowerShell unit jobs; major updates and discovered product families require human review
+- Added automatic discovery of newer Windows families, ABBYY FineReader majors, and Foxit annual families, proposing catalog/default changes and documentation in tested PRs; Microsoft index publication lag is documented
+- Added Pester coverage for dependency classification, future Windows families, source validation, Microsoft/ABBYY discovery, and Foxit template package selection
+- Added opt-in Lenovo Commercial Vantage ADMX support: dynamically discovers the current Enterprise deployment ZIP, extracts policy files only, and detects same-version package rebuilds using the stored download URL ([#84](https://github.com/msfreaks/EvergreenAdmx/issues/84))
+- Added Lenovo Pester coverage for metadata discovery, aliases, explicit inclusion, selective extraction, language fallback, policy store copying, revision stamping, version/rebuild checks, and failure cleanup; nightly checks verify its templates and version record
+- Added community Snagit 2025 / 2026 ADMX from [systmworks/ADMX-Snagit](https://github.com/systmworks/ADMX-Snagit), including the `TechSmith Snagit` alias and language fallback ([#90](https://github.com/msfreaks/EvergreenAdmx/issues/90))
+- Added Windows 11 26H2 ADMX support using official Microsoft download ID `108847` ([#91](https://github.com/msfreaks/EvergreenAdmx/issues/91))
+- Added regression tests for typed `-Include` resolution, default products, 26H2 selection, and Snagit release/extraction behavior; CI now tests PowerShell 7 and Windows PowerShell 5.1
+
+### Changed
+
+- Reduced maintenance to one discovery runner and publisher jobs only for categories with changes; unchanged PRs retain their commits and CI results
+- Required reusable release smoke tests to pass against the same commit before real PowerShell Gallery uploads; publishing dry runs remain lightweight
+- Clarified the README quick-start defaults as Windows 11 26H2
+- Centralized reviewed Windows release mappings and ABBYY major selection inside the standalone script; Windows validation, product aliases, defaults, and dispatch consume that catalog
+- Removed duplicated module version pins from workflows and local testing instructions; the maintenance publisher uses scoped write permissions and dispatches CI for the exact proposed commit
+- Enabled required CI checks and force-push/deletion protection on `main`, Dependabot security updates, secret scanning with push protection, read-only default workflow tokens, auto-merge, and merged-branch cleanup on the maintained fork
+- ABBYY version records now include the approved major and attachment date, with one-time migration of older date-only records
+- Windows 11 now defaults to `26H2`; Windows 10 continues to default to `22H2`, and explicit older supported feature versions remain available
+- Updated script metadata to `2610.0` so release tag validation matches the upcoming release
+- Pinned GitHub Actions to current stable commit SHAs, including checkout 7.0.1, upload-artifact 7.0.2, cache 6.1.0, and markdownlint-cli2-action 24.2.0
+- Pinned Pester to 6.2.0 and PSScriptAnalyzer to 1.25.0; cached modules skip repeated Gallery downloads, and test jobs use PSResourceGet for module acquisition
+- Added workflow concurrency controls, bounded timeouts, short artifact retention, and checkouts without persisted credentials; release smoke tests now check out the release tag
+- Nightly tests stop on processing errors and include verbose product diagnostics; Gallery publication checks query immediately before waiting for propagation
+- Nightly checks ensure WinGet and 7-Zip are available before testing installer-based products, bootstrapping WinGet only when missing
+
+### Fixed
+
+- Replaced Foxit's manually maintained candidate version list and failing HEAD probes with release-history discovery and ranged GET checks for both Reader and Editor templates
+- Removed stale ABBYY attachment URL fallbacks; missing or mismatched templates now fail clearly, and filenames follow the reviewed major
+- Read Windows package versions from structured Download Center metadata, including single-component versions, before storing a valid version record
+- Discover replacement Windows download IDs for existing editions using publication/version metadata, without downgrading packages or changing older edition defaults
+- Explicitly load both ZIP compression assemblies for Lenovo extraction and fixtures so Windows PowerShell 5.1 can resolve the archive types
+- Fixed all products being skipped when `-Include` contains multiple entries or uses defaults: the resolver returned a nested array that the script's `[string[]]` variable converted to one space-separated string ([#89](https://github.com/msfreaks/EvergreenAdmx/issues/89)); this also caused [nightly run 37200731000](https://github.com/JonathanPitre/EvergreenAdmx/actions/runs/37200731000) to produce zero ADMX files
+- Preserved the PowerShell 7 publishing fix for the unavailable legacy NuGet provider feed ([#87](https://github.com/msfreaks/EvergreenAdmx/issues/87)); PowerShellGet 2.2.5 remains the supported publishing dependency
+
 ## [2608.0] 2026-08-01
 
 ### Added
